@@ -1,3 +1,24 @@
+Metadata-Version: 2.4
+Name: mcp-knowledge-hub
+Version: 0.1.0
+Summary: Base inicial para um hub de conhecimento com FastAPI, pgvector e MCP
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: fastapi>=0.115
+Requires-Dist: uvicorn[standard]>=0.30
+Requires-Dist: pydantic>=2.8
+Requires-Dist: pydantic-settings>=2.4
+Requires-Dist: sqlalchemy[asyncio]>=2.0
+Requires-Dist: asyncpg>=0.29
+Requires-Dist: pgvector>=0.3
+Requires-Dist: httpx>=0.27
+Requires-Dist: python-multipart>=0.0.9
+Requires-Dist: pypdf>=4.3
+Requires-Dist: mcp>=1.0.0
+Provides-Extra: dev
+Requires-Dist: pytest>=8.3; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.24; extra == "dev"
+
 # MCP Knowledge Hub
 
 Base inicial de um hub de conhecimento com:
@@ -31,27 +52,13 @@ docker-compose up -d postgres
 
 O banco sobe em `localhost:5432` com a extensão `vector` habilitada.
 
-2. Para subir banco e backend via Docker:
-
-```bash
-npm run dev:up
-```
-
-Ou somente o backend, assumindo o banco ativo:
-
-```bash
-npm run backend:up
-```
-
-A API sobe em `http://localhost:8000`.
-
-3. Instale as dependências Python com `uv`:
+2. Instale as dependências Python com `uv`:
 
 ```bash
 uv sync
 ```
 
-4. Rode a API localmente, fora do Docker:
+3. Rode a API:
 
 ```bash
 uv run backend
@@ -81,13 +88,13 @@ curl -X POST http://localhost:8000/api/v1/knowledge/answer \
   -d '{"query":"resuma o documento", "limit":5}'
 ```
 
-5. Rode o MCP Server:
+4. Rode o MCP Server:
 
 ```bash
 uv run mcp-server
 ```
 
-6. No frontend:
+5. No frontend:
 
 ```bash
 cd frontend

@@ -1,0 +1,17 @@
+.git
+.venv
+__pycache__
+.pytest_cache
+.mypy_cache
+.ruff_cache
+*.pyc
+*.pyo
+*.pyd
+.env
+node_modules
+frontend/node_modules
+frontend/dist
+mcp_knowledge_hub.egg-info
+dist
+build
+*.sqlite3

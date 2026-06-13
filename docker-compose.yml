@@ -1,4 +1,40 @@
 services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mcp-knowledge-hub-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      APP_NAME: "MCP Knowledge Hub"
+      ENVIRONMENT: development
+      FRONTEND_ORIGIN: "http://localhost:5173"
+      POSTGRES_DSN: "postgresql+asyncpg://postgres:postgres@postgres:5432/knowledge_hub"
+      LLM_PROVIDER: "${LLM_PROVIDER:-local}"
+      LOCAL_LLM_BASE_URL: "${LOCAL_LLM_BASE_URL:-http://host.docker.internal:11434/v1}"
+      LOCAL_LLM_MODEL: "${LOCAL_LLM_MODEL:-llama3.1}"
+      API_LLM_BASE_URL: "${API_LLM_BASE_URL:-https://api.openai.com/v1}"
+      API_LLM_MODEL: "${API_LLM_MODEL:-gpt-4.1-mini}"
+      API_KEY: "${API_KEY:-}"
+      EMBEDDING_MODEL: "${EMBEDDING_MODEL:-text-embedding-3-small}"
+      VECTOR_DIM: "${VECTOR_DIM:-1536}"
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health').read()",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   postgres:
     image: pgvector/pgvector:pg16
     container_name: mcp-knowledge-hub-postgres

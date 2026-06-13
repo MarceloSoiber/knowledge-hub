@@ -1,0 +1,3 @@
+[console_scripts]
+backend = backend.app.main:main
+mcp-server = mcp_server.server:main

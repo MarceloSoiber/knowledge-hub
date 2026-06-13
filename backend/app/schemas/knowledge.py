@@ -24,3 +24,20 @@ class KnowledgeSearchResponse(BaseModel):
     query: str
     limit: int
     results: list[KnowledgeChunkRead]
+
+
+class KnowledgeUploadResponse(BaseModel):
+    source_id: int
+    title: str
+    chunks_created: int
+
+
+class KnowledgeAnswerRequest(BaseModel):
+    query: str = Field(min_length=1)
+    limit: int = Field(default=5, ge=1, le=20)
+
+
+class KnowledgeAnswerResponse(BaseModel):
+    query: str
+    answer: str
+    sources: list[KnowledgeChunkRead]

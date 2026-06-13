@@ -19,7 +19,9 @@ class DocumentSource(Base):
     uri: Mapped[str] = mapped_column(String(1024), nullable=False, unique=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    chunks: Mapped[list["KnowledgeChunk"]] = relationship(back_populates="source")
+    chunks: Mapped[list["KnowledgeChunk"]] = relationship(
+        back_populates="source", cascade="all, delete-orphan"
+    )
 
 
 class KnowledgeChunk(Base):
@@ -29,7 +31,9 @@ class KnowledgeChunk(Base):
     source_id: Mapped[int] = mapped_column(ForeignKey("document_sources.id"), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True)
-    embedding: Mapped[list[float] | None] = mapped_column(Vector(EMBEDDING_DIMENSION), nullable=True)
+    embedding: Mapped[list[float] | None] = mapped_column(
+        Vector(EMBEDDING_DIMENSION), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     source: Mapped[DocumentSource] = relationship(back_populates="chunks")
