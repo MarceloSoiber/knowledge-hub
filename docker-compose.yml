@@ -14,13 +14,15 @@ services:
       FRONTEND_ORIGIN: "http://localhost:5173"
       POSTGRES_DSN: "postgresql+asyncpg://postgres:postgres@postgres:5432/knowledge_hub"
       LLM_PROVIDER: "${LLM_PROVIDER:-local}"
-      LOCAL_LLM_BASE_URL: "${LOCAL_LLM_BASE_URL:-http://host.docker.internal:11434/v1}"
-      LOCAL_LLM_MODEL: "${LOCAL_LLM_MODEL:-llama3.1}"
+      LOCAL_LLM_BASE_URL: "${LOCAL_LLM_BASE_URL:-http://host.docker.internal:1234}"
+      LOCAL_LLM_MODEL: "${LOCAL_LLM_MODEL:-gemma-4-12b}"
       API_LLM_BASE_URL: "${API_LLM_BASE_URL:-https://api.openai.com/v1}"
       API_LLM_MODEL: "${API_LLM_MODEL:-gpt-4.1-mini}"
       API_KEY: "${API_KEY:-}"
       EMBEDDING_MODEL: "${EMBEDDING_MODEL:-text-embedding-3-small}"
       VECTOR_DIM: "${VECTOR_DIM:-1536}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "8000:8000"
     healthcheck:

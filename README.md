@@ -45,6 +45,16 @@ npm run backend:up
 
 A API sobe em `http://localhost:8000`.
 
+Para usar LM Studio localmente, inicie o server em `http://127.0.0.1:1234`.
+Dentro do container, o backend acessa esse server por
+`http://host.docker.internal:1234`. O modelo inicial configurado e
+`gemma-4-12b`.
+
+Para gerar embeddings localmente, o servidor OpenAI-compatible tambem precisa
+responder em `/v1/embeddings` para o modelo definido em `EMBEDDING_MODEL`.
+Se o modelo de chat nao suportar embeddings, carregue um modelo de embeddings
+no LM Studio e ajuste `EMBEDDING_MODEL`/`VECTOR_DIM`.
+
 3. Instale as dependências Python com `uv`:
 
 ```bash

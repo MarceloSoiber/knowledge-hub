@@ -18,6 +18,13 @@ class EmbeddingClient:
         raise NotImplementedError
 
 
+def openai_base_url(base_url: str) -> str:
+    clean_base_url = base_url.rstrip("/")
+    if clean_base_url.endswith("/v1"):
+        return clean_base_url
+    return f"{clean_base_url}/v1"
+
+
 class OpenAIEmbeddingClient(EmbeddingClient):
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
@@ -26,11 +33,17 @@ class OpenAIEmbeddingClient(EmbeddingClient):
         if not texts:
             return []
 
-        if not self.settings.api_key:
+        if self.settings.llm_provider == "local":
+            base_url = self.settings.local_llm_base_url
+            headers = {}
+        else:
+            base_url = self.settings.api_llm_base_url
+            headers = {"Authorization": f"Bearer {self.settings.api_key}"}
+
+        if self.settings.llm_provider != "local" and not self.settings.api_key:
             raise EmbeddingConfigurationError("API_KEY is required to generate embeddings.")
 
-        url = f"{self.settings.api_llm_base_url.rstrip('/')}/embeddings"
-        headers = {"Authorization": f"Bearer {self.settings.api_key}"}
+        url = f"{openai_base_url(base_url)}/embeddings"
         payload = {"model": self.settings.embedding_model, "input": texts}
 
         async with httpx.AsyncClient(timeout=60) as client:

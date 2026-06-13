@@ -165,7 +165,12 @@ async def test_answer_knowledge_uses_search_sources() -> None:
 @pytest.mark.asyncio
 async def test_openai_embedding_client_requires_api_key() -> None:
     client = OpenAIEmbeddingClient(
-        Settings(api_key="", api_llm_base_url="https://api.openai.com/v1", vector_dim=3)
+        Settings(
+            llm_provider="api",
+            api_key="",
+            api_llm_base_url="https://api.openai.com/v1",
+            vector_dim=3,
+        )
     )
 
     with pytest.raises(EmbeddingConfigurationError):

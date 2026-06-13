@@ -19,6 +19,13 @@ class AnswerClient:
         raise NotImplementedError
 
 
+def openai_base_url(base_url: str) -> str:
+    clean_base_url = base_url.rstrip("/")
+    if clean_base_url.endswith("/v1"):
+        return clean_base_url
+    return f"{clean_base_url}/v1"
+
+
 class OpenAICompatibleAnswerClient(AnswerClient):
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
@@ -59,7 +66,7 @@ class OpenAICompatibleAnswerClient(AnswerClient):
             "temperature": 0.2,
         }
 
-        url = f"{base_url.rstrip('/')}/chat/completions"
+        url = f"{openai_base_url(base_url)}/chat/completions"
         async with httpx.AsyncClient(timeout=60) as client:
             response = await client.post(url, headers=headers, json=payload)
 
