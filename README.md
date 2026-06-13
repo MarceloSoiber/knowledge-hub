@@ -23,6 +23,14 @@ Base inicial de um hub de conhecimento com:
 docker compose up -d postgres
 ```
 
+Se o plugin `docker compose` não estiver instalado, use:
+
+```bash
+docker-compose up -d postgres
+```
+
+O banco sobe em `localhost:5432` com a extensão `vector` habilitada.
+
 2. Instale as dependências Python com `uv`:
 
 ```bash

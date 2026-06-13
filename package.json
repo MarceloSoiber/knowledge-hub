@@ -1,0 +1,11 @@
+{
+  "name": "mcp-knowledge-hub",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "db:up": "docker-compose up -d postgres"
+  },
+  "devDependencies": {
+    "ntl": "^5.1.0"
+  }
+}
