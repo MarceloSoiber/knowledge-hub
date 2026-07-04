@@ -67,8 +67,11 @@ class OpenAICompatibleAnswerClient(AnswerClient):
         }
 
         url = f"{openai_base_url(base_url)}/chat/completions"
-        async with httpx.AsyncClient(timeout=60) as client:
-            response = await client.post(url, headers=headers, json=payload)
+        try:
+            async with httpx.AsyncClient(timeout=60) as client:
+                response = await client.post(url, headers=headers, json=payload)
+        except httpx.RequestError as exc:
+            raise LLMError(f"Could not connect to LLM provider at {url}.") from exc
 
         if response.status_code >= 400:
             raise LLMError(f"LLM provider returned HTTP {response.status_code}.")

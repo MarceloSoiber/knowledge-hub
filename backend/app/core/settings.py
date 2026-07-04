@@ -17,13 +17,13 @@ class Settings(BaseSettings):
 
     llm_provider: str = Field(default="local")
     local_llm_base_url: str = Field(default="http://127.0.0.1:1234")
-    local_llm_model: str = Field(default="gemma-4-12b")
+    local_llm_model: str = Field(default="gemma-4-12b-it")
     api_llm_base_url: str = Field(default="https://api.openai.com/v1")
     api_llm_model: str = Field(default="gpt-4.1-mini")
     api_key: str = Field(default="")
 
-    embedding_model: str = Field(default="text-embedding-3-small")
-    vector_dim: int = Field(default=1536)
+    embedding_model: str = Field(default="text-embedding-nomic-embed-text-v1.5")
+    vector_dim: int = Field(default=768)
 
 
 @lru_cache(maxsize=1)

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...db.session import get_session
@@ -39,6 +39,7 @@ async def knowledge_search(
             session=session,
             query=payload.query,
             limit=payload.limit,
+            category=payload.category,
             embedding_client=build_embedding_client(),
         )
     except EmbeddingConfigurationError as exc:
@@ -57,6 +58,7 @@ async def knowledge_search(
 )
 async def upload_knowledge_file(
     file: UploadFile = File(...),
+    category: str = Form(..., min_length=1, max_length=100),
     session: AsyncSession = Depends(get_session),
 ) -> KnowledgeUploadResponse:
     content = await file.read()
@@ -66,6 +68,7 @@ async def upload_knowledge_file(
             session=session,
             filename=file.filename or "upload",
             content=content,
+            category=category,
             embedding_client=build_embedding_client(),
         )
     except FileTooLargeError as exc:
@@ -84,6 +87,7 @@ async def upload_knowledge_file(
     return KnowledgeUploadResponse(
         source_id=source.id,
         title=source.title,
+        category=source.category,
         chunks_created=chunks_created,
     )
 
@@ -98,6 +102,7 @@ async def knowledge_answer(
             session=session,
             query=payload.query,
             limit=payload.limit,
+            category=payload.category,
             embedding_client=build_embedding_client(),
             answer_client=build_answer_client(),
         )

@@ -92,12 +92,17 @@ async def ingest_uploaded_file(
     session: AsyncSession,
     filename: str,
     content: bytes,
+    category: str,
     embedding_client: EmbeddingClient,
 ) -> tuple[DocumentSource, int]:
+    normalized_category = category.strip()
+    if not normalized_category:
+        raise KnowledgeIngestionError("Category must not be empty.")
+
     text = extract_text(filename, content)
     chunks = chunk_text(text)
     embeddings = await embedding_client.embed_texts(chunks)
-    uri = f"upload:{filename}"
+    uri = f"upload:{normalized_category}:{filename}"
 
     existing_source = await session.scalar(
         select(DocumentSource).where(DocumentSource.uri == uri)
@@ -108,9 +113,15 @@ async def ingest_uploaded_file(
         )
         source = existing_source
         source.title = filename
+        source.category = normalized_category
         source.source_type = "upload"
     else:
-        source = DocumentSource(title=filename, source_type="upload", uri=uri)
+        source = DocumentSource(
+            title=filename,
+            category=normalized_category,
+            source_type="upload",
+            uri=uri,
+        )
         session.add(source)
         await session.flush()
 
@@ -119,7 +130,13 @@ async def ingest_uploaded_file(
             KnowledgeChunk(
                 source_id=source.id,
                 content=chunk,
-                metadata_json=json.dumps({"filename": filename, "chunk_index": index}),
+                metadata_json=json.dumps(
+                    {
+                        "filename": filename,
+                        "category": normalized_category,
+                        "chunk_index": index,
+                    }
+                ),
                 embedding=embedding,
             )
         )
@@ -134,6 +151,7 @@ async def search_knowledge(
     query: str,
     limit: int,
     embedding_client: EmbeddingClient,
+    category: str | None = None,
 ) -> list[KnowledgeChunkRead]:
     query_embedding = (await embedding_client.embed_texts([query]))[0]
     distance = KnowledgeChunk.embedding.cosine_distance(query_embedding)
@@ -145,10 +163,12 @@ async def search_knowledge(
             KnowledgeChunk.content,
             distance.label("distance"),
         )
+        .join(DocumentSource, KnowledgeChunk.source_id == DocumentSource.id)
         .where(KnowledgeChunk.embedding.is_not(None))
-        .order_by(distance)
-        .limit(limit)
     )
+    if category is not None:
+        statement = statement.where(DocumentSource.category == category.strip())
+    statement = statement.order_by(distance).limit(limit)
 
     rows = (await session.execute(statement)).all()
     return [
@@ -168,8 +188,11 @@ async def answer_knowledge(
     limit: int,
     embedding_client: EmbeddingClient,
     answer_client: AnswerClient,
+    category: str | None = None,
 ) -> tuple[str, list[KnowledgeChunkRead]]:
-    sources = await search_knowledge(session, query, limit, embedding_client)
+    sources = await search_knowledge(
+        session, query, limit, embedding_client, category=category
+    )
     answer = await answer_client.answer(query, sources)
     return answer, sources
 
@@ -180,6 +203,7 @@ async def list_sources(session: AsyncSession) -> list[dict[str, str | int]]:
             select(
                 DocumentSource.id,
                 DocumentSource.title,
+                DocumentSource.category,
                 DocumentSource.source_type,
                 DocumentSource.uri,
             )
@@ -191,6 +215,7 @@ async def list_sources(session: AsyncSession) -> list[dict[str, str | int]]:
         {
             "id": row.id,
             "title": row.title,
+            "category": row.category,
             "source_type": row.source_type,
             "uri": row.uri,
         }

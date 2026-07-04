@@ -117,18 +117,26 @@ def test_chunk_text_uses_overlap() -> None:
 
 @pytest.mark.asyncio
 async def test_ingest_uploaded_file_replaces_existing_source() -> None:
-    source = DocumentSource(id=7, title="old.md", source_type="upload", uri="upload:notes.md")
+    source = DocumentSource(
+        id=7,
+        title="old.md",
+        category="old",
+        source_type="upload",
+        uri="upload:manuals:notes.md",
+    )
     session = FakeSession(existing_source=source)
 
     updated_source, chunks_created = await ingest_uploaded_file(
         session=session,
         filename="notes.md",
         content=b"new content",
+        category="manuals",
         embedding_client=FakeEmbeddingClient(),
     )
 
     assert updated_source.id == 7
     assert updated_source.title == "notes.md"
+    assert updated_source.category == "manuals"
     assert chunks_created == 1
     assert session.deleted_old_chunks is True
     assert session.committed is True

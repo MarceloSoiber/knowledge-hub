@@ -7,7 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .base import Base
 
 
-EMBEDDING_DIMENSION = 1536
+EMBEDDING_DIMENSION = 768
 
 
 class DocumentSource(Base):
@@ -15,6 +15,9 @@ class DocumentSource(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
+    category: Mapped[str] = mapped_column(
+        String(100), nullable=False, default="uncategorized", server_default="uncategorized"
+    )
     source_type: Mapped[str] = mapped_column(String(50), nullable=False, default="file")
     uri: Mapped[str] = mapped_column(String(1024), nullable=False, unique=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

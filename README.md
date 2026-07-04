@@ -46,14 +46,12 @@ npm run backend:up
 A API sobe em `http://localhost:8000`.
 
 Para usar LM Studio localmente, inicie o server em `http://127.0.0.1:1234`.
-Dentro do container, o backend acessa esse server por
-`http://host.docker.internal:1234`. O modelo inicial configurado e
-`gemma-4-12b`.
+O backend usa `network_mode: host`, entao acessa o LM Studio no mesmo endereco.
+O modelo de chat inicial configurado e `gemma-4-12b-it`.
 
 Para gerar embeddings localmente, o servidor OpenAI-compatible tambem precisa
-responder em `/v1/embeddings` para o modelo definido em `EMBEDDING_MODEL`.
-Se o modelo de chat nao suportar embeddings, carregue um modelo de embeddings
-no LM Studio e ajuste `EMBEDDING_MODEL`/`VECTOR_DIM`.
+responder em `/v1/embeddings`. A configuracao inicial usa
+`text-embedding-nomic-embed-text-v1.5` com `VECTOR_DIM=768`.
 
 3. Instale as dependências Python com `uv`:
 
@@ -72,7 +70,8 @@ uv run backend
 Ingestao de arquivo:
 
 ```bash
-curl -F "file=@./documento.pdf" http://localhost:8000/api/v1/knowledge/uploads
+curl -F "file=@./documento.pdf" -F "category=financeiro" \
+  http://localhost:8000/api/v1/knowledge/uploads
 ```
 
 Busca semantica:
