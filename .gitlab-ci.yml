@@ -1,0 +1,19 @@
+ stages:
+    - deploy
+
+  deploy:
+    stage: deploy
+    tags:
+      - docker-deploy
+    resource_group: production
+    variables:
+      COMPOSE_PROJECT_NAME: mcp-knowledge-hub
+    script:
+      - docker compose config --quiet
+      - docker compose up -d --build --remove-orphans
+      - docker compose ps
+      - curl --fail --retry 15 --retry-delay 2 http://127.0.0.1:8000/health
+    environment:
+      name: production
+    rules:
+      - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
