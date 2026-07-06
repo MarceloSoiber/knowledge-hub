@@ -1,3 +1,6 @@
+import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -6,11 +9,21 @@ from .api.routes.knowledge import router as knowledge_router
 from .core.settings import get_settings
 from .db.init import init_db
 
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    logger.info("Initializing database")
+    await init_db()
+    logger.info("Database initialization completed")
+    yield
+
 
 def create_app() -> FastAPI:
     settings = get_settings()
 
-    app = FastAPI(title=settings.app_name, version="0.1.0")
+    app = FastAPI(title=settings.app_name, version="0.1.0", lifespan=lifespan)
 
     app.add_middleware(
         CORSMiddleware,
@@ -22,10 +35,6 @@ def create_app() -> FastAPI:
 
     app.include_router(health_router)
     app.include_router(knowledge_router, prefix="/api/v1")
-
-    @app.on_event("startup")
-    async def startup() -> None:
-        await init_db()
 
     @app.get("/")
     async def root() -> dict[str, str]:
