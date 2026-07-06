@@ -45,8 +45,18 @@ npm run backend:up
 
 A API sobe em `http://localhost:8000`.
 
+Em outra maquina da rede, acesse pelo IP do host Docker:
+
+```bash
+curl http://192.168.15.125:8000/health
+```
+
+O Compose publica a porta do backend com `8000:8000`. O IP interno do
+container nao deve ser usado para acesso externo.
+
 Para usar LM Studio localmente, inicie o server em `http://127.0.0.1:1234`.
-O backend usa `network_mode: host`, entao acessa o LM Studio no mesmo endereco.
+No Docker, o backend acessa esse server pelo endereco
+`http://host.docker.internal:1234`.
 O modelo de chat inicial configurado e `gemma-4-12b-it`.
 
 Para gerar embeddings localmente, o servidor OpenAI-compatible tambem precisa
