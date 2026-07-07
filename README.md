@@ -55,8 +55,9 @@ O Compose publica a porta do backend com `8000:8000`. O IP interno do
 container nao deve ser usado para acesso externo.
 
 Para usar LM Studio localmente, inicie o server em `http://127.0.0.1:1234`.
-No Docker, o backend acessa esse server pelo endereco
-`http://host.docker.internal:1234`.
+Se o LM Studio estiver em outra maquina da rede, configure
+`DOCKER_LOCAL_LLM_BASE_URL` no `.env` com o IP dessa maquina, por exemplo
+`http://192.168.15.114:1234`.
 O modelo de chat inicial configurado e `gemma-4-12b-it`.
 
 Para gerar embeddings localmente, o servidor OpenAI-compatible tambem precisa
