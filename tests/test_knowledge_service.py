@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import pytest
 from pydantic import ValidationError
 
+from backend.app.cli.config import generate_auth_token, validate_auth_token
 from backend.app.core.auth import is_valid_token
 from backend.app.core.settings import Settings
 from backend.app.db.models import DocumentSource
@@ -150,6 +151,17 @@ def test_token_auth_accepts_matching_bearer_token() -> None:
 def test_token_auth_is_disabled_without_configured_token() -> None:
     assert is_valid_token("", "") is True
     assert is_valid_token("anything", "") is True
+
+
+def test_auth_token_validation_accepts_generated_token() -> None:
+    token = generate_auth_token()
+
+    assert validate_auth_token(token) == token
+
+
+def test_auth_token_validation_rejects_paste_garbage() -> None:
+    with pytest.raises(ValueError):
+        validate_auth_token("valid-token" + "\x1b[200~" + "more-text")
 
 
 @pytest.mark.asyncio
