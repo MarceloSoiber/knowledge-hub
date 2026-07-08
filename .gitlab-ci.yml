@@ -8,6 +8,7 @@ deploy:
   resource_group: production
   variables:
     COMPOSE_PROJECT_NAME: mcp-knowledge-hub
+    DOCKER_LOCAL_LLM_BASE_URL: "http://192.168.15.114:1234"
   script:
     - docker compose config --quiet
     - docker compose up -d --build --remove-orphans
