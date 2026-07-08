@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import pytest
 from pydantic import ValidationError
 
+from backend.app.core.auth import is_valid_token
 from backend.app.core.settings import Settings
 from backend.app.db.models import DocumentSource
 from backend.app.schemas.knowledge import (
@@ -139,6 +140,16 @@ def test_knowledge_schemas_trim_and_reject_blank_values() -> None:
 
     with pytest.raises(ValidationError):
         KnowledgeUploadRequest(category="   ")
+
+
+def test_token_auth_accepts_matching_bearer_token() -> None:
+    assert is_valid_token("secret-token", "secret-token") is True
+    assert is_valid_token("wrong-token", "secret-token") is False
+
+
+def test_token_auth_is_disabled_without_configured_token() -> None:
+    assert is_valid_token("", "") is True
+    assert is_valid_token("anything", "") is True
 
 
 @pytest.mark.asyncio

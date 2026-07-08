@@ -8,7 +8,7 @@ pgvector>=0.3
 httpx>=0.27
 python-multipart>=0.0.9
 pypdf>=4.3
-mcp>=1.0.0
+mcp>=1.12.0
 
 [dev]
 pytest>=8.3

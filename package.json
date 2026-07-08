@@ -5,7 +5,8 @@
   "scripts": {
     "db:up": "docker-compose up -d postgres",
     "backend:up": "docker-compose up -d backend",
-    "dev:up": "docker-compose up -d postgres backend"
+    "mcp:up": "docker-compose up -d mcp",
+    "dev:up": "docker-compose up -d postgres backend mcp"
   },
   "devDependencies": {
     "ntl": "^5.1.0"

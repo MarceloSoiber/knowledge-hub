@@ -1,3 +1,4 @@
 [console_scripts]
 backend = backend.app.main:main
 mcp-server = mcp_server.server:main
+set-auth-token = backend.app.cli.config:set_auth_token_main

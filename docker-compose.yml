@@ -37,6 +37,39 @@ services:
       timeout: 5s
       retries: 10
 
+  mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mcp-knowledge-hub-mcp
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    command: ["mcp-server"]
+    environment:
+      APP_NAME: "MCP Knowledge Hub"
+      ENVIRONMENT: development
+      POSTGRES_DSN: "postgresql+asyncpg://postgres:postgres@postgres:5432/knowledge_hub"
+      LLM_PROVIDER: "${LLM_PROVIDER:-local}"
+      LOCAL_LLM_BASE_URL: "${DOCKER_LOCAL_LLM_BASE_URL:-http://host.docker.internal:1234}"
+      LOCAL_LLM_MODEL: "${LOCAL_LLM_MODEL:-gemma-4-12b-it}"
+      API_LLM_BASE_URL: "${API_LLM_BASE_URL:-https://api.openai.com/v1}"
+      API_LLM_MODEL: "${API_LLM_MODEL:-gpt-4.1-mini}"
+      API_KEY: "${API_KEY:-}"
+      EMBEDDING_MODEL: "${EMBEDDING_MODEL:-text-embedding-nomic-embed-text-v1.5}"
+      VECTOR_DIM: "${VECTOR_DIM:-768}"
+      MCP_HOST: "0.0.0.0"
+      MCP_PORT: "8001"
+      MCP_PUBLIC_URL: "${MCP_PUBLIC_URL:-http://192.0.2.10:8001}"
+      MCP_PATH: "${MCP_PATH:-/mcp}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${MCP_PORT:-8001}:8001"
+
   postgres:
     image: pgvector/pgvector:pg16
     container_name: mcp-knowledge-hub-postgres
