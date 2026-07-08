@@ -1,4 +1,14 @@
-from pydantic import BaseModel, Field
+from typing import Annotated
+
+from fastapi import Form
+from pydantic import BaseModel, Field, StringConstraints
+
+
+NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+CategoryStr = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=100),
+]
 
 
 class KnowledgeSourceRead(BaseModel):
@@ -17,9 +27,9 @@ class KnowledgeChunkRead(BaseModel):
 
 
 class KnowledgeSearchRequest(BaseModel):
-    query: str = Field(min_length=1)
+    query: NonEmptyStr
     limit: int = Field(default=5, ge=1, le=50)
-    category: str | None = Field(default=None, min_length=1, max_length=100)
+    category: CategoryStr | None = None
 
 
 class KnowledgeSearchResponse(BaseModel):
@@ -35,10 +45,18 @@ class KnowledgeUploadResponse(BaseModel):
     chunks_created: int
 
 
+class KnowledgeUploadRequest(BaseModel):
+    category: CategoryStr
+
+    @classmethod
+    def as_form(cls, category: Annotated[str, Form(...)]) -> "KnowledgeUploadRequest":
+        return cls(category=category)
+
+
 class KnowledgeAnswerRequest(BaseModel):
-    query: str = Field(min_length=1)
+    query: NonEmptyStr
     limit: int = Field(default=5, ge=1, le=20)
-    category: str | None = Field(default=None, min_length=1, max_length=100)
+    category: CategoryStr | None = None
 
 
 class KnowledgeAnswerResponse(BaseModel):

@@ -3,10 +3,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import pytest
+from pydantic import ValidationError
 
 from backend.app.core.settings import Settings
 from backend.app.db.models import DocumentSource
-from backend.app.schemas.knowledge import KnowledgeChunkRead
+from backend.app.schemas.knowledge import (
+    KnowledgeAnswerRequest,
+    KnowledgeChunkRead,
+    KnowledgeSearchRequest,
+    KnowledgeUploadRequest,
+)
 from backend.app.services.embeddings import (
     EmbeddingConfigurationError,
     OpenAIEmbeddingClient,
@@ -113,6 +119,26 @@ def test_chunk_text_uses_overlap() -> None:
     chunks = chunk_text("abcdefghij", chunk_size=6, overlap=2)
 
     assert chunks == ["abcdef", "efghij"]
+
+
+def test_knowledge_schemas_trim_and_reject_blank_values() -> None:
+    search = KnowledgeSearchRequest(query="  find me  ", category="  docs  ")
+    answer = KnowledgeAnswerRequest(query="  answer me  ")
+    upload = KnowledgeUploadRequest(category="  manuals  ")
+
+    assert search.query == "find me"
+    assert search.category == "docs"
+    assert answer.query == "answer me"
+    assert upload.category == "manuals"
+
+    with pytest.raises(ValidationError):
+        KnowledgeSearchRequest(query="   ")
+
+    with pytest.raises(ValidationError):
+        KnowledgeAnswerRequest(query="   ")
+
+    with pytest.raises(ValidationError):
+        KnowledgeUploadRequest(category="   ")
 
 
 @pytest.mark.asyncio

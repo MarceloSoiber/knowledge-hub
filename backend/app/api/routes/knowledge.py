@@ -7,6 +7,7 @@ from ...schemas.knowledge import (
     KnowledgeAnswerResponse,
     KnowledgeSearchRequest,
     KnowledgeSearchResponse,
+    KnowledgeUploadRequest,
     KnowledgeUploadResponse,
 )
 from ...services.embeddings import (
@@ -58,7 +59,7 @@ async def knowledge_search(
 )
 async def upload_knowledge_file(
     file: UploadFile = File(...),
-    category: str = Form(..., min_length=1, max_length=100),
+    payload: KnowledgeUploadRequest = Depends(KnowledgeUploadRequest.as_form),
     session: AsyncSession = Depends(get_session),
 ) -> KnowledgeUploadResponse:
     content = await file.read()
@@ -68,7 +69,7 @@ async def upload_knowledge_file(
             session=session,
             filename=file.filename or "upload",
             content=content,
-            category=category,
+            category=payload.category,
             embedding_client=build_embedding_client(),
         )
     except FileTooLargeError as exc:
