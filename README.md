@@ -61,10 +61,34 @@ Com o ambiente local:
 uv run set-auth-token
 ```
 
+Para gerar e salvar automaticamente um token forte:
+
+```bash
+uv run set-auth-token --generate
+```
+
 Com Docker:
 
 ```bash
 docker-compose run --rm backend set-auth-token
+```
+
+Ou gerando o token automaticamente:
+
+```bash
+docker-compose run --rm backend set-auth-token --generate
+```
+
+Se o servidor tiver Docker, mas não tiver `docker-compose`, execute o comando dentro do container do backend já iniciado:
+
+```bash
+docker exec -it mcp-knowledge-hub-backend set-auth-token
+```
+
+Para evitar problemas de colagem no terminal, prefira gerar e salvar direto no container:
+
+```bash
+docker exec -it mcp-knowledge-hub-backend set-auth-token --generate
 ```
 
 O comando pede o token de forma interativa:
@@ -73,13 +97,16 @@ O comando pede o token de forma interativa:
 AUTH_TOKEN:
 ```
 
-Para gerar um token forte:
+No modo interativo, o token precisa ter entre 32 e 256 caracteres e conter apenas letras, números, hífen e underscore. Isso evita salvar caracteres invisíveis de colagem no banco.
+
+Depois de salvar, use esse valor apenas no cliente/API que vai acessar o sistema. O modo `--generate` imprime o token uma vez no terminal; guarde esse valor no cliente MCP.
+
+Para conferir se o token foi salvo sem exibir o valor:
 
 ```bash
-python3 -c "import secrets; print(secrets.token_urlsafe(48))"
+docker exec -it mcp-knowledge-hub-postgres psql -U postgres -d knowledge_hub \
+  -c "select key, length(value) as token_length, updated_at from app_config;"
 ```
-
-Depois de salvar, use esse valor apenas no cliente/API que vai acessar o sistema.
 
 ## Rodando Com Docker
 
@@ -290,10 +317,30 @@ Para trocar o token, rode novamente:
 uv run set-auth-token
 ```
 
+Ou gere um novo token automaticamente:
+
+```bash
+uv run set-auth-token --generate
+```
+
 ou, via Docker:
 
 ```bash
 docker-compose run --rm backend set-auth-token
+```
+
+Sem `docker-compose` no servidor:
+
+```bash
+docker exec -it mcp-knowledge-hub-backend set-auth-token
+docker restart mcp-knowledge-hub-mcp
+```
+
+Para gerar e salvar direto no container:
+
+```bash
+docker exec -it mcp-knowledge-hub-backend set-auth-token --generate
+docker restart mcp-knowledge-hub-mcp
 ```
 
 O backend e o MCP consultam o banco para validar o Bearer token, então o novo valor passa a valer sem precisar gravar segredo no repositório.

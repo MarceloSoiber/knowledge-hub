@@ -44,9 +44,14 @@ def build_auth_settings():
     )
 
 
+settings = get_settings()
+
 mcp = FastMCP(
     "knowledge-hub-mcp",
     instructions="Ferramentas MCP para consultar e ampliar o Knowledge Hub.",
+    host=settings.mcp_host,
+    port=settings.mcp_port,
+    streamable_http_path=settings.mcp_path,
     auth=build_auth_settings(),
     token_verifier=build_token_verifier(),
 )
@@ -77,13 +82,7 @@ def workspace_overview() -> dict[str, str]:
 
 
 def main() -> None:
-    settings = get_settings()
-    mcp.run(
-        transport="streamable-http",
-        host=settings.mcp_host,
-        port=settings.mcp_port,
-        streamable_http_path=settings.mcp_path,
-    )
+    mcp.run(transport="streamable-http")
 
 
 if __name__ == "__main__":
