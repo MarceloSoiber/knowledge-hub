@@ -1,7 +1,7 @@
 from sqlalchemy import text
 
 from .base import Base
-from .models import DocumentSource, KnowledgeChunk  # noqa: F401
+from .models import AppConfig, DocumentSource, KnowledgeChunk  # noqa: F401
 from .session import engine
 
 

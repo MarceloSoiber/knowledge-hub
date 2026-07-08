@@ -10,7 +10,6 @@ class Settings(BaseSettings):
     app_name: str = Field(default="MCP Knowledge Hub")
     environment: str = Field(default="development")
     frontend_origin: str = Field(default="http://localhost:5173")
-
     postgres_dsn: str = Field(
         default="postgresql+asyncpg://postgres:postgres@localhost:5432/knowledge_hub"
     )
@@ -24,6 +23,11 @@ class Settings(BaseSettings):
 
     embedding_model: str = Field(default="text-embedding-nomic-embed-text-v1.5")
     vector_dim: int = Field(default=768)
+
+    mcp_host: str = Field(default="0.0.0.0")
+    mcp_port: int = Field(default=8001)
+    mcp_public_url: str = Field(default="http://192.0.2.10:8001")
+    mcp_path: str = Field(default="/mcp")
 
 
 @lru_cache(maxsize=1)

@@ -19,7 +19,7 @@ dependencies = [
   "httpx>=0.27",
   "python-multipart>=0.0.9",
   "pypdf>=4.3",
-  "mcp>=1.0.0",
+  "mcp>=1.12.0",
 ]
 
 [project.optional-dependencies]
@@ -31,6 +31,7 @@ dev = [
 [project.scripts]
 backend = "backend.app.main:main"
 mcp-server = "mcp_server.server:main"
+set-auth-token = "backend.app.cli.config:set_auth_token_main"
 
 [tool.setuptools]
 package-dir = {"" = "."}
