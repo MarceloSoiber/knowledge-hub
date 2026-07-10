@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+import re
 from pathlib import Path
 
 from sqlalchemy import delete, select
@@ -44,6 +45,14 @@ def build_pdf_reader(stream: io.BytesIO):
     return PdfReader(stream)
 
 
+def extract_pdf_page_text(page: object) -> str:
+    extract_text_method = getattr(page, "extract_text")
+    try:
+        return extract_text_method(extraction_mode="layout") or ""
+    except TypeError:
+        return extract_text_method() or ""
+
+
 def validate_upload(filename: str, content: bytes) -> str:
     extension = Path(filename).suffix.lower()
     if extension not in SUPPORTED_EXTENSIONS:
@@ -51,6 +60,26 @@ def validate_upload(filename: str, content: bytes) -> str:
     if len(content) > MAX_UPLOAD_BYTES:
         raise FileTooLargeError("Uploaded file is larger than 10MB.")
     return extension
+
+
+def normalize_text(text: str) -> str:
+    text = text.replace("\r\n", "\n").replace("\r", "\n").replace("\xa0", " ")
+    lines = [" ".join(line.split()) for line in text.splitlines()]
+    return "\n".join(line for line in lines if line)
+
+
+def normalize_pdf_text(text: str) -> str:
+    text = text.replace("\r\n", "\n").replace("\r", "\n").replace("\xa0", " ")
+    text = re.sub(r"(?<=\w)-\n(?=\w)", "", text)
+
+    paragraphs = re.split(r"\n{2,}", text)
+    normalized: list[str] = []
+    for paragraph in paragraphs:
+        lines = [" ".join(line.split()) for line in paragraph.splitlines()]
+        paragraph_text = " ".join(line for line in lines if line)
+        if paragraph_text:
+            normalized.append(paragraph_text)
+    return "\n\n".join(normalized)
 
 
 def extract_text(filename: str, content: bytes) -> str:
@@ -63,12 +92,32 @@ def extract_text(filename: str, content: bytes) -> str:
             raise KnowledgeIngestionError("File must be encoded as UTF-8.") from exc
     else:
         reader = build_pdf_reader(io.BytesIO(content))
-        text = "\n".join(page.extract_text() or "" for page in reader.pages)
+        text = "\n\n".join(extract_pdf_page_text(page) for page in reader.pages)
+        text = normalize_pdf_text(text)
 
-    text = "\n".join(line.strip() for line in text.splitlines() if line.strip())
+    if extension in {".txt", ".md"}:
+        text = normalize_text(text)
     if not text:
         raise EmptyDocumentError("Uploaded document does not contain readable text.")
     return text
+
+
+def find_chunk_end(text: str, start: int, max_end: int, chunk_size: int) -> int:
+    if max_end == len(text):
+        return max_end
+
+    min_end = start + max(chunk_size // 2, 1)
+    for separator in ("\n\n", "\n", ". ", "; ", ", ", " "):
+        boundary = text.rfind(separator, min_end, max_end)
+        if boundary != -1:
+            return boundary + len(separator)
+    return max_end
+
+
+def find_chunk_start(text: str, start: int) -> int:
+    while start < len(text) and text[start].isspace():
+        start += 1
+    return start
 
 
 def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> list[str]:
@@ -78,13 +127,14 @@ def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVE
     chunks: list[str] = []
     start = 0
     while start < len(text):
-        end = min(start + chunk_size, len(text))
+        max_end = min(start + chunk_size, len(text))
+        end = find_chunk_end(text, start, max_end, chunk_size)
         chunk = text[start:end].strip()
         if chunk:
             chunks.append(chunk)
         if end == len(text):
             break
-        start = end - overlap
+        start = find_chunk_start(text, max(end - overlap, 0))
     return chunks
 
 
@@ -100,9 +150,58 @@ async def ingest_uploaded_file(
         raise KnowledgeIngestionError("Category must not be empty.")
 
     text = extract_text(filename, content)
+    uri = f"upload:{normalized_category}:{filename}"
+    return await ingest_text_source(
+        session=session,
+        title=filename,
+        text=text,
+        category=normalized_category,
+        source_type="upload",
+        uri=uri,
+        embedding_client=embedding_client,
+    )
+
+
+async def ingest_plain_text(
+    session: AsyncSession,
+    title: str,
+    content: str,
+    category: str,
+    embedding_client: EmbeddingClient,
+) -> tuple[DocumentSource, int]:
+    normalized_title = title.strip()
+    normalized_category = category.strip()
+    if not normalized_title:
+        raise KnowledgeIngestionError("Title must not be empty.")
+    if not normalized_category:
+        raise KnowledgeIngestionError("Category must not be empty.")
+    text = normalize_text(content)
+    if not text:
+        raise EmptyDocumentError("Text content does not contain readable text.")
+
+    uri = f"text:{normalized_category}:{normalized_title}"
+    return await ingest_text_source(
+        session=session,
+        title=normalized_title,
+        text=text,
+        category=normalized_category,
+        source_type="text",
+        uri=uri,
+        embedding_client=embedding_client,
+    )
+
+
+async def ingest_text_source(
+    session: AsyncSession,
+    title: str,
+    text: str,
+    category: str,
+    source_type: str,
+    uri: str,
+    embedding_client: EmbeddingClient,
+) -> tuple[DocumentSource, int]:
     chunks = chunk_text(text)
     embeddings = await embedding_client.embed_texts(chunks)
-    uri = f"upload:{normalized_category}:{filename}"
 
     existing_source = await session.scalar(
         select(DocumentSource).where(DocumentSource.uri == uri)
@@ -112,14 +211,14 @@ async def ingest_uploaded_file(
             delete(KnowledgeChunk).where(KnowledgeChunk.source_id == existing_source.id)
         )
         source = existing_source
-        source.title = filename
-        source.category = normalized_category
-        source.source_type = "upload"
+        source.title = title
+        source.category = category
+        source.source_type = source_type
     else:
         source = DocumentSource(
-            title=filename,
-            category=normalized_category,
-            source_type="upload",
+            title=title,
+            category=category,
+            source_type=source_type,
             uri=uri,
         )
         session.add(source)
@@ -132,8 +231,9 @@ async def ingest_uploaded_file(
                 content=chunk,
                 metadata_json=json.dumps(
                     {
-                        "filename": filename,
-                        "category": normalized_category,
+                        "title": title,
+                        "category": category,
+                        "source_type": source_type,
                         "chunk_index": index,
                     }
                 ),

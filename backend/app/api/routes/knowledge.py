@@ -7,6 +7,7 @@ from ...schemas.knowledge import (
     KnowledgeAnswerResponse,
     KnowledgeSearchRequest,
     KnowledgeSearchResponse,
+    KnowledgeTextIngestRequest,
     KnowledgeUploadRequest,
     KnowledgeUploadResponse,
 )
@@ -21,6 +22,7 @@ from ...services.knowledge import (
     KnowledgeIngestionError,
     UnsupportedFileTypeError,
     answer_knowledge,
+    ingest_plain_text,
     ingest_uploaded_file,
     list_sources,
     search_knowledge,
@@ -77,6 +79,40 @@ async def upload_knowledge_file(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail=str(exc)
         ) from exc
     except (UnsupportedFileTypeError, EmptyDocumentError, KnowledgeIngestionError) as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except EmbeddingConfigurationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
+        ) from exc
+    except EmbeddingError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+    return KnowledgeUploadResponse(
+        source_id=source.id,
+        title=source.title,
+        category=source.category,
+        chunks_created=chunks_created,
+    )
+
+
+@router.post(
+    "/texts",
+    response_model=KnowledgeUploadResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def ingest_knowledge_text(
+    payload: KnowledgeTextIngestRequest,
+    session: AsyncSession = Depends(get_session),
+) -> KnowledgeUploadResponse:
+    try:
+        source, chunks_created = await ingest_plain_text(
+            session=session,
+            title=payload.title,
+            content=payload.content,
+            category=payload.category,
+            embedding_client=build_embedding_client(),
+        )
+    except (EmptyDocumentError, KnowledgeIngestionError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except EmbeddingConfigurationError as exc:
         raise HTTPException(

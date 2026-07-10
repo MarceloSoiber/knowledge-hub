@@ -9,6 +9,10 @@ CategoryStr = Annotated[
     str,
     StringConstraints(strip_whitespace=True, min_length=1, max_length=100),
 ]
+TitleStr = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=255),
+]
 
 
 class KnowledgeSourceRead(BaseModel):
@@ -51,6 +55,12 @@ class KnowledgeUploadRequest(BaseModel):
     @classmethod
     def as_form(cls, category: Annotated[str, Form(...)]) -> "KnowledgeUploadRequest":
         return cls(category=category)
+
+
+class KnowledgeTextIngestRequest(BaseModel):
+    title: TitleStr
+    category: CategoryStr
+    content: NonEmptyStr
 
 
 class KnowledgeAnswerRequest(BaseModel):

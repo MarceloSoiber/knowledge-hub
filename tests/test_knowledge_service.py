@@ -13,6 +13,7 @@ from backend.app.schemas.knowledge import (
     KnowledgeAnswerRequest,
     KnowledgeChunkRead,
     KnowledgeSearchRequest,
+    KnowledgeTextIngestRequest,
     KnowledgeUploadRequest,
 )
 from backend.app.services.embeddings import (
@@ -24,6 +25,7 @@ from backend.app.services.knowledge import (
     answer_knowledge,
     chunk_text,
     extract_text,
+    ingest_plain_text,
     ingest_uploaded_file,
     search_knowledge,
 )
@@ -104,7 +106,8 @@ def test_extract_text_rejects_unsupported_extensions() -> None:
 
 def test_extract_text_reads_pdf(monkeypatch: pytest.MonkeyPatch) -> None:
     class FakePage:
-        def extract_text(self) -> str:
+        def extract_text(self, extraction_mode: str | None = None) -> str:
+            assert extraction_mode == "layout"
             return "pdf page"
 
     class FakePdfReader:
@@ -117,21 +120,51 @@ def test_extract_text_reads_pdf(monkeypatch: pytest.MonkeyPatch) -> None:
     assert extract_text("paper.pdf", b"%PDF") == "pdf page"
 
 
+def test_extract_text_normalizes_pdf_layout(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FakePage:
+        def extract_text(self, extraction_mode: str | None = None) -> str:
+            assert extraction_mode == "layout"
+            return "Receita de Vendas de Imó-\nveis\nFonte:\xa0TRBL11"
+
+    class FakePdfReader:
+        def __init__(self, stream: object) -> None:
+            _ = stream
+            self.pages = [FakePage()]
+
+    monkeypatch.setattr("backend.app.services.knowledge.build_pdf_reader", FakePdfReader)
+
+    assert extract_text("paper.pdf", b"%PDF") == "Receita de Vendas de Imóveis Fonte: TRBL11"
+
+
 def test_chunk_text_uses_overlap() -> None:
     chunks = chunk_text("abcdefghij", chunk_size=6, overlap=2)
 
     assert chunks == ["abcdef", "efghij"]
 
 
+def test_chunk_text_prefers_sentence_boundaries() -> None:
+    chunks = chunk_text("Primeira frase. Segunda frase. Terceira frase.", chunk_size=32, overlap=0)
+
+    assert chunks == ["Primeira frase. Segunda frase.", "Terceira frase."]
+
+
 def test_knowledge_schemas_trim_and_reject_blank_values() -> None:
     search = KnowledgeSearchRequest(query="  find me  ", category="  docs  ")
     answer = KnowledgeAnswerRequest(query="  answer me  ")
     upload = KnowledgeUploadRequest(category="  manuals  ")
+    text = KnowledgeTextIngestRequest(
+        title="  Sprint notes  ",
+        category="  engineering  ",
+        content="  decision log  ",
+    )
 
     assert search.query == "find me"
     assert search.category == "docs"
     assert answer.query == "answer me"
     assert upload.category == "manuals"
+    assert text.title == "Sprint notes"
+    assert text.category == "engineering"
+    assert text.content == "decision log"
 
     with pytest.raises(ValidationError):
         KnowledgeSearchRequest(query="   ")
@@ -141,6 +174,12 @@ def test_knowledge_schemas_trim_and_reject_blank_values() -> None:
 
     with pytest.raises(ValidationError):
         KnowledgeUploadRequest(category="   ")
+
+    with pytest.raises(ValidationError):
+        KnowledgeTextIngestRequest(title="   ", category="docs", content="text")
+
+    with pytest.raises(ValidationError):
+        KnowledgeTextIngestRequest(title="notes", category="docs", content="   ")
 
 
 def test_token_auth_accepts_matching_bearer_token() -> None:
@@ -186,6 +225,57 @@ async def test_ingest_uploaded_file_replaces_existing_source() -> None:
     assert updated_source.id == 7
     assert updated_source.title == "notes.md"
     assert updated_source.category == "manuals"
+    assert chunks_created == 1
+    assert session.deleted_old_chunks is True
+    assert session.committed is True
+
+
+@pytest.mark.asyncio
+async def test_ingest_plain_text_creates_text_source() -> None:
+    session = FakeSession()
+    embedding_client = FakeEmbeddingClient()
+
+    source, chunks_created = await ingest_plain_text(
+        session=session,
+        title="  Meeting notes  ",
+        content=" Linha um. \n\n Linha dois. ",
+        category="  docs  ",
+        embedding_client=embedding_client,
+    )
+
+    assert source.id == 99
+    assert source.title == "Meeting notes"
+    assert source.category == "docs"
+    assert source.source_type == "text"
+    assert source.uri == "text:docs:Meeting notes"
+    assert chunks_created == 1
+    assert embedding_client.inputs == [["Linha um.\nLinha dois."]]
+    assert session.committed is True
+
+
+@pytest.mark.asyncio
+async def test_ingest_plain_text_replaces_existing_text_source() -> None:
+    source = DocumentSource(
+        id=8,
+        title="old title",
+        category="old",
+        source_type="text",
+        uri="text:docs:notes",
+    )
+    session = FakeSession(existing_source=source)
+
+    updated_source, chunks_created = await ingest_plain_text(
+        session=session,
+        title="notes",
+        content="updated content",
+        category="docs",
+        embedding_client=FakeEmbeddingClient(),
+    )
+
+    assert updated_source.id == 8
+    assert updated_source.title == "notes"
+    assert updated_source.category == "docs"
+    assert updated_source.source_type == "text"
     assert chunks_created == 1
     assert session.deleted_old_chunks is True
     assert session.committed is True

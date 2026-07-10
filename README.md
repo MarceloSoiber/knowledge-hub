@@ -207,6 +207,19 @@ curl -F "file=@./documento.pdf" \
   http://localhost:8000/api/v1/knowledge/uploads
 ```
 
+Ingestão de texto:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/knowledge/texts \
+  -H "Authorization: Bearer $KNOWLEDGE_HUB_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "anotacoes-da-reuniao",
+    "category": "financeiro",
+    "content": "Cole aqui o texto que deve entrar na base de conhecimento."
+  }'
+```
+
 Busca semântica:
 
 ```bash
