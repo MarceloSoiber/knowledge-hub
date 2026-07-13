@@ -4,7 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: mcp-knowledge-hub-backend
-    restart: unless-stopped
+    restart: "no"
     depends_on:
       postgres:
         condition: service_healthy
@@ -42,7 +42,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: mcp-knowledge-hub-mcp
-    restart: unless-stopped
+    restart: "no"
     depends_on:
       backend:
         condition: service_healthy
@@ -73,7 +73,7 @@ services:
   postgres:
     image: pgvector/pgvector:pg16
     container_name: mcp-knowledge-hub-postgres
-    restart: unless-stopped
+    restart: "no"
     environment:
       POSTGRES_DB: knowledge_hub
       POSTGRES_USER: postgres

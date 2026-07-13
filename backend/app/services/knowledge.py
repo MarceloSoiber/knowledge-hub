@@ -8,7 +8,7 @@ from pathlib import Path
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..db.models import DocumentSource, KnowledgeChunk
+from ..db.models import Category, DocumentSource, KnowledgeChunk
 from ..schemas.knowledge import KnowledgeChunkRead
 from .embeddings import EmbeddingClient
 from .rag import AnswerClient
@@ -33,6 +33,10 @@ class FileTooLargeError(KnowledgeIngestionError):
 
 
 class EmptyDocumentError(KnowledgeIngestionError):
+    pass
+
+
+class CategoryNotFoundError(KnowledgeIngestionError):
     pass
 
 
@@ -142,20 +146,18 @@ async def ingest_uploaded_file(
     session: AsyncSession,
     filename: str,
     content: bytes,
-    category: str,
+    category_id: int,
     embedding_client: EmbeddingClient,
 ) -> tuple[DocumentSource, int]:
-    normalized_category = category.strip()
-    if not normalized_category:
-        raise KnowledgeIngestionError("Category must not be empty.")
+    category = await get_category(session, category_id)
 
     text = extract_text(filename, content)
-    uri = f"upload:{normalized_category}:{filename}"
+    uri = f"upload:{category.name}:{filename}"
     return await ingest_text_source(
         session=session,
         title=filename,
         text=text,
-        category=normalized_category,
+        category=category,
         source_type="upload",
         uri=uri,
         embedding_client=embedding_client,
@@ -166,25 +168,23 @@ async def ingest_plain_text(
     session: AsyncSession,
     title: str,
     content: str,
-    category: str,
+    category_id: int,
     embedding_client: EmbeddingClient,
 ) -> tuple[DocumentSource, int]:
     normalized_title = title.strip()
-    normalized_category = category.strip()
     if not normalized_title:
         raise KnowledgeIngestionError("Title must not be empty.")
-    if not normalized_category:
-        raise KnowledgeIngestionError("Category must not be empty.")
+    category = await get_category(session, category_id)
     text = normalize_text(content)
     if not text:
         raise EmptyDocumentError("Text content does not contain readable text.")
 
-    uri = f"text:{normalized_category}:{normalized_title}"
+    uri = f"text:{category.name}:{normalized_title}"
     return await ingest_text_source(
         session=session,
         title=normalized_title,
         text=text,
-        category=normalized_category,
+        category=category,
         source_type="text",
         uri=uri,
         embedding_client=embedding_client,
@@ -195,7 +195,7 @@ async def ingest_text_source(
     session: AsyncSession,
     title: str,
     text: str,
-    category: str,
+    category: Category,
     source_type: str,
     uri: str,
     embedding_client: EmbeddingClient,
@@ -212,12 +212,12 @@ async def ingest_text_source(
         )
         source = existing_source
         source.title = title
-        source.category = category
+        source.category_id = category.id
         source.source_type = source_type
     else:
         source = DocumentSource(
             title=title,
-            category=category,
+            category_id=category.id,
             source_type=source_type,
             uri=uri,
         )
@@ -232,7 +232,8 @@ async def ingest_text_source(
                 metadata_json=json.dumps(
                     {
                         "title": title,
-                        "category": category,
+                        "category_id": category.id,
+                        "category": category.name,
                         "source_type": source_type,
                         "chunk_index": index,
                     }
@@ -251,7 +252,7 @@ async def search_knowledge(
     query: str,
     limit: int,
     embedding_client: EmbeddingClient,
-    category: str | None = None,
+    category_id: int | None = None,
 ) -> list[KnowledgeChunkRead]:
     query_embedding = (await embedding_client.embed_texts([query]))[0]
     distance = KnowledgeChunk.embedding.cosine_distance(query_embedding)
@@ -266,8 +267,8 @@ async def search_knowledge(
         .join(DocumentSource, KnowledgeChunk.source_id == DocumentSource.id)
         .where(KnowledgeChunk.embedding.is_not(None))
     )
-    if category is not None:
-        statement = statement.where(DocumentSource.category == category.strip())
+    if category_id is not None:
+        statement = statement.where(DocumentSource.category_id == category_id)
     statement = statement.order_by(distance).limit(limit)
 
     rows = (await session.execute(statement)).all()
@@ -288,10 +289,10 @@ async def answer_knowledge(
     limit: int,
     embedding_client: EmbeddingClient,
     answer_client: AnswerClient,
-    category: str | None = None,
+    category_id: int | None = None,
 ) -> tuple[str, list[KnowledgeChunkRead]]:
     sources = await search_knowledge(
-        session, query, limit, embedding_client, category=category
+        session, query, limit, embedding_client, category_id=category_id
     )
     answer = await answer_client.answer(query, sources)
     return answer, sources
@@ -303,7 +304,7 @@ async def list_sources(session: AsyncSession) -> list[dict[str, str | int]]:
             select(
                 DocumentSource.id,
                 DocumentSource.title,
-                DocumentSource.category,
+                DocumentSource.category_id,
                 DocumentSource.source_type,
                 DocumentSource.uri,
             )
@@ -315,9 +316,23 @@ async def list_sources(session: AsyncSession) -> list[dict[str, str | int]]:
         {
             "id": row.id,
             "title": row.title,
-            "category": row.category,
+            "category_id": row.category_id,
             "source_type": row.source_type,
             "uri": row.uri,
         }
         for row in rows
     ]
+
+
+async def get_category(session: AsyncSession, category_id: int) -> Category:
+    category = await session.get(Category, category_id)
+    if category is None:
+        raise CategoryNotFoundError(f"Category {category_id} does not exist.")
+    return category
+
+
+async def list_categories(session: AsyncSession) -> list[dict[str, str | int]]:
+    rows = (
+        await session.execute(select(Category.id, Category.name).order_by(Category.name))
+    ).all()
+    return [{"id": row.id, "name": row.name} for row in rows]

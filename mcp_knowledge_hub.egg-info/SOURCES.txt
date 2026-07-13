@@ -21,6 +21,7 @@ pyproject.toml
 backend/app/main.py
 backend/app/api/routes/health.py
 backend/app/api/routes/knowledge.py
+backend/app/cli/config.py
 backend/app/core/auth.py
 backend/app/core/settings.py
 backend/app/db/base.py
@@ -28,6 +29,7 @@ backend/app/db/init.py
 backend/app/db/models.py
 backend/app/db/session.py
 backend/app/schemas/knowledge.py
+backend/app/services/config.py
 backend/app/services/embeddings.py
 backend/app/services/knowledge.py
 backend/app/services/llm.py

@@ -8,7 +8,7 @@ from pydantic import ValidationError
 from backend.app.cli.config import generate_auth_token, validate_auth_token
 from backend.app.core.auth import is_valid_token
 from backend.app.core.settings import Settings
-from backend.app.db.models import DocumentSource
+from backend.app.db.models import Category, DocumentSource
 from backend.app.schemas.knowledge import (
     KnowledgeAnswerRequest,
     KnowledgeChunkRead,
@@ -21,12 +21,14 @@ from backend.app.services.embeddings import (
     OpenAIEmbeddingClient,
 )
 from backend.app.services.knowledge import (
+    CategoryNotFoundError,
     UnsupportedFileTypeError,
     answer_knowledge,
     chunk_text,
     extract_text,
     ingest_plain_text,
     ingest_uploaded_file,
+    list_categories,
     search_knowledge,
 )
 from backend.app.services.rag import LLMConfigurationError, OpenAICompatibleAnswerClient
@@ -62,9 +64,20 @@ class FakeExecuteResult:
         return self._rows
 
 
+@dataclass
+class FakeCategoryRow:
+    id: int
+    name: str
+
+
 class FakeSession:
-    def __init__(self, existing_source: DocumentSource | None = None) -> None:
+    def __init__(
+        self,
+        existing_source: DocumentSource | None = None,
+        category: Category | None = None,
+    ) -> None:
         self.existing_source = existing_source
+        self.category = category or Category(id=3, name="docs")
         self.added: list[object] = []
         self.deleted_old_chunks = False
         self.committed = False
@@ -73,6 +86,12 @@ class FakeSession:
     async def scalar(self, statement: object) -> DocumentSource | None:
         _ = statement
         return self.existing_source
+
+    async def get(self, entity: object, entity_id: int) -> Category | None:
+        assert entity is Category
+        if self.category is not None and self.category.id == entity_id:
+            return self.category
+        return None
 
     async def execute(self, statement: object) -> FakeExecuteResult:
         if statement.__class__.__name__ == "Delete":
@@ -149,21 +168,21 @@ def test_chunk_text_prefers_sentence_boundaries() -> None:
 
 
 def test_knowledge_schemas_trim_and_reject_blank_values() -> None:
-    search = KnowledgeSearchRequest(query="  find me  ", category="  docs  ")
+    search = KnowledgeSearchRequest(query="  find me  ", category_id=3)
     answer = KnowledgeAnswerRequest(query="  answer me  ")
-    upload = KnowledgeUploadRequest(category="  manuals  ")
+    upload = KnowledgeUploadRequest(category_id=4)
     text = KnowledgeTextIngestRequest(
         title="  Sprint notes  ",
-        category="  engineering  ",
+        category_id=5,
         content="  decision log  ",
     )
 
     assert search.query == "find me"
-    assert search.category == "docs"
+    assert search.category_id == 3
     assert answer.query == "answer me"
-    assert upload.category == "manuals"
+    assert upload.category_id == 4
     assert text.title == "Sprint notes"
-    assert text.category == "engineering"
+    assert text.category_id == 5
     assert text.content == "decision log"
 
     with pytest.raises(ValidationError):
@@ -173,13 +192,13 @@ def test_knowledge_schemas_trim_and_reject_blank_values() -> None:
         KnowledgeAnswerRequest(query="   ")
 
     with pytest.raises(ValidationError):
-        KnowledgeUploadRequest(category="   ")
+        KnowledgeUploadRequest(category_id=0)
 
     with pytest.raises(ValidationError):
-        KnowledgeTextIngestRequest(title="   ", category="docs", content="text")
+        KnowledgeTextIngestRequest(title="   ", category_id=3, content="text")
 
     with pytest.raises(ValidationError):
-        KnowledgeTextIngestRequest(title="notes", category="docs", content="   ")
+        KnowledgeTextIngestRequest(title="notes", category_id=3, content="   ")
 
 
 def test_token_auth_accepts_matching_bearer_token() -> None:
@@ -208,23 +227,26 @@ async def test_ingest_uploaded_file_replaces_existing_source() -> None:
     source = DocumentSource(
         id=7,
         title="old.md",
-        category="old",
+        category_id=2,
         source_type="upload",
         uri="upload:manuals:notes.md",
     )
-    session = FakeSession(existing_source=source)
+    session = FakeSession(
+        existing_source=source,
+        category=Category(id=3, name="manuals"),
+    )
 
     updated_source, chunks_created = await ingest_uploaded_file(
         session=session,
         filename="notes.md",
         content=b"new content",
-        category="manuals",
+        category_id=3,
         embedding_client=FakeEmbeddingClient(),
     )
 
     assert updated_source.id == 7
     assert updated_source.title == "notes.md"
-    assert updated_source.category == "manuals"
+    assert updated_source.category_id == 3
     assert chunks_created == 1
     assert session.deleted_old_chunks is True
     assert session.committed is True
@@ -239,13 +261,13 @@ async def test_ingest_plain_text_creates_text_source() -> None:
         session=session,
         title="  Meeting notes  ",
         content=" Linha um. \n\n Linha dois. ",
-        category="  docs  ",
+        category_id=3,
         embedding_client=embedding_client,
     )
 
     assert source.id == 99
     assert source.title == "Meeting notes"
-    assert source.category == "docs"
+    assert source.category_id == 3
     assert source.source_type == "text"
     assert source.uri == "text:docs:Meeting notes"
     assert chunks_created == 1
@@ -258,7 +280,7 @@ async def test_ingest_plain_text_replaces_existing_text_source() -> None:
     source = DocumentSource(
         id=8,
         title="old title",
-        category="old",
+        category_id=2,
         source_type="text",
         uri="text:docs:notes",
     )
@@ -268,17 +290,53 @@ async def test_ingest_plain_text_replaces_existing_text_source() -> None:
         session=session,
         title="notes",
         content="updated content",
-        category="docs",
+        category_id=3,
         embedding_client=FakeEmbeddingClient(),
     )
 
     assert updated_source.id == 8
     assert updated_source.title == "notes"
-    assert updated_source.category == "docs"
+    assert updated_source.category_id == 3
     assert updated_source.source_type == "text"
     assert chunks_created == 1
     assert session.deleted_old_chunks is True
     assert session.committed is True
+
+
+@pytest.mark.asyncio
+async def test_ingest_plain_text_rejects_unknown_category() -> None:
+    embedding_client = FakeEmbeddingClient()
+
+    with pytest.raises(CategoryNotFoundError, match="Category 999 does not exist"):
+        await ingest_plain_text(
+            session=FakeSession(),
+            title="notes",
+            content="content",
+            category_id=999,
+            embedding_client=embedding_client,
+        )
+
+    assert embedding_client.inputs == []
+
+
+@pytest.mark.asyncio
+async def test_list_categories_returns_id_and_name() -> None:
+    class FakeCategorySession:
+        async def execute(self, statement: object) -> FakeExecuteResult:
+            _ = statement
+            return FakeExecuteResult(
+                [
+                    FakeCategoryRow(id=2, name="engineering"),
+                    FakeCategoryRow(id=1, name="finance"),
+                ]
+            )
+
+    categories = await list_categories(FakeCategorySession())  # type: ignore[arg-type]
+
+    assert categories == [
+        {"id": 2, "name": "engineering"},
+        {"id": 1, "name": "finance"},
+    ]
 
 
 @pytest.mark.asyncio

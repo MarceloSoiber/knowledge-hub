@@ -4,8 +4,9 @@ Version: 0.1.0
 Summary: Base inicial para um hub de conhecimento com FastAPI, pgvector e MCP
 Requires-Python: >=3.11
 Description-Content-Type: text/markdown
-Requires-Dist: fastapi>=0.115
-Requires-Dist: uvicorn[standard]>=0.30
+Requires-Dist: fastapi<0.116,>=0.115
+Requires-Dist: starlette<0.47,>=0.40
+Requires-Dist: uvicorn[standard]<0.31,>=0.30
 Requires-Dist: pydantic>=2.8
 Requires-Dist: pydantic-settings>=2.4
 Requires-Dist: sqlalchemy[asyncio]>=2.0
@@ -82,10 +83,34 @@ Com o ambiente local:
 uv run set-auth-token
 ```
 
+Para gerar e salvar automaticamente um token forte:
+
+```bash
+uv run set-auth-token --generate
+```
+
 Com Docker:
 
 ```bash
 docker-compose run --rm backend set-auth-token
+```
+
+Ou gerando o token automaticamente:
+
+```bash
+docker-compose run --rm backend set-auth-token --generate
+```
+
+Se o servidor tiver Docker, mas não tiver `docker-compose`, execute o comando dentro do container do backend já iniciado:
+
+```bash
+docker exec -it mcp-knowledge-hub-backend set-auth-token
+```
+
+Para evitar problemas de colagem no terminal, prefira gerar e salvar direto no container:
+
+```bash
+docker exec -it mcp-knowledge-hub-backend set-auth-token --generate
 ```
 
 O comando pede o token de forma interativa:
@@ -94,13 +119,16 @@ O comando pede o token de forma interativa:
 AUTH_TOKEN:
 ```
 
-Para gerar um token forte:
+No modo interativo, o token precisa ter entre 32 e 256 caracteres e conter apenas letras, números, hífen e underscore. Isso evita salvar caracteres invisíveis de colagem no banco.
+
+Depois de salvar, use esse valor apenas no cliente/API que vai acessar o sistema. O modo `--generate` imprime o token uma vez no terminal; guarde esse valor no cliente MCP.
+
+Para conferir se o token foi salvo sem exibir o valor:
 
 ```bash
-python3 -c "import secrets; print(secrets.token_urlsafe(48))"
+docker exec -it mcp-knowledge-hub-postgres psql -U postgres -d knowledge_hub \
+  -c "select key, length(value) as token_length, updated_at from app_config;"
 ```
-
-Depois de salvar, use esse valor apenas no cliente/API que vai acessar o sistema.
 
 ## Rodando Com Docker
 
@@ -115,6 +143,15 @@ Subir apenas o banco:
 ```bash
 npm run db:up
 ```
+
+Limpar todos os registros de documentos e conhecimento (operação irreversível):
+
+```bash
+npm run db:clear
+```
+
+Esse comando esvazia as tabelas `knowledge_chunks` e `document_sources` e reinicia suas
+sequências de IDs. O container do PostgreSQL precisa estar em execução.
 
 Subir apenas o backend:
 
@@ -192,13 +229,33 @@ Para testar com `curl`, você pode guardar o token só na sessão atual do termi
 export KNOWLEDGE_HUB_TOKEN="cole-o-token-aqui"
 ```
 
+Liste as categorias disponíveis para obter o ID usado na ingestão e nos filtros:
+
+```bash
+curl -H "Authorization: Bearer $KNOWLEDGE_HUB_TOKEN" \
+  http://localhost:8000/api/v1/knowledge/categories
+```
+
 Ingestão de arquivo:
 
 ```bash
 curl -F "file=@./documento.pdf" \
-  -F "category=financeiro" \
+  -F "category_id=1" \
   -H "Authorization: Bearer $KNOWLEDGE_HUB_TOKEN" \
   http://localhost:8000/api/v1/knowledge/uploads
+```
+
+Ingestão de texto:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/knowledge/texts \
+  -H "Authorization: Bearer $KNOWLEDGE_HUB_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "anotacoes-da-reuniao",
+    "category_id": 1,
+    "content": "Cole aqui o texto que deve entrar na base de conhecimento."
+  }'
 ```
 
 Busca semântica:
@@ -245,8 +302,9 @@ Authorization: Bearer <seu-token>
 | Tool | Uso | Parâmetros | Retorno |
 | --- | --- | --- | --- |
 | `health` | Verifica se o servidor MCP está respondendo. | Nenhum. | `{ "status": "ok", "service": "knowledge-hub-mcp" }` |
-| `search` | Busca chunks por similaridade semântica nos documentos ingeridos. | `query` obrigatório, `limit` opcional, `category` opcional. | Lista de chunks com `id`, `source_id`, `content` e `score`. |
-| `sources` | Lista documentos/fontes disponíveis no hub. | Nenhum. | Lista com `id`, `title`, `category`, `source_type` e `uri`. |
+| `search` | Busca chunks por similaridade semântica nos documentos ingeridos. | `query` obrigatório, `limit` opcional, `category_id` opcional. | Lista de chunks com `id`, `source_id`, `content` e `score`. |
+| `sources` | Lista documentos/fontes disponíveis no hub. | Nenhum. | Lista com `id`, `title`, `category_id`, `source_type` e `uri`. |
+| `categories` | Lista as categorias disponíveis. | Nenhum. | Lista com `id` e `name`. |
 
 Exemplo de argumentos para `search`:
 
@@ -254,11 +312,11 @@ Exemplo de argumentos para `search`:
 {
   "query": "quais documentos falam sobre contratos?",
   "limit": 5,
-  "category": "juridico"
+  "category_id": 1
 }
 ```
 
-O campo `category` pode ser omitido para buscar em todas as categorias:
+O campo `category_id` pode ser omitido para buscar em todas as categorias:
 
 ```json
 {
@@ -311,10 +369,30 @@ Para trocar o token, rode novamente:
 uv run set-auth-token
 ```
 
+Ou gere um novo token automaticamente:
+
+```bash
+uv run set-auth-token --generate
+```
+
 ou, via Docker:
 
 ```bash
 docker-compose run --rm backend set-auth-token
+```
+
+Sem `docker-compose` no servidor:
+
+```bash
+docker exec -it mcp-knowledge-hub-backend set-auth-token
+docker restart mcp-knowledge-hub-mcp
+```
+
+Para gerar e salvar direto no container:
+
+```bash
+docker exec -it mcp-knowledge-hub-backend set-auth-token --generate
+docker restart mcp-knowledge-hub-mcp
 ```
 
 O backend e o MCP consultam o banco para validar o Bearer token, então o novo valor passa a valer sem precisar gravar segredo no repositório.

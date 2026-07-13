@@ -7,7 +7,9 @@ from backend.app.services.config import get_auth_token
 
 from .tools.knowledge import (
     KnowledgeHit,
+    KnowledgeCategory,
     KnowledgeSource,
+    get_knowledge_categories,
     get_knowledge_sources,
     get_workspace_overview,
     search_knowledge,
@@ -66,14 +68,19 @@ def health() -> dict[str, str]:
 async def search(
     query: str,
     limit: int = 5,
-    category: str | None = None,
+    category_id: int | None = None,
 ) -> list[KnowledgeHit]:
-    return await search_knowledge(query=query, limit=limit, category=category)
+    return await search_knowledge(query=query, limit=limit, category_id=category_id)
 
 
 @mcp.tool()
 async def sources() -> list[KnowledgeSource]:
     return await get_knowledge_sources()
+
+
+@mcp.tool()
+async def categories() -> list[KnowledgeCategory]:
+    return await get_knowledge_categories()
 
 
 @mcp.resource("config://workspace-overview")

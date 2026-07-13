@@ -10,14 +10,21 @@ from .base import Base
 EMBEDDING_DIMENSION = 768
 
 
+class Category(Base):
+    __tablename__ = "categories"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
+
+    sources: Mapped[list["DocumentSource"]] = relationship(back_populates="category")
+
+
 class DocumentSource(Base):
     __tablename__ = "document_sources"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
-    category: Mapped[str] = mapped_column(
-        String(100), nullable=False, default="uncategorized", server_default="uncategorized"
-    )
+    category_id: Mapped[int] = mapped_column(ForeignKey("categories.id"), nullable=False)
     source_type: Mapped[str] = mapped_column(String(50), nullable=False, default="file")
     uri: Mapped[str] = mapped_column(String(1024), nullable=False, unique=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -25,6 +32,7 @@ class DocumentSource(Base):
     chunks: Mapped[list["KnowledgeChunk"]] = relationship(
         back_populates="source", cascade="all, delete-orphan"
     )
+    category: Mapped[Category] = relationship(back_populates="sources")
 
 
 class KnowledgeChunk(Base):

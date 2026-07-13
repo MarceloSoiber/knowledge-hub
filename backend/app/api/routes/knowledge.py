@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...db.session import get_session
 from ...schemas.knowledge import (
+    CategoryRead,
     KnowledgeAnswerRequest,
     KnowledgeAnswerResponse,
     KnowledgeSearchRequest,
@@ -17,6 +18,7 @@ from ...services.embeddings import (
     build_embedding_client,
 )
 from ...services.knowledge import (
+    CategoryNotFoundError,
     EmptyDocumentError,
     FileTooLargeError,
     KnowledgeIngestionError,
@@ -24,6 +26,7 @@ from ...services.knowledge import (
     answer_knowledge,
     ingest_plain_text,
     ingest_uploaded_file,
+    list_categories,
     list_sources,
     search_knowledge,
 )
@@ -42,7 +45,7 @@ async def knowledge_search(
             session=session,
             query=payload.query,
             limit=payload.limit,
-            category=payload.category,
+            category_id=payload.category_id,
             embedding_client=build_embedding_client(),
         )
     except EmbeddingConfigurationError as exc:
@@ -71,13 +74,15 @@ async def upload_knowledge_file(
             session=session,
             filename=file.filename or "upload",
             content=content,
-            category=payload.category,
+            category_id=payload.category_id,
             embedding_client=build_embedding_client(),
         )
     except FileTooLargeError as exc:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail=str(exc)
         ) from exc
+    except CategoryNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except (UnsupportedFileTypeError, EmptyDocumentError, KnowledgeIngestionError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except EmbeddingConfigurationError as exc:
@@ -90,7 +95,7 @@ async def upload_knowledge_file(
     return KnowledgeUploadResponse(
         source_id=source.id,
         title=source.title,
-        category=source.category,
+        category_id=source.category_id,
         chunks_created=chunks_created,
     )
 
@@ -109,9 +114,11 @@ async def ingest_knowledge_text(
             session=session,
             title=payload.title,
             content=payload.content,
-            category=payload.category,
+            category_id=payload.category_id,
             embedding_client=build_embedding_client(),
         )
+    except CategoryNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except (EmptyDocumentError, KnowledgeIngestionError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except EmbeddingConfigurationError as exc:
@@ -124,7 +131,7 @@ async def ingest_knowledge_text(
     return KnowledgeUploadResponse(
         source_id=source.id,
         title=source.title,
-        category=source.category,
+        category_id=source.category_id,
         chunks_created=chunks_created,
     )
 
@@ -139,7 +146,7 @@ async def knowledge_answer(
             session=session,
             query=payload.query,
             limit=payload.limit,
-            category=payload.category,
+            category_id=payload.category_id,
             embedding_client=build_embedding_client(),
             answer_client=build_answer_client(),
         )
@@ -158,3 +165,10 @@ async def knowledge_sources(
     session: AsyncSession = Depends(get_session),
 ) -> list[dict[str, str | int]]:
     return await list_sources(session)
+
+
+@router.get("/categories", response_model=list[CategoryRead])
+async def knowledge_categories(
+    session: AsyncSession = Depends(get_session),
+) -> list[dict[str, str | int]]:
+    return await list_categories(session)

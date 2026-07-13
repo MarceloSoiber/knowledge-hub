@@ -5,20 +5,21 @@ from pydantic import BaseModel, Field, StringConstraints
 
 
 NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
-CategoryStr = Annotated[
-    str,
-    StringConstraints(strip_whitespace=True, min_length=1, max_length=100),
-]
 TitleStr = Annotated[
     str,
     StringConstraints(strip_whitespace=True, min_length=1, max_length=255),
 ]
 
 
+class CategoryRead(BaseModel):
+    id: int
+    name: str
+
+
 class KnowledgeSourceRead(BaseModel):
     id: int
     title: str
-    category: str
+    category_id: int
     source_type: str
     uri: str
 
@@ -33,7 +34,7 @@ class KnowledgeChunkRead(BaseModel):
 class KnowledgeSearchRequest(BaseModel):
     query: NonEmptyStr
     limit: int = Field(default=5, ge=1, le=50)
-    category: CategoryStr | None = None
+    category_id: int | None = Field(default=None, ge=1)
 
 
 class KnowledgeSearchResponse(BaseModel):
@@ -45,28 +46,28 @@ class KnowledgeSearchResponse(BaseModel):
 class KnowledgeUploadResponse(BaseModel):
     source_id: int
     title: str
-    category: str
+    category_id: int
     chunks_created: int
 
 
 class KnowledgeUploadRequest(BaseModel):
-    category: CategoryStr
+    category_id: int = Field(ge=1)
 
     @classmethod
-    def as_form(cls, category: Annotated[str, Form(...)]) -> "KnowledgeUploadRequest":
-        return cls(category=category)
+    def as_form(cls, category_id: Annotated[int, Form(...)]) -> "KnowledgeUploadRequest":
+        return cls(category_id=category_id)
 
 
 class KnowledgeTextIngestRequest(BaseModel):
     title: TitleStr
-    category: CategoryStr
+    category_id: int = Field(ge=1)
     content: NonEmptyStr
 
 
 class KnowledgeAnswerRequest(BaseModel):
     query: NonEmptyStr
     limit: int = Field(default=5, ge=1, le=20)
-    category: CategoryStr | None = None
+    category_id: int | None = Field(default=None, ge=1)
 
 
 class KnowledgeAnswerResponse(BaseModel):

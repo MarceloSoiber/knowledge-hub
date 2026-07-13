@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "scripts": {
     "db:up": "docker-compose up -d postgres",
+    "db:clear": "docker-compose exec -T postgres psql -U postgres -d knowledge_hub -v ON_ERROR_STOP=1 -c \"TRUNCATE TABLE knowledge_chunks, document_sources RESTART IDENTITY CASCADE;\"",
     "backend:up": "docker-compose up -d backend",
     "mcp:up": "docker-compose up -d mcp",
     "dev:up": "docker-compose up -d postgres backend mcp"

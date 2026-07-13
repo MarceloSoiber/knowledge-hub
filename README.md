@@ -122,6 +122,15 @@ Subir apenas o banco:
 npm run db:up
 ```
 
+Limpar todos os registros de documentos e conhecimento (operação irreversível):
+
+```bash
+npm run db:clear
+```
+
+Esse comando esvazia as tabelas `knowledge_chunks` e `document_sources` e reinicia suas
+sequências de IDs. O container do PostgreSQL precisa estar em execução.
+
 Subir apenas o backend:
 
 ```bash
@@ -198,11 +207,18 @@ Para testar com `curl`, você pode guardar o token só na sessão atual do termi
 export KNOWLEDGE_HUB_TOKEN="cole-o-token-aqui"
 ```
 
+Liste as categorias disponíveis para obter o ID usado na ingestão e nos filtros:
+
+```bash
+curl -H "Authorization: Bearer $KNOWLEDGE_HUB_TOKEN" \
+  http://localhost:8000/api/v1/knowledge/categories
+```
+
 Ingestão de arquivo:
 
 ```bash
 curl -F "file=@./documento.pdf" \
-  -F "category=financeiro" \
+  -F "category_id=1" \
   -H "Authorization: Bearer $KNOWLEDGE_HUB_TOKEN" \
   http://localhost:8000/api/v1/knowledge/uploads
 ```
@@ -215,7 +231,7 @@ curl -X POST http://localhost:8000/api/v1/knowledge/texts \
   -H "Content-Type: application/json" \
   -d '{
     "title": "anotacoes-da-reuniao",
-    "category": "financeiro",
+    "category_id": 1,
     "content": "Cole aqui o texto que deve entrar na base de conhecimento."
   }'
 ```
@@ -264,8 +280,9 @@ Authorization: Bearer <seu-token>
 | Tool | Uso | Parâmetros | Retorno |
 | --- | --- | --- | --- |
 | `health` | Verifica se o servidor MCP está respondendo. | Nenhum. | `{ "status": "ok", "service": "knowledge-hub-mcp" }` |
-| `search` | Busca chunks por similaridade semântica nos documentos ingeridos. | `query` obrigatório, `limit` opcional, `category` opcional. | Lista de chunks com `id`, `source_id`, `content` e `score`. |
-| `sources` | Lista documentos/fontes disponíveis no hub. | Nenhum. | Lista com `id`, `title`, `category`, `source_type` e `uri`. |
+| `search` | Busca chunks por similaridade semântica nos documentos ingeridos. | `query` obrigatório, `limit` opcional, `category_id` opcional. | Lista de chunks com `id`, `source_id`, `content` e `score`. |
+| `sources` | Lista documentos/fontes disponíveis no hub. | Nenhum. | Lista com `id`, `title`, `category_id`, `source_type` e `uri`. |
+| `categories` | Lista as categorias disponíveis. | Nenhum. | Lista com `id` e `name`. |
 
 Exemplo de argumentos para `search`:
 
@@ -273,11 +290,11 @@ Exemplo de argumentos para `search`:
 {
   "query": "quais documentos falam sobre contratos?",
   "limit": 5,
-  "category": "juridico"
+  "category_id": 1
 }
 ```
 
-O campo `category` pode ser omitido para buscar em todas as categorias:
+O campo `category_id` pode ser omitido para buscar em todas as categorias:
 
 ```json
 {
