@@ -49,7 +49,12 @@ MCP_HOST="0.0.0.0"
 MCP_PORT="8001"
 MCP_PUBLIC_URL="http://192.0.2.10:8001"
 MCP_PATH="/mcp"
+MCP_WRITE_ENABLED="false"
 ```
+
+`MCP_WRITE_ENABLED` controla se o token MCP emitido pelo servidor recebe tambem
+o escopo `knowledge:write`. O padrao e `false`, mantendo o MCP somente leitura.
+Ative apenas quando quiser permitir a tool `ingest_text`.
 
 ### Configurar Token De Acesso
 
@@ -293,6 +298,12 @@ Authorization: Bearer <seu-token>
 | `search` | Busca chunks por similaridade semântica nos documentos ingeridos. | `query` obrigatório, `limit` opcional, `category_ids` opcional. | Lista de chunks com `id`, `source_id`, `content` e `score`. |
 | `sources` | Lista documentos/fontes disponíveis no hub. | Nenhum. | Lista com `id`, `title`, `categories`, `source_type` e `uri`. |
 | `categories` | Lista as categorias disponíveis. | Nenhum. | Lista com `id` e `name`. |
+| `ingest_text` | Persiste uma nota textual confirmada pelo usuário. Requer `MCP_WRITE_ENABLED=true` e escopo `knowledge:write`. | `title`, `content`, `category_ids` obrigatórios; `metadata` opcional com `client_id` ou `note_type`. | Objeto com `source_id`, `title`, `categories` e `chunks_created`. |
+
+`ingest_text` grava conhecimento persistente. Antes de chamar essa tool, o agente
+deve pedir confirmação explícita ao usuário sobre o texto que será salvo. Ela não
+deve ser usada para arquivar conversas automaticamente. Para escolher categorias,
+use `categories` e envie os IDs em `category_ids`.
 
 Exemplo de argumentos para `search`:
 
@@ -310,6 +321,19 @@ O campo `category_ids` pode ser omitido para buscar em todas as categorias:
 {
   "query": "resuma os pontos principais do material enviado",
   "limit": 5
+}
+```
+
+Exemplo de argumentos para `ingest_text`:
+
+```json
+{
+  "title": "Decisão de arquitetura",
+  "content": "Usar o serviço de ingestão existente para manter rollback e chunks consistentes.",
+  "category_ids": [1, 2],
+  "metadata": {
+    "note_type": "decision"
+  }
 }
 ```
 

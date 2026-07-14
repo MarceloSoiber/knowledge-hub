@@ -58,6 +58,8 @@ async def ingest_plain_text(
     content: str,
     category_ids: list[int],
     embedding_client: EmbeddingClient,
+    source_type: str = "text",
+    metadata: dict[str, str] | None = None,
 ) -> tuple[DocumentSource, int]:
     normalized_title = title.strip()
     if not normalized_title:
@@ -67,15 +69,16 @@ async def ingest_plain_text(
     if not text:
         raise EmptyDocumentError("Text content does not contain readable text.")
 
-    uri = f"text:{normalized_title}"
+    uri = f"{source_type}:{normalized_title}"
     return await ingest_text_source(
         session=session,
         title=normalized_title,
         text=text,
         categories=categories,
-        source_type="text",
+        source_type=source_type,
         uri=uri,
         embedding_client=embedding_client,
+        extra_metadata=metadata,
     )
 
 
@@ -87,6 +90,7 @@ async def ingest_text_source(
     source_type: str,
     uri: str,
     embedding_client: EmbeddingClient,
+    extra_metadata: dict[str, str] | None = None,
 ) -> tuple[DocumentSource, int]:
     chunks = chunk_text(text)
     embeddings = await embedding_client.embed_texts(chunks)
@@ -109,18 +113,18 @@ async def ingest_text_source(
         await session.flush()
 
     category_payload = [{"id": category.id, "name": category.name} for category in categories]
-    metadata = [
-        json.dumps(
-            {
-                "title": title,
-                "category_ids": [category.id for category in categories],
-                "categories": category_payload,
-                "source_type": source_type,
-                "chunk_index": index,
-            }
-        )
-        for index, _ in enumerate(chunks)
-    ]
+    metadata = []
+    for index, _ in enumerate(chunks):
+        chunk_metadata = {
+            "title": title,
+            "category_ids": [category.id for category in categories],
+            "categories": category_payload,
+            "source_type": source_type,
+            "chunk_index": index,
+        }
+        if extra_metadata:
+            chunk_metadata["metadata"] = extra_metadata
+        metadata.append(json.dumps(chunk_metadata))
     add_source_chunks(session, source.id, chunks, embeddings, metadata)
 
     await session.commit()

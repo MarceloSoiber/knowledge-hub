@@ -314,6 +314,28 @@ async def test_ingest_plain_text_creates_text_source() -> None:
 
 
 @pytest.mark.asyncio
+async def test_ingest_plain_text_can_create_mcp_source() -> None:
+    session = FakeSession()
+
+    source, chunks_created = await ingest_plain_text(
+        session=session,
+        title="Confirmed note",
+        content="persist this confirmed note",
+        category_ids=[3],
+        embedding_client=FakeEmbeddingClient(),
+        source_type="mcp",
+        metadata={"note_type": "decision"},
+    )
+
+    assert source.id == 99
+    assert source.title == "Confirmed note"
+    assert source.source_type == "mcp"
+    assert source.uri == "mcp:Confirmed note"
+    assert chunks_created == 1
+    assert session.committed is True
+
+
+@pytest.mark.asyncio
 async def test_ingest_plain_text_replaces_existing_text_source() -> None:
     source = DocumentSource(
         id=8,

@@ -41,6 +41,49 @@ export KNOWLEDGE_HUB_TOKEN="seu-token"
 Quando nenhum token estiver configurado, a autenticação fica desabilitada. Os endpoints
 `GET /` e `GET /health` são públicos em ambos os casos.
 
+## MCP
+
+O servidor MCP usa o mesmo token Bearer salvo em `app_config.auth_token`.
+Por padrão, ele emite apenas o escopo `knowledge:read` para ferramentas de
+consulta. Para permitir escrita via MCP, configure:
+
+```env
+MCP_WRITE_ENABLED="true"
+```
+
+Com escrita ativa, a tool `ingest_text` exige `knowledge:write` e aceita:
+
+```json
+{
+  "title": "Decisão de arquitetura",
+  "content": "Texto confirmado pelo usuário para persistência.",
+  "category_ids": [1, 2],
+  "metadata": {
+    "note_type": "decision"
+  }
+}
+```
+
+Resposta:
+
+```json
+{
+  "source_id": 42,
+  "title": "Decisão de arquitetura",
+  "categories": [
+    {
+      "id": 1,
+      "name": "docs"
+    }
+  ],
+  "chunks_created": 2
+}
+```
+
+A tool grava conhecimento persistente. Clientes/agentes devem pedir confirmação
+explícita ao usuário antes de chamá-la e não devem usá-la para arquivar conversas
+automaticamente. `metadata` aceita apenas `client_id` e `note_type`.
+
 ## Resumo dos endpoints
 
 | Método | Endpoint | Descrição |

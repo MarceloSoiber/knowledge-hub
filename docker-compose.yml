@@ -65,6 +65,7 @@ services:
       MCP_PORT: "8001"
       MCP_PUBLIC_URL: "${MCP_PUBLIC_URL:-http://192.0.2.10:8001}"
       MCP_PATH: "${MCP_PATH:-/mcp}"
+      MCP_WRITE_ENABLED: "${MCP_WRITE_ENABLED:-false}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
