@@ -232,6 +232,10 @@ POST /api/v1/knowledge/texts
 Content-Type: application/json
 ```
 
+Tambem aceita `multipart/form-data` ou `application/x-www-form-urlencoded` com os
+mesmos campos. Em formulario, envie `category_ids` como campo repetido quando
+houver mais de uma categoria.
+
 Corpo da requisição:
 
 | Campo | Tipo | Obrigatório | Regras |
