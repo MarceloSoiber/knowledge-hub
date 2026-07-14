@@ -2,8 +2,9 @@ from pydantic import BaseModel, Field
 
 from backend.app.db.session import SessionLocal
 from backend.app.services.embeddings import build_embedding_client
-from backend.app.services.knowledge import list_categories, list_sources
-from backend.app.services.knowledge import search_knowledge as search_backend_knowledge
+from backend.app.services.categories import list_categories
+from backend.app.services.search import list_sources
+from backend.app.services.search import search_knowledge as search_backend_knowledge
 
 
 class KnowledgeHit(BaseModel):

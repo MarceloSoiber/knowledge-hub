@@ -20,18 +20,12 @@ from backend.app.services.embeddings import (
     EmbeddingConfigurationError,
     OpenAIEmbeddingClient,
 )
-from backend.app.services.knowledge import (
-    CategoryNotFoundError,
-    UnsupportedFileTypeError,
-    answer_knowledge,
-    chunk_text,
-    extract_text,
-    ingest_plain_text,
-    ingest_uploaded_file,
-    list_categories,
-    search_knowledge,
-)
+from backend.app.services.categories import CategoryNotFoundError, list_categories
+from backend.app.services.documents.chunker import chunk_text
+from backend.app.services.documents.extractors import UnsupportedFileTypeError, extract_text
+from backend.app.services.ingestion import ingest_plain_text, ingest_uploaded_file
 from backend.app.services.rag import LLMConfigurationError, OpenAICompatibleAnswerClient
+from backend.app.services.search import answer_knowledge, search_knowledge
 
 
 class FakeEmbeddingClient:
@@ -134,7 +128,7 @@ def test_extract_text_reads_pdf(monkeypatch: pytest.MonkeyPatch) -> None:
             _ = stream
             self.pages = [FakePage()]
 
-    monkeypatch.setattr("backend.app.services.knowledge.build_pdf_reader", FakePdfReader)
+    monkeypatch.setattr("backend.app.services.documents.extractors.build_pdf_reader", FakePdfReader)
 
     assert extract_text("paper.pdf", b"%PDF") == "pdf page"
 
@@ -150,7 +144,7 @@ def test_extract_text_normalizes_pdf_layout(monkeypatch: pytest.MonkeyPatch) -> 
             _ = stream
             self.pages = [FakePage()]
 
-    monkeypatch.setattr("backend.app.services.knowledge.build_pdf_reader", FakePdfReader)
+    monkeypatch.setattr("backend.app.services.documents.extractors.build_pdf_reader", FakePdfReader)
 
     assert extract_text("paper.pdf", b"%PDF") == "Receita de Vendas de Imóveis Fonte: TRBL11"
 

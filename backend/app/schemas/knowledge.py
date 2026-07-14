@@ -54,7 +54,7 @@ class KnowledgeUploadRequest(BaseModel):
     category_id: int = Field(ge=1)
 
     @classmethod
-    def as_form(cls, category_id: Annotated[int, Form(...)]) -> "KnowledgeUploadRequest":
+    async def as_form(cls, category_id: Annotated[int, Form(...)]) -> "KnowledgeUploadRequest":
         return cls(category_id=category_id)
 
 

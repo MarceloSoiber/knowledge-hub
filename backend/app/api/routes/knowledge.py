@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...db.session import get_session
+from ...api.dependencies import get_answer_client, get_embedding_client
 from ...schemas.knowledge import (
     CategoryRead,
     KnowledgeAnswerRequest,
@@ -13,24 +14,20 @@ from ...schemas.knowledge import (
     KnowledgeUploadResponse,
 )
 from ...services.embeddings import (
+    EmbeddingClient,
     EmbeddingConfigurationError,
     EmbeddingError,
-    build_embedding_client,
 )
-from ...services.knowledge import (
-    CategoryNotFoundError,
+from ...services.categories import CategoryNotFoundError, list_categories
+from ...services.documents.extractors import (
     EmptyDocumentError,
     FileTooLargeError,
-    KnowledgeIngestionError,
     UnsupportedFileTypeError,
-    answer_knowledge,
-    ingest_plain_text,
-    ingest_uploaded_file,
-    list_categories,
-    list_sources,
-    search_knowledge,
 )
-from ...services.rag import LLMConfigurationError, LLMError, build_answer_client
+from ...services.ingestion import KnowledgeIngestionError, ingest_plain_text
+from ...services.ingestion import ingest_uploaded_file
+from ...services.rag import AnswerClient, LLMConfigurationError, LLMError
+from ...services.search import answer_knowledge, list_sources, search_knowledge
 
 router = APIRouter(prefix="/knowledge", tags=["knowledge"])
 
@@ -39,6 +36,7 @@ router = APIRouter(prefix="/knowledge", tags=["knowledge"])
 async def knowledge_search(
     payload: KnowledgeSearchRequest,
     session: AsyncSession = Depends(get_session),
+    embedding_client: EmbeddingClient = Depends(get_embedding_client),
 ) -> KnowledgeSearchResponse:
     try:
         results = await search_knowledge(
@@ -46,7 +44,7 @@ async def knowledge_search(
             query=payload.query,
             limit=payload.limit,
             category_id=payload.category_id,
-            embedding_client=build_embedding_client(),
+            embedding_client=embedding_client,
         )
     except EmbeddingConfigurationError as exc:
         raise HTTPException(
@@ -66,6 +64,7 @@ async def upload_knowledge_file(
     file: UploadFile = File(...),
     payload: KnowledgeUploadRequest = Depends(KnowledgeUploadRequest.as_form),
     session: AsyncSession = Depends(get_session),
+    embedding_client: EmbeddingClient = Depends(get_embedding_client),
 ) -> KnowledgeUploadResponse:
     content = await file.read()
 
@@ -75,7 +74,7 @@ async def upload_knowledge_file(
             filename=file.filename or "upload",
             content=content,
             category_id=payload.category_id,
-            embedding_client=build_embedding_client(),
+            embedding_client=embedding_client,
         )
     except FileTooLargeError as exc:
         raise HTTPException(
@@ -108,6 +107,7 @@ async def upload_knowledge_file(
 async def ingest_knowledge_text(
     payload: KnowledgeTextIngestRequest,
     session: AsyncSession = Depends(get_session),
+    embedding_client: EmbeddingClient = Depends(get_embedding_client),
 ) -> KnowledgeUploadResponse:
     try:
         source, chunks_created = await ingest_plain_text(
@@ -115,7 +115,7 @@ async def ingest_knowledge_text(
             title=payload.title,
             content=payload.content,
             category_id=payload.category_id,
-            embedding_client=build_embedding_client(),
+            embedding_client=embedding_client,
         )
     except CategoryNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
@@ -140,6 +140,8 @@ async def ingest_knowledge_text(
 async def knowledge_answer(
     payload: KnowledgeAnswerRequest,
     session: AsyncSession = Depends(get_session),
+    embedding_client: EmbeddingClient = Depends(get_embedding_client),
+    answer_client: AnswerClient = Depends(get_answer_client),
 ) -> KnowledgeAnswerResponse:
     try:
         answer, sources = await answer_knowledge(
@@ -147,8 +149,8 @@ async def knowledge_answer(
             query=payload.query,
             limit=payload.limit,
             category_id=payload.category_id,
-            embedding_client=build_embedding_client(),
-            answer_client=build_answer_client(),
+            embedding_client=embedding_client,
+            answer_client=answer_client,
         )
     except (EmbeddingConfigurationError, LLMConfigurationError) as exc:
         raise HTTPException(
