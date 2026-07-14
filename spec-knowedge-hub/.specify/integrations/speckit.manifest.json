@@ -1,7 +1,7 @@
 {
   "integration": "speckit",
   "version": "0.12.13",
-  "installed_at": "2026-07-13T23:55:38.370470+00:00",
+  "installed_at": "2026-07-14T12:20:53.149363+00:00",
   "files": {
     ".specify/templates/spec-template.md": "3945437fc35cd30a5b2bf7beea680337c3516826d3efa5a6b92c4a7eca1ba28e",
     ".specify/templates/checklist-template.md": "0ad704b60af2df817aee1c0a2ecc0e0304b271d2de34047df1c891735967033e",
