@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import re
 
+PDF_PAGE_COUNTER_PATTERN = re.compile(r"^\s*\d+\s*/\s*\d+\s*$")
+
 
 def normalize_text(text: str) -> str:
     text = text.replace("\r\n", "\n").replace("\r", "\n").replace("\xa0", " ")
@@ -16,7 +18,11 @@ def normalize_pdf_text(text: str) -> str:
     paragraphs = re.split(r"\n{2,}", text)
     normalized: list[str] = []
     for paragraph in paragraphs:
-        lines = [" ".join(line.split()) for line in paragraph.splitlines()]
+        lines = [
+            " ".join(line.split())
+            for line in paragraph.splitlines()
+            if not PDF_PAGE_COUNTER_PATTERN.fullmatch(line)
+        ]
         paragraph_text = " ".join(line for line in lines if line)
         if paragraph_text:
             normalized.append(paragraph_text)

@@ -163,6 +163,31 @@ def test_extract_text_normalizes_pdf_layout(monkeypatch: pytest.MonkeyPatch) -> 
     assert extract_text("paper.pdf", b"%PDF") == "Receita de Vendas de Imóveis Fonte: TRBL11"
 
 
+def test_extract_text_removes_pdf_page_counters(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FakePage:
+        def __init__(self, text: str) -> None:
+            self.text = text
+
+        def extract_text(self, extraction_mode: str | None = None) -> str:
+            assert extraction_mode == "layout"
+            return self.text
+
+    class FakePdfReader:
+        def __init__(self, stream: object) -> None:
+            _ = stream
+            self.pages = [
+                FakePage("1 / 17\n\nResumo do fundo\nReceita recorrente"),
+                FakePage("2 / 17\n\nRiscos e oportunidades"),
+            ]
+
+    monkeypatch.setattr("backend.app.services.documents.extractors.build_pdf_reader", FakePdfReader)
+
+    assert (
+        extract_text("paper.pdf", b"%PDF")
+        == "Resumo do fundo Receita recorrente\n\nRiscos e oportunidades"
+    )
+
+
 def test_chunk_text_uses_overlap() -> None:
     chunks = chunk_text("abcdefghij", chunk_size=6, overlap=2)
 
