@@ -42,4 +42,5 @@ mcp_knowledge_hub.egg-info/requires.txt
 mcp_knowledge_hub.egg-info/top_level.txt
 mcp_server/server.py
 mcp_server/tools/knowledge.py
+tests/test_knowledge_api_integration.py
 tests/test_knowledge_service.py

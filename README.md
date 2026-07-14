@@ -381,6 +381,28 @@ O backend e o MCP consultam o banco para validar o Bearer token, então o novo v
 uv run pytest -q
 ```
 
+## Qualidade
+
+Instale dependencias de desenvolvimento:
+
+```bash
+uv sync --extra dev
+cd frontend && npm install
+```
+
+Rodar quality gate completo (backend + frontend):
+
+```bash
+npm run quality
+```
+
+Rodar quality gate por camada:
+
+```bash
+npm run backend:quality
+npm run frontend:quality
+```
+
 ## Troubleshooting
 
 Porta `8000` ocupada:
