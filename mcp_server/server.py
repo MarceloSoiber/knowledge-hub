@@ -9,9 +9,11 @@ from .tools.knowledge import (
     KnowledgeHit,
     KnowledgeCategory,
     KnowledgeSource,
+    MCPTextIngestResult,
     get_knowledge_categories,
     get_knowledge_sources,
     get_workspace_overview,
+    ingest_mcp_text,
     search_knowledge,
 )
 
@@ -28,10 +30,17 @@ def build_token_verifier():
             return AccessToken(
                 token=token,
                 client_id="knowledge-hub-mcp-client",
-                scopes=["knowledge:read"],
+                scopes=build_mcp_scopes(),
             )
 
     return StaticTokenVerifier()
+
+
+def build_mcp_scopes() -> list[str]:
+    scopes = ["knowledge:read"]
+    if get_settings().mcp_write_enabled:
+        scopes.append("knowledge:write")
+    return scopes
 
 
 def build_auth_settings():
@@ -81,6 +90,28 @@ async def sources() -> list[KnowledgeSource]:
 @mcp.tool()
 async def categories() -> list[KnowledgeCategory]:
     return await get_knowledge_categories()
+
+
+@mcp.tool(
+    description=(
+        "Persiste uma nota textual no Knowledge Hub somente depois de confirmacao "
+        "explicita do usuario. Nao use para arquivar conversas automaticamente. "
+        "Use categories() antes para escolher category_ids validos. Requer "
+        "escopo knowledge:write."
+    )
+)
+async def ingest_text(
+    title: str,
+    content: str,
+    category_ids: list[int],
+    metadata: dict[str, str] | None = None,
+) -> MCPTextIngestResult:
+    return await ingest_mcp_text(
+        title=title,
+        content=content,
+        category_ids=category_ids,
+        metadata=metadata,
+    )
 
 
 @mcp.resource("config://workspace-overview")

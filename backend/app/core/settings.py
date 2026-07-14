@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     mcp_port: int = Field(default=8001)
     mcp_public_url: str = Field(default="http://192.0.2.10:8001")
     mcp_path: str = Field(default="/mcp")
+    mcp_write_enabled: bool = Field(default=False)
 
 
 @lru_cache(maxsize=1)
