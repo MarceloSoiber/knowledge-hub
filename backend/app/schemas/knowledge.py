@@ -1,20 +1,31 @@
 from typing import Annotated
 
 from fastapi import Form
-from pydantic import BaseModel, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
 
 
 NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
-CategoryStr = Annotated[
+TitleStr = Annotated[
     str,
-    StringConstraints(strip_whitespace=True, min_length=1, max_length=100),
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=255),
 ]
+
+
+class CategoryRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+
+
+class CategoryWrite(BaseModel):
+    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
 
 
 class KnowledgeSourceRead(BaseModel):
     id: int
     title: str
-    category: str
+    categories: list[CategoryRead]
     source_type: str
     uri: str
 
@@ -29,7 +40,12 @@ class KnowledgeChunkRead(BaseModel):
 class KnowledgeSearchRequest(BaseModel):
     query: NonEmptyStr
     limit: int = Field(default=5, ge=1, le=50)
-    category: CategoryStr | None = None
+    category_ids: list[int] | None = Field(default=None)
+
+    @field_validator("category_ids")
+    @classmethod
+    def validate_category_ids(cls, value: list[int] | None) -> list[int] | None:
+        return validate_optional_category_ids(value)
 
 
 class KnowledgeSearchResponse(BaseModel):
@@ -41,25 +57,70 @@ class KnowledgeSearchResponse(BaseModel):
 class KnowledgeUploadResponse(BaseModel):
     source_id: int
     title: str
-    category: str
+    categories: list[CategoryRead]
     chunks_created: int
 
 
 class KnowledgeUploadRequest(BaseModel):
-    category: CategoryStr
+    category_ids: list[int]
+
+    @field_validator("category_ids")
+    @classmethod
+    def validate_category_ids(cls, value: list[int]) -> list[int]:
+        return validate_required_category_ids(value)
 
     @classmethod
-    def as_form(cls, category: Annotated[str, Form(...)]) -> "KnowledgeUploadRequest":
-        return cls(category=category)
+    async def as_form(
+        cls, category_ids: Annotated[list[int], Form(...)]
+    ) -> "KnowledgeUploadRequest":
+        return cls(category_ids=category_ids)
+
+
+class KnowledgeTextIngestRequest(BaseModel):
+    title: TitleStr
+    category_ids: list[int]
+    content: NonEmptyStr
+
+    @field_validator("category_ids")
+    @classmethod
+    def validate_category_ids(cls, value: list[int]) -> list[int]:
+        return validate_required_category_ids(value)
 
 
 class KnowledgeAnswerRequest(BaseModel):
     query: NonEmptyStr
     limit: int = Field(default=5, ge=1, le=20)
-    category: CategoryStr | None = None
+    category_ids: list[int] | None = Field(default=None)
+
+    @field_validator("category_ids")
+    @classmethod
+    def validate_category_ids(cls, value: list[int] | None) -> list[int] | None:
+        return validate_optional_category_ids(value)
 
 
 class KnowledgeAnswerResponse(BaseModel):
     query: str
     answer: str
     sources: list[KnowledgeChunkRead]
+
+
+def validate_required_category_ids(value: list[int]) -> list[int]:
+    if not value:
+        raise ValueError("At least one category id is required.")
+    return validate_category_id_list(value)
+
+
+def validate_optional_category_ids(value: list[int] | None) -> list[int] | None:
+    if value is None:
+        return None
+    if not value:
+        raise ValueError("Category id filter must not be empty.")
+    return validate_category_id_list(value)
+
+
+def validate_category_id_list(value: list[int]) -> list[int]:
+    if any(category_id < 1 for category_id in value):
+        raise ValueError("Category ids must be greater than zero.")
+    if len(set(value)) != len(value):
+        raise ValueError("Category ids must not contain duplicates.")
+    return value
