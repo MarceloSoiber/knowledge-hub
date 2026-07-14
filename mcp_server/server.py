@@ -68,9 +68,9 @@ def health() -> dict[str, str]:
 async def search(
     query: str,
     limit: int = 5,
-    category_id: int | None = None,
+    category_ids: list[int] | None = None,
 ) -> list[KnowledgeHit]:
-    return await search_knowledge(query=query, limit=limit, category_id=category_id)
+    return await search_knowledge(query=query, limit=limit, category_ids=category_ids)
 
 
 @mcp.tool()

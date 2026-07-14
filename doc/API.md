@@ -48,6 +48,9 @@ Quando nenhum token estiver configurado, a autenticação fica desabilitada. Os 
 | `GET` | `/` | Identifica a API. |
 | `GET` | `/health` | Verifica a saúde da aplicação. |
 | `GET` | `/api/v1/knowledge/categories` | Lista as categorias disponíveis. |
+| `POST` | `/api/v1/knowledge/categories` | Cria uma categoria. |
+| `PATCH` | `/api/v1/knowledge/categories/{id}` | Renomeia uma categoria. |
+| `DELETE` | `/api/v1/knowledge/categories/{id}` | Remove uma categoria sem documentos associados. |
 | `GET` | `/api/v1/knowledge/sources` | Lista os documentos cadastrados. |
 | `POST` | `/api/v1/knowledge/uploads` | Cadastra um arquivo. |
 | `POST` | `/api/v1/knowledge/texts` | Cadastra conteúdo textual. |
@@ -56,8 +59,8 @@ Quando nenhum token estiver configurado, a autenticação fica desabilitada. Os 
 
 ## Categorias
 
-Os documentos são associados a uma categoria por meio de `category_id`. Consulte a
-listagem antes de cadastrar um documento ou aplicar um filtro.
+Os documentos são associados a uma ou mais categorias por meio de `category_ids`.
+Consulte a listagem antes de cadastrar um documento ou aplicar um filtro.
 
 ### Listar categorias
 
@@ -87,6 +90,48 @@ Resposta `200 OK`:
 ]
 ```
 
+### Criar categoria
+
+```http
+POST /api/v1/knowledge/categories
+Content-Type: application/json
+```
+
+Exemplo:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/knowledge/categories \
+  -H "Authorization: Bearer $KNOWLEDGE_HUB_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Financeiro"}'
+```
+
+Resposta `201 Created`:
+
+```json
+{
+  "id": 2,
+  "name": "financeiro"
+}
+```
+
+### Renomear categoria
+
+```http
+PATCH /api/v1/knowledge/categories/{id}
+Content-Type: application/json
+```
+
+O nome é normalizado com remoção de espaços externos e letras minúsculas.
+
+### Excluir categoria
+
+```http
+DELETE /api/v1/knowledge/categories/{id}
+```
+
+Categorias associadas a documentos não podem ser excluídas e retornam `409 Conflict`.
+
 ## Cadastro de conhecimento
 
 O cadastro pode ser feito por arquivo ou por texto. Nos dois casos, o conteúdo é
@@ -104,7 +149,7 @@ Campos:
 | Campo | Tipo | Obrigatório | Regras |
 | --- | --- | --- | --- |
 | `file` | arquivo | sim | Formatos `.txt`, `.md` ou `.pdf`; máximo de 10 MB. |
-| `category_id` | inteiro | sim | Deve ser maior que zero e apontar para uma categoria existente. |
+| `category_ids` | inteiros repetidos | sim | Cada valor deve ser maior que zero, sem duplicatas, e apontar para uma categoria existente. |
 
 Exemplo:
 
@@ -112,7 +157,8 @@ Exemplo:
 curl -X POST \
   -H "Authorization: Bearer $KNOWLEDGE_HUB_TOKEN" \
   -F "file=@./documento.pdf" \
-  -F "category_id=2" \
+  -F "category_ids=2" \
+  -F "category_ids=3" \
   http://localhost:8000/api/v1/knowledge/uploads
 ```
 
@@ -122,7 +168,16 @@ Resposta `201 Created`:
 {
   "source_id": 10,
   "title": "documento.pdf",
-  "category_id": 2,
+  "categories": [
+    {
+      "id": 2,
+      "name": "financeiro"
+    },
+    {
+      "id": 3,
+      "name": "contratos"
+    }
+  ],
   "chunks_created": 8
 }
 ```
@@ -139,7 +194,7 @@ Corpo da requisição:
 | Campo | Tipo | Obrigatório | Regras |
 | --- | --- | --- | --- |
 | `title` | string | sim | Entre 1 e 255 caracteres após remover espaços externos. |
-| `category_id` | inteiro | sim | Deve ser maior que zero e apontar para uma categoria existente. |
+| `category_ids` | lista de inteiros | sim | Deve conter pelo menos um ID maior que zero, sem duplicatas, e apontar para categorias existentes. |
 | `content` | string | sim | Não pode ficar vazio após a normalização. |
 
 Exemplo:
@@ -150,7 +205,7 @@ curl -X POST http://localhost:8000/api/v1/knowledge/texts \
   -H "Content-Type: application/json" \
   -d '{
     "title": "Ata da reunião",
-    "category_id": 2,
+    "category_ids": [2, 3],
     "content": "Este é o conteúdo que será armazenado na base de conhecimento."
   }'
 ```
@@ -161,7 +216,16 @@ Resposta `201 Created`:
 {
   "source_id": 11,
   "title": "Ata da reunião",
-  "category_id": 2,
+  "categories": [
+    {
+      "id": 2,
+      "name": "financeiro"
+    },
+    {
+      "id": 3,
+      "name": "contratos"
+    }
+  ],
   "chunks_created": 1
 }
 ```
@@ -184,7 +248,7 @@ Corpo da requisição:
 | --- | --- | --- | --- |
 | `query` | string | sim | Não pode ser vazia. |
 | `limit` | inteiro | não | Padrão `5`; mínimo `1`; máximo `50`. |
-| `category_id` | inteiro | não | Filtra os documentos por categoria. |
+| `category_ids` | lista de inteiros | não | Filtra documentos que pertençam a qualquer uma das categorias informadas. |
 
 Exemplo:
 
@@ -195,7 +259,7 @@ curl -X POST http://localhost:8000/api/v1/knowledge/search \
   -d '{
     "query": "Quais documentos mencionam contratos?",
     "limit": 5,
-    "category_id": 2
+    "category_ids": [2, 3]
   }'
 ```
 
@@ -229,7 +293,7 @@ Corpo da requisição:
 | --- | --- | --- | --- |
 | `query` | string | sim | Não pode ser vazia. |
 | `limit` | inteiro | não | Padrão `5`; mínimo `1`; máximo `20`. |
-| `category_id` | inteiro | não | Filtra os documentos usados na resposta. |
+| `category_ids` | lista de inteiros | não | Filtra documentos usados na resposta por semântica qualquer categoria. |
 
 Exemplo:
 
@@ -240,7 +304,7 @@ curl -X POST http://localhost:8000/api/v1/knowledge/answer \
   -d '{
     "query": "Resuma os pontos principais dos contratos.",
     "limit": 5,
-    "category_id": 2
+    "category_ids": [2, 3]
   }'
 ```
 
@@ -281,16 +345,30 @@ Resposta `200 OK`:
   {
     "id": 10,
     "title": "documento.pdf",
-    "category_id": 2,
+    "categories": [
+      {
+        "id": 2,
+        "name": "financeiro"
+      }
+    ],
     "source_type": "upload",
-    "uri": "upload:financeiro:documento.pdf"
+    "uri": "upload:documento.pdf"
   },
   {
     "id": 11,
     "title": "Ata da reunião",
-    "category_id": 2,
+    "categories": [
+      {
+        "id": 2,
+        "name": "financeiro"
+      },
+      {
+        "id": 3,
+        "name": "contratos"
+      }
+    ],
     "source_type": "text",
-    "uri": "text:financeiro:Ata da reunião"
+    "uri": "text:Ata da reunião"
   }
 ]
 ```
@@ -343,7 +421,8 @@ Principais códigos:
 | --- | --- |
 | `400 Bad Request` | Arquivo inválido, conteúdo vazio ou falha de ingestão. |
 | `401 Unauthorized` | Token Bearer ausente ou inválido quando a autenticação está ativa. |
-| `404 Not Found` | O `category_id` informado no cadastro não existe. |
+| `404 Not Found` | A categoria informada não existe. |
+| `409 Conflict` | Nome de categoria duplicado ou categoria em uso durante exclusão. |
 | `413 Content Too Large` | O arquivo enviado ultrapassa 10 MB. |
 | `422 Unprocessable Entity` | O corpo ou os parâmetros não atendem ao schema. |
 | `502 Bad Gateway` | Falha ao consultar o serviço de embeddings ou o LLM. |

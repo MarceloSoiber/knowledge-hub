@@ -3,7 +3,17 @@
 New code should import from the focused service modules directly.
 """
 
-from .categories import CategoryNotFoundError, get_category, list_categories
+from .categories import (
+    CategoryConflictError,
+    CategoryInUseError,
+    CategoryNotFoundError,
+    create_category,
+    delete_category,
+    get_categories,
+    get_category,
+    list_categories,
+    update_category,
+)
 from .documents.chunker import chunk_text, find_chunk_end, find_chunk_start
 from .documents.extractors import (
     EmptyDocumentError,
@@ -21,6 +31,8 @@ from .search import answer_knowledge, list_sources, search_knowledge
 
 __all__ = [
     "CategoryNotFoundError",
+    "CategoryConflictError",
+    "CategoryInUseError",
     "EmptyDocumentError",
     "FileTooLargeError",
     "KnowledgeIngestionError",
@@ -28,10 +40,13 @@ __all__ = [
     "answer_knowledge",
     "build_pdf_reader",
     "chunk_text",
+    "create_category",
+    "delete_category",
     "extract_pdf_page_text",
     "extract_text",
     "find_chunk_end",
     "find_chunk_start",
+    "get_categories",
     "get_category",
     "ingest_plain_text",
     "ingest_text_source",
@@ -41,5 +56,6 @@ __all__ = [
     "normalize_pdf_text",
     "normalize_text",
     "search_knowledge",
+    "update_category",
     "validate_upload",
 ]

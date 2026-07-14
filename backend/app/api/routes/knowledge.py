@@ -5,6 +5,7 @@ from ...db.session import get_session
 from ...api.dependencies import get_answer_client, get_embedding_client
 from ...schemas.knowledge import (
     CategoryRead,
+    CategoryWrite,
     KnowledgeAnswerRequest,
     KnowledgeAnswerResponse,
     KnowledgeSearchRequest,
@@ -18,7 +19,15 @@ from ...services.embeddings import (
     EmbeddingConfigurationError,
     EmbeddingError,
 )
-from ...services.categories import CategoryNotFoundError, list_categories
+from ...services.categories import (
+    CategoryConflictError,
+    CategoryInUseError,
+    CategoryNotFoundError,
+    create_category,
+    delete_category,
+    list_categories,
+    update_category,
+)
 from ...services.documents.extractors import (
     EmptyDocumentError,
     FileTooLargeError,
@@ -43,9 +52,11 @@ async def knowledge_search(
             session=session,
             query=payload.query,
             limit=payload.limit,
-            category_id=payload.category_id,
+            category_ids=payload.category_ids,
             embedding_client=embedding_client,
         )
+    except CategoryNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except EmbeddingConfigurationError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
@@ -73,7 +84,7 @@ async def upload_knowledge_file(
             session=session,
             filename=file.filename or "upload",
             content=content,
-            category_id=payload.category_id,
+            category_ids=payload.category_ids,
             embedding_client=embedding_client,
         )
     except FileTooLargeError as exc:
@@ -94,7 +105,7 @@ async def upload_knowledge_file(
     return KnowledgeUploadResponse(
         source_id=source.id,
         title=source.title,
-        category_id=source.category_id,
+        categories=source.categories,
         chunks_created=chunks_created,
     )
 
@@ -114,7 +125,7 @@ async def ingest_knowledge_text(
             session=session,
             title=payload.title,
             content=payload.content,
-            category_id=payload.category_id,
+            category_ids=payload.category_ids,
             embedding_client=embedding_client,
         )
     except CategoryNotFoundError as exc:
@@ -131,7 +142,7 @@ async def ingest_knowledge_text(
     return KnowledgeUploadResponse(
         source_id=source.id,
         title=source.title,
-        category_id=source.category_id,
+        categories=source.categories,
         chunks_created=chunks_created,
     )
 
@@ -148,10 +159,12 @@ async def knowledge_answer(
             session=session,
             query=payload.query,
             limit=payload.limit,
-            category_id=payload.category_id,
+            category_ids=payload.category_ids,
             embedding_client=embedding_client,
             answer_client=answer_client,
         )
+    except CategoryNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except (EmbeddingConfigurationError, LLMConfigurationError) as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
@@ -165,7 +178,7 @@ async def knowledge_answer(
 @router.get("/sources")
 async def knowledge_sources(
     session: AsyncSession = Depends(get_session),
-) -> list[dict[str, str | int]]:
+) -> list[dict[str, object]]:
     return await list_sources(session)
 
 
@@ -174,3 +187,45 @@ async def knowledge_categories(
     session: AsyncSession = Depends(get_session),
 ) -> list[dict[str, str | int]]:
     return await list_categories(session)
+
+
+@router.post(
+    "/categories",
+    response_model=CategoryRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_knowledge_category(
+    payload: CategoryWrite,
+    session: AsyncSession = Depends(get_session),
+) -> CategoryRead:
+    try:
+        return await create_category(session, payload.name)
+    except CategoryConflictError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+
+@router.patch("/categories/{category_id}", response_model=CategoryRead)
+async def update_knowledge_category(
+    category_id: int,
+    payload: CategoryWrite,
+    session: AsyncSession = Depends(get_session),
+) -> CategoryRead:
+    try:
+        return await update_category(session, category_id, payload.name)
+    except CategoryNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except CategoryConflictError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+
+@router.delete("/categories/{category_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_knowledge_category(
+    category_id: int,
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    try:
+        await delete_category(session, category_id)
+    except CategoryNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except CategoryInUseError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc

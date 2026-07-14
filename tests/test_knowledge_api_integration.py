@@ -11,7 +11,11 @@ from backend.app.api.dependencies import get_answer_client, get_embedding_client
 from backend.app.core.auth import require_auth_token
 from backend.app.db.session import get_session
 from backend.app.main import create_app
-from backend.app.services.categories import CategoryNotFoundError
+from backend.app.services.categories import (
+    CategoryConflictError,
+    CategoryInUseError,
+    CategoryNotFoundError,
+)
 from backend.app.services.rag import LLMConfigurationError
 
 
@@ -137,7 +141,7 @@ async def test_search_response_contract(
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.post(
             "/api/v1/knowledge/search",
-            json={"query": "find this", "limit": 5},
+            json={"query": "find this", "limit": 5, "category_ids": [2, 3]},
         )
 
     assert response.status_code == 200
@@ -153,6 +157,29 @@ async def test_search_response_contract(
             }
         ],
     }
+
+
+@pytest.mark.asyncio
+async def test_search_maps_unknown_category_to_404(
+    app: Any,
+    transport: httpx.ASGITransport,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_search(**_: object) -> list[dict[str, object]]:
+        raise CategoryNotFoundError("Category 99 does not exist.")
+
+    app.dependency_overrides[require_auth_token] = no_auth
+    app.dependency_overrides[get_embedding_client] = fake_embedding_client
+    monkeypatch.setattr("backend.app.api.routes.knowledge.search_knowledge", fake_search)
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/api/v1/knowledge/search",
+            json={"query": "find this", "category_ids": [99]},
+        )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Category 99 does not exist."}
 
 
 @pytest.mark.asyncio
@@ -172,7 +199,7 @@ async def test_upload_maps_category_not_found_to_404(
         response = await client.post(
             "/api/v1/knowledge/uploads",
             files={"file": ("notes.txt", b"hello world", "text/plain")},
-            data={"category_id": "99"},
+            data={"category_ids": "99"},
         )
 
     assert response.status_code == 404
@@ -211,7 +238,11 @@ async def test_text_ingestion_response_contract(
 ) -> None:
     async def fake_ingest_text(**_: object) -> tuple[object, int]:
         return (
-            SimpleNamespace(id=12, title="meeting-notes", category_id=2),
+            SimpleNamespace(
+                id=12,
+                title="meeting-notes",
+                categories=[SimpleNamespace(id=2, name="docs"), SimpleNamespace(id=3, name="ops")],
+            ),
             3,
         )
 
@@ -224,7 +255,7 @@ async def test_text_ingestion_response_contract(
             "/api/v1/knowledge/texts",
             json={
                 "title": "meeting-notes",
-                "category_id": 2,
+                "category_ids": [2, 3],
                 "content": "first line\nsecond line",
             },
         )
@@ -233,7 +264,7 @@ async def test_text_ingestion_response_contract(
     assert response.json() == {
         "source_id": 12,
         "title": "meeting-notes",
-        "category_id": 2,
+        "categories": [{"id": 2, "name": "docs"}, {"id": 3, "name": "ops"}],
         "chunks_created": 3,
     }
 
@@ -249,9 +280,9 @@ async def test_sources_response_contract(
             {
                 "id": 1,
                 "title": "onboarding-guide",
-                "category_id": 4,
+                "categories": [{"id": 4, "name": "docs"}],
                 "source_type": "upload",
-                "uri": "upload:docs:onboarding-guide.pdf",
+                "uri": "upload:onboarding-guide.pdf",
             }
         ]
 
@@ -266,8 +297,64 @@ async def test_sources_response_contract(
         {
             "id": 1,
             "title": "onboarding-guide",
-            "category_id": 4,
+            "categories": [{"id": 4, "name": "docs"}],
             "source_type": "upload",
-            "uri": "upload:docs:onboarding-guide.pdf",
+            "uri": "upload:onboarding-guide.pdf",
         }
     ]
+
+
+@pytest.mark.asyncio
+async def test_category_crud_status_mapping(
+    app: Any,
+    transport: httpx.ASGITransport,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_create_category(_: object, name: str) -> object:
+        return SimpleNamespace(id=9, name=name.strip().lower())
+
+    async def fake_update_category(_: object, category_id: int, name: str) -> object:
+        return SimpleNamespace(id=category_id, name=name.strip().lower())
+
+    async def fake_delete_category(_: object, category_id: int) -> None:
+        assert category_id == 9
+
+    app.dependency_overrides[require_auth_token] = no_auth
+    monkeypatch.setattr("backend.app.api.routes.knowledge.create_category", fake_create_category)
+    monkeypatch.setattr("backend.app.api.routes.knowledge.update_category", fake_update_category)
+    monkeypatch.setattr("backend.app.api.routes.knowledge.delete_category", fake_delete_category)
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        created = await client.post("/api/v1/knowledge/categories", json={"name": " Docs "})
+        updated = await client.patch("/api/v1/knowledge/categories/9", json={"name": "Manuals"})
+        deleted = await client.delete("/api/v1/knowledge/categories/9")
+
+    assert created.status_code == 201
+    assert created.json() == {"id": 9, "name": "docs"}
+    assert updated.status_code == 200
+    assert updated.json() == {"id": 9, "name": "manuals"}
+    assert deleted.status_code == 204
+
+
+@pytest.mark.asyncio
+async def test_category_conflicts_map_to_409(
+    app: Any,
+    transport: httpx.ASGITransport,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_create_category(_: object, __: str) -> object:
+        raise CategoryConflictError("Category 'docs' already exists.")
+
+    async def fake_delete_category(_: object, __: int) -> None:
+        raise CategoryInUseError("Category 1 is in use.")
+
+    app.dependency_overrides[require_auth_token] = no_auth
+    monkeypatch.setattr("backend.app.api.routes.knowledge.create_category", fake_create_category)
+    monkeypatch.setattr("backend.app.api.routes.knowledge.delete_category", fake_delete_category)
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        create_response = await client.post("/api/v1/knowledge/categories", json={"name": "docs"})
+        delete_response = await client.delete("/api/v1/knowledge/categories/1")
+
+    assert create_response.status_code == 409
+    assert delete_response.status_code == 409

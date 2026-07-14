@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pydantic import BaseModel, Field
 
 from backend.app.db.session import SessionLocal
@@ -17,7 +19,7 @@ class KnowledgeHit(BaseModel):
 class KnowledgeSource(BaseModel):
     id: int
     title: str
-    category_id: int
+    categories: list[KnowledgeCategory]
     source_type: str
     uri: str
 
@@ -30,14 +32,14 @@ class KnowledgeCategory(BaseModel):
 async def search_knowledge(
     query: str,
     limit: int = 5,
-    category_id: int | None = None,
+    category_ids: list[int] | None = None,
 ) -> list[KnowledgeHit]:
     async with SessionLocal() as session:
         results = await search_backend_knowledge(
             session=session,
             query=query,
             limit=limit,
-            category_id=category_id,
+            category_ids=category_ids,
             embedding_client=build_embedding_client(),
         )
     return [KnowledgeHit(**result.model_dump()) for result in results]

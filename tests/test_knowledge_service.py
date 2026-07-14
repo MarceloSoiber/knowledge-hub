@@ -20,7 +20,12 @@ from backend.app.services.embeddings import (
     EmbeddingConfigurationError,
     OpenAIEmbeddingClient,
 )
-from backend.app.services.categories import CategoryNotFoundError, list_categories
+from backend.app.services.categories import (
+    CategoryConflictError,
+    CategoryNotFoundError,
+    create_category,
+    list_categories,
+)
 from backend.app.services.documents.chunker import chunk_text
 from backend.app.services.documents.extractors import UnsupportedFileTypeError, extract_text
 from backend.app.services.ingestion import ingest_plain_text, ingest_uploaded_file
@@ -57,6 +62,12 @@ class FakeExecuteResult:
     def all(self) -> list[FakeRow]:
         return self._rows
 
+    def scalars(self) -> "FakeExecuteResult":
+        return self
+
+    def __iter__(self):
+        return iter(self._rows)
+
 
 @dataclass
 class FakeCategoryRow:
@@ -68,10 +79,10 @@ class FakeSession:
     def __init__(
         self,
         existing_source: DocumentSource | None = None,
-        category: Category | None = None,
+        categories: list[Category] | None = None,
     ) -> None:
         self.existing_source = existing_source
-        self.category = category or Category(id=3, name="docs")
+        self.categories = categories or [Category(id=3, name="docs")]
         self.added: list[object] = []
         self.deleted_old_chunks = False
         self.committed = False
@@ -83,13 +94,16 @@ class FakeSession:
 
     async def get(self, entity: object, entity_id: int) -> Category | None:
         assert entity is Category
-        if self.category is not None and self.category.id == entity_id:
-            return self.category
+        for category in self.categories:
+            if category.id == entity_id:
+                return category
         return None
 
     async def execute(self, statement: object) -> FakeExecuteResult:
         if statement.__class__.__name__ == "Delete":
             self.deleted_old_chunks = True
+        if "categories" in str(statement):
+            return FakeExecuteResult(self.categories)  # type: ignore[arg-type]
         return FakeExecuteResult(self.rows)
 
     def add(self, entity: object) -> None:
@@ -162,21 +176,21 @@ def test_chunk_text_prefers_sentence_boundaries() -> None:
 
 
 def test_knowledge_schemas_trim_and_reject_blank_values() -> None:
-    search = KnowledgeSearchRequest(query="  find me  ", category_id=3)
+    search = KnowledgeSearchRequest(query="  find me  ", category_ids=[3])
     answer = KnowledgeAnswerRequest(query="  answer me  ")
-    upload = KnowledgeUploadRequest(category_id=4)
+    upload = KnowledgeUploadRequest(category_ids=[4])
     text = KnowledgeTextIngestRequest(
         title="  Sprint notes  ",
-        category_id=5,
+        category_ids=[5],
         content="  decision log  ",
     )
 
     assert search.query == "find me"
-    assert search.category_id == 3
+    assert search.category_ids == [3]
     assert answer.query == "answer me"
-    assert upload.category_id == 4
+    assert upload.category_ids == [4]
     assert text.title == "Sprint notes"
-    assert text.category_id == 5
+    assert text.category_ids == [5]
     assert text.content == "decision log"
 
     with pytest.raises(ValidationError):
@@ -186,13 +200,19 @@ def test_knowledge_schemas_trim_and_reject_blank_values() -> None:
         KnowledgeAnswerRequest(query="   ")
 
     with pytest.raises(ValidationError):
-        KnowledgeUploadRequest(category_id=0)
+        KnowledgeUploadRequest(category_ids=[0])
 
     with pytest.raises(ValidationError):
-        KnowledgeTextIngestRequest(title="   ", category_id=3, content="text")
+        KnowledgeUploadRequest(category_ids=[])
 
     with pytest.raises(ValidationError):
-        KnowledgeTextIngestRequest(title="notes", category_id=3, content="   ")
+        KnowledgeSearchRequest(query="find", category_ids=[1, 1])
+
+    with pytest.raises(ValidationError):
+        KnowledgeTextIngestRequest(title="   ", category_ids=[3], content="text")
+
+    with pytest.raises(ValidationError):
+        KnowledgeTextIngestRequest(title="notes", category_ids=[3], content="   ")
 
 
 def test_token_auth_accepts_matching_bearer_token() -> None:
@@ -221,26 +241,25 @@ async def test_ingest_uploaded_file_replaces_existing_source() -> None:
     source = DocumentSource(
         id=7,
         title="old.md",
-        category_id=2,
         source_type="upload",
-        uri="upload:manuals:notes.md",
+        uri="upload:notes.md",
     )
     session = FakeSession(
         existing_source=source,
-        category=Category(id=3, name="manuals"),
+        categories=[Category(id=3, name="manuals"), Category(id=4, name="docs")],
     )
 
     updated_source, chunks_created = await ingest_uploaded_file(
         session=session,
         filename="notes.md",
         content=b"new content",
-        category_id=3,
+        category_ids=[3, 4],
         embedding_client=FakeEmbeddingClient(),
     )
 
     assert updated_source.id == 7
     assert updated_source.title == "notes.md"
-    assert updated_source.category_id == 3
+    assert [category.id for category in updated_source.categories] == [3, 4]
     assert chunks_created == 1
     assert session.deleted_old_chunks is True
     assert session.committed is True
@@ -255,15 +274,15 @@ async def test_ingest_plain_text_creates_text_source() -> None:
         session=session,
         title="  Meeting notes  ",
         content=" Linha um. \n\n Linha dois. ",
-        category_id=3,
+        category_ids=[3],
         embedding_client=embedding_client,
     )
 
     assert source.id == 99
     assert source.title == "Meeting notes"
-    assert source.category_id == 3
+    assert [category.id for category in source.categories] == [3]
     assert source.source_type == "text"
-    assert source.uri == "text:docs:Meeting notes"
+    assert source.uri == "text:Meeting notes"
     assert chunks_created == 1
     assert embedding_client.inputs == [["Linha um.\nLinha dois."]]
     assert session.committed is True
@@ -274,9 +293,8 @@ async def test_ingest_plain_text_replaces_existing_text_source() -> None:
     source = DocumentSource(
         id=8,
         title="old title",
-        category_id=2,
         source_type="text",
-        uri="text:docs:notes",
+        uri="text:notes",
     )
     session = FakeSession(existing_source=source)
 
@@ -284,13 +302,13 @@ async def test_ingest_plain_text_replaces_existing_text_source() -> None:
         session=session,
         title="notes",
         content="updated content",
-        category_id=3,
+        category_ids=[3],
         embedding_client=FakeEmbeddingClient(),
     )
 
     assert updated_source.id == 8
     assert updated_source.title == "notes"
-    assert updated_source.category_id == 3
+    assert [category.id for category in updated_source.categories] == [3]
     assert updated_source.source_type == "text"
     assert chunks_created == 1
     assert session.deleted_old_chunks is True
@@ -306,7 +324,7 @@ async def test_ingest_plain_text_rejects_unknown_category() -> None:
             session=FakeSession(),
             title="notes",
             content="content",
-            category_id=999,
+            category_ids=[999],
             embedding_client=embedding_client,
         )
 
@@ -331,6 +349,43 @@ async def test_list_categories_returns_id_and_name() -> None:
         {"id": 2, "name": "engineering"},
         {"id": 1, "name": "finance"},
     ]
+
+
+@pytest.mark.asyncio
+async def test_create_category_normalizes_and_rejects_duplicates() -> None:
+    class FakeCategorySession:
+        def __init__(self, existing: Category | None = None) -> None:
+            self.existing = existing
+            self.added: list[Category] = []
+            self.committed = False
+
+        async def scalar(self, statement: object) -> Category | None:
+            _ = statement
+            return self.existing
+
+        def add(self, entity: object) -> None:
+            assert isinstance(entity, Category)
+            entity.id = 10
+            self.added.append(entity)
+
+        async def commit(self) -> None:
+            self.committed = True
+
+        async def refresh(self, entity: object) -> None:
+            _ = entity
+
+    session = FakeCategorySession()
+
+    category = await create_category(session, "  Finance  ")  # type: ignore[arg-type]
+
+    assert category.name == "finance"
+    assert session.committed is True
+
+    with pytest.raises(CategoryConflictError):
+        await create_category(
+            FakeCategorySession(existing=Category(id=1, name="finance")),  # type: ignore[arg-type]
+            "FINANCE",
+        )
 
 
 @pytest.mark.asyncio

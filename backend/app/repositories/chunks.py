@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, exists, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..db.models import DocumentSource, KnowledgeChunk
+from ..db.models import DocumentSource, KnowledgeChunk, document_source_categories
 from ..schemas.knowledge import KnowledgeChunkRead
 
 
@@ -33,7 +33,7 @@ async def search_similar_chunks(
     session: AsyncSession,
     query_embedding: list[float],
     limit: int,
-    category_id: int | None = None,
+    category_ids: list[int] | None = None,
 ) -> list[KnowledgeChunkRead]:
     distance = KnowledgeChunk.embedding.cosine_distance(query_embedding)
 
@@ -47,8 +47,12 @@ async def search_similar_chunks(
         .join(DocumentSource, KnowledgeChunk.source_id == DocumentSource.id)
         .where(KnowledgeChunk.embedding.is_not(None))
     )
-    if category_id is not None:
-        statement = statement.where(DocumentSource.category_id == category_id)
+    if category_ids is not None:
+        statement = statement.where(
+            exists()
+            .where(document_source_categories.c.document_source_id == DocumentSource.id)
+            .where(document_source_categories.c.category_id.in_(category_ids))
+        )
     statement = statement.order_by(distance).limit(limit)
 
     rows = (await session.execute(statement)).all()

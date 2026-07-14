@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Table, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
@@ -10,13 +10,29 @@ from .base import Base
 EMBEDDING_DIMENSION = 768
 
 
+document_source_categories = Table(
+    "document_source_categories",
+    Base.metadata,
+    Column(
+        "document_source_id",
+        ForeignKey("document_sources.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column("category_id", ForeignKey("categories.id"), primary_key=True),
+)
+
+
 class Category(Base):
     __tablename__ = "categories"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    sources: Mapped[list["DocumentSource"]] = relationship(back_populates="category")
+    sources: Mapped[list["DocumentSource"]] = relationship(
+        secondary=document_source_categories,
+        back_populates="categories",
+    )
 
 
 class DocumentSource(Base):
@@ -24,7 +40,6 @@ class DocumentSource(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
-    category_id: Mapped[int] = mapped_column(ForeignKey("categories.id"), nullable=False)
     source_type: Mapped[str] = mapped_column(String(50), nullable=False, default="file")
     uri: Mapped[str] = mapped_column(String(1024), nullable=False, unique=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -32,7 +47,10 @@ class DocumentSource(Base):
     chunks: Mapped[list["KnowledgeChunk"]] = relationship(
         back_populates="source", cascade="all, delete-orphan"
     )
-    category: Mapped[Category] = relationship(back_populates="sources")
+    categories: Mapped[list[Category]] = relationship(
+        secondary=document_source_categories,
+        back_populates="sources",
+    )
 
 
 class KnowledgeChunk(Base):
