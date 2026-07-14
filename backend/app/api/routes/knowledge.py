@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
+from fastapi.exceptions import RequestValidationError
+from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...db.session import get_session
@@ -39,6 +41,24 @@ from ...services.rag import AnswerClient, LLMConfigurationError, LLMError
 from ...services.search import answer_knowledge, list_sources, search_knowledge
 
 router = APIRouter(prefix="/knowledge", tags=["knowledge"])
+
+
+async def parse_text_ingest_payload(request: Request) -> KnowledgeTextIngestRequest:
+    content_type = request.headers.get("content-type", "")
+    if content_type.startswith(("multipart/form-data", "application/x-www-form-urlencoded")):
+        form = await request.form()
+        payload = {
+            "title": form.get("title"),
+            "content": form.get("content"),
+            "category_ids": form.getlist("category_ids"),
+        }
+    else:
+        payload = await request.json()
+
+    try:
+        return KnowledgeTextIngestRequest.model_validate(payload)
+    except ValidationError as exc:
+        raise RequestValidationError(exc.errors()) from exc
 
 
 @router.post("/search", response_model=KnowledgeSearchResponse)
@@ -116,7 +136,7 @@ async def upload_knowledge_file(
     status_code=status.HTTP_201_CREATED,
 )
 async def ingest_knowledge_text(
-    payload: KnowledgeTextIngestRequest,
+    payload: KnowledgeTextIngestRequest = Depends(parse_text_ingest_payload),
     session: AsyncSession = Depends(get_session),
     embedding_client: EmbeddingClient = Depends(get_embedding_client),
 ) -> KnowledgeUploadResponse:

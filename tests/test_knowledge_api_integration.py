@@ -270,6 +270,48 @@ async def test_text_ingestion_response_contract(
 
 
 @pytest.mark.asyncio
+async def test_text_ingestion_accepts_form_data(
+    app: Any,
+    transport: httpx.ASGITransport,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_ingest_text(**kwargs: object) -> tuple[object, int]:
+        assert kwargs["title"] == "market-notes"
+        assert kwargs["content"] == "ações e dividendos"
+        assert kwargs["category_ids"] == [1]
+        return (
+            SimpleNamespace(
+                id=13,
+                title="market-notes",
+                categories=[SimpleNamespace(id=1, name="financeiro")],
+            ),
+            1,
+        )
+
+    app.dependency_overrides[require_auth_token] = no_auth
+    app.dependency_overrides[get_embedding_client] = fake_embedding_client
+    monkeypatch.setattr("backend.app.api.routes.knowledge.ingest_plain_text", fake_ingest_text)
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/api/v1/knowledge/texts",
+            data={
+                "title": "market-notes",
+                "content": "ações e dividendos",
+                "category_ids": "1",
+            },
+        )
+
+    assert response.status_code == 201
+    assert response.json() == {
+        "source_id": 13,
+        "title": "market-notes",
+        "categories": [{"id": 1, "name": "financeiro"}],
+        "chunks_created": 1,
+    }
+
+
+@pytest.mark.asyncio
 async def test_sources_response_contract(
     app: Any,
     transport: httpx.ASGITransport,
