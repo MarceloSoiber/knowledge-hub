@@ -84,5 +84,17 @@ async def init_db() -> None:
             text("ALTER TABLE document_sources DROP COLUMN IF EXISTS category")
         )
         await connection.execute(
-            text("ALTER TABLE knowledge_chunks ALTER COLUMN embedding TYPE vector(768)")
+            text(
+                "DO $$ "
+                "BEGIN "
+                "IF EXISTS ("
+                "SELECT 1 FROM pg_attribute "
+                "WHERE attrelid = 'knowledge_chunks'::regclass "
+                "AND attname = 'embedding' "
+                "AND atttypmod <> 768"
+                ") THEN "
+                "ALTER TABLE knowledge_chunks ALTER COLUMN embedding TYPE vector(768); "
+                "END IF; "
+                "END $$"
+            )
         )
