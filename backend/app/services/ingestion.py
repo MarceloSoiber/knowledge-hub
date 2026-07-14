@@ -128,5 +128,4 @@ async def ingest_text_source(
     add_source_chunks(session, source.id, chunks, embeddings, metadata)
 
     await session.commit()
-    await session.refresh(source)
     return source, len(chunks)
