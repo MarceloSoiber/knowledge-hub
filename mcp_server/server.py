@@ -50,7 +50,10 @@ def build_auth_settings():
 
     return AuthSettings(
         issuer_url=settings.mcp_public_url,
-        resource_server_url=settings.mcp_public_url,
+        # VS Code treats the protected-resource metadata as an OAuth flow and
+        # prompts for client registration. This server uses a static Bearer
+        # token instead, so keep bearer validation without advertising OAuth.
+        resource_server_url=None,
         required_scopes=["knowledge:read"],
     )
 
