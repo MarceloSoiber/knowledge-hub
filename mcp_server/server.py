@@ -1,3 +1,5 @@
+import logging
+
 from mcp.server.fastmcp import FastMCP
 
 from backend.app.core.auth import is_valid_token
@@ -18,15 +20,22 @@ from .tools.knowledge import (
 )
 
 
+logger = logging.getLogger(__name__)
+
+
 def build_token_verifier():
     from mcp.server.auth.provider import AccessToken
 
     class StaticTokenVerifier:
         async def verify_token(self, token: str) -> AccessToken | None:
-            async with SessionLocal() as session:
-                expected_token = await get_auth_token(session)
-                if not expected_token or not is_valid_token(token, expected_token):
-                    return None
+            try:
+                async with SessionLocal() as session:
+                    expected_token = await get_auth_token(session)
+            except Exception:
+                logger.exception("Failed to validate MCP bearer token.")
+                return None
+            if not expected_token or not is_valid_token(token, expected_token):
+                return None
             return AccessToken(
                 token=token,
                 client_id="knowledge-hub-mcp-client",

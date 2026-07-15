@@ -9,7 +9,7 @@ pgvector>=0.3
 httpx>=0.27
 python-multipart>=0.0.9
 pypdf>=4.3
-mcp>=1.12.0
+mcp<1.13,>=1.12.4
 
 [dev]
 ruff>=0.6
