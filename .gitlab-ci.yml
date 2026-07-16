@@ -40,10 +40,18 @@ deploy:
         fi
       }
 
+      release_mcp_port() {
+        if ss -ltn "sport = :8001" | grep -q ':8001'; then
+          echo "Port 8001 is still busy; releasing stale MCP listener."
+          sudo -n fuser -k 8001/tcp || true
+        fi
+      }
+
       echo "Restarting container runtime to clear stale container state before deploy."
       restart_container_runtime
       remove_recreate_containers
       cleanup_containers
+      release_mcp_port
 
       if docker ps -aq \
         --filter name=mcp-knowledge-hub-backend \
@@ -60,6 +68,7 @@ deploy:
         restart_container_runtime
         remove_recreate_containers
         cleanup_containers
+        release_mcp_port
 
         if docker ps -aq \
           --filter name=mcp-knowledge-hub-backend \
