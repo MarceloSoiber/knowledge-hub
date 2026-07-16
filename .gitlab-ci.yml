@@ -42,10 +42,8 @@ deploy:
 
       release_service_ports() {
         for port in 8000 8001; do
-          if ss -ltn "sport = :${port}" | grep -q ":${port}"; then
-            echo "Port ${port} is still busy; releasing stale service listener."
-            sudo -n fuser -k "${port}/tcp" || true
-          fi
+          echo "Releasing possible stale listener on port ${port}."
+          sudo -n fuser -k "${port}/tcp" || true
         done
       }
 
