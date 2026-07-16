@@ -23,8 +23,6 @@ services:
       VECTOR_DIM: "${VECTOR_DIM:-768}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    ports:
-      - "${BACKEND_PORT:-8000}:8000"
     healthcheck:
       test:
         [

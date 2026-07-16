@@ -74,7 +74,7 @@ deploy:
         deploy_containers
       fi
     - docker compose ps
-    - curl --fail --retry 30 --retry-delay 2 --retry-connrefused --retry-all-errors --max-time 5 http://127.0.0.1:8000/health
+    - docker compose exec -T backend python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5).read()"
   environment:
     name: production
   rules:
