@@ -94,6 +94,27 @@ async def test_knowledge_categories_requires_bearer_token(
 
 
 @pytest.mark.asyncio
+async def test_knowledge_categories_rejects_when_auth_token_is_unconfigured(
+    app: Any,
+    transport: httpx.ASGITransport,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_get_auth_token(_: object) -> str:
+        return ""
+
+    monkeypatch.setattr("backend.app.core.auth.get_auth_token", fake_get_auth_token)
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.get(
+            "/api/v1/knowledge/categories",
+            headers={"Authorization": "Bearer any-token"},
+        )
+
+    assert response.status_code == 401
+    assert response.json() == {"detail": "Invalid or missing bearer token."}
+
+
+@pytest.mark.asyncio
 async def test_categories_response_contract(
     app: Any,
     transport: httpx.ASGITransport,
