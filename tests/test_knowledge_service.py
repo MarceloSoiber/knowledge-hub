@@ -188,6 +188,22 @@ def test_extract_text_removes_pdf_page_counters(monkeypatch: pytest.MonkeyPatch)
     )
 
 
+def test_extract_text_removes_pdf_generator_footer(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FakePage:
+        def extract_text(self, extraction_mode: str | None = None) -> str:
+            assert extraction_mode == "layout"
+            return "Resumo do fundo\n\nPowered by TCPDF (www.tcpdf.org)"
+
+    class FakePdfReader:
+        def __init__(self, stream: object) -> None:
+            _ = stream
+            self.pages = [FakePage()]
+
+    monkeypatch.setattr("backend.app.services.documents.extractors.build_pdf_reader", FakePdfReader)
+
+    assert extract_text("paper.pdf", b"%PDF") == "Resumo do fundo"
+
+
 def test_chunk_text_uses_overlap() -> None:
     chunks = chunk_text("abcdefghij", chunk_size=6, overlap=2)
 
