@@ -23,7 +23,7 @@ async def require_auth_token(
 ) -> None:
     expected_token = await get_auth_token(session)
     if not expected_token:
-        return
+        raise_token_error()
 
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise_token_error()
