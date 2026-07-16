@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError
@@ -12,6 +14,9 @@ from ...schemas.knowledge import (
     KnowledgeAnswerResponse,
     KnowledgeSearchRequest,
     KnowledgeSearchResponse,
+    KnowledgeSourceDetail,
+    KnowledgeSourcePatchRequest,
+    KnowledgeSourceRead,
     KnowledgeTextIngestRequest,
     KnowledgeUploadRequest,
     KnowledgeUploadResponse,
@@ -35,10 +40,21 @@ from ...services.documents.extractors import (
     FileTooLargeError,
     UnsupportedFileTypeError,
 )
-from ...services.ingestion import KnowledgeIngestionError, ingest_plain_text
+from ...services.ingestion import (
+    DuplicateSourceContentError,
+    KnowledgeIngestionError,
+    ingest_plain_text,
+)
 from ...services.ingestion import ingest_uploaded_file
 from ...services.rag import AnswerClient, LLMConfigurationError, LLMError
 from ...services.search import answer_knowledge, list_sources, search_knowledge
+from ...services.sources import (
+    SourceDeleteConfirmationError,
+    SourceNotFoundError,
+    delete_source,
+    get_source_detail,
+    update_source,
+)
 
 router = APIRouter(prefix="/knowledge", tags=["knowledge"])
 
@@ -113,6 +129,8 @@ async def upload_knowledge_file(
         ) from exc
     except CategoryNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except DuplicateSourceContentError as exc:
+        raise _duplicate_source_http_error(exc) from exc
     except (UnsupportedFileTypeError, EmptyDocumentError, KnowledgeIngestionError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except EmbeddingConfigurationError as exc:
@@ -123,7 +141,7 @@ async def upload_knowledge_file(
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
 
     return KnowledgeUploadResponse(
-        source_id=source.id,
+        source_id=source.public_id,
         title=source.title,
         categories=source.categories,
         chunks_created=chunks_created,
@@ -150,6 +168,8 @@ async def ingest_knowledge_text(
         )
     except CategoryNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except DuplicateSourceContentError as exc:
+        raise _duplicate_source_http_error(exc) from exc
     except (EmptyDocumentError, KnowledgeIngestionError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except EmbeddingConfigurationError as exc:
@@ -160,7 +180,7 @@ async def ingest_knowledge_text(
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
 
     return KnowledgeUploadResponse(
-        source_id=source.id,
+        source_id=source.public_id,
         title=source.title,
         categories=source.categories,
         chunks_created=chunks_created,
@@ -195,11 +215,69 @@ async def knowledge_answer(
     return KnowledgeAnswerResponse(query=payload.query, answer=answer, sources=sources)
 
 
-@router.get("/sources")
+@router.get("/sources", response_model=list[KnowledgeSourceRead])
 async def knowledge_sources(
     session: AsyncSession = Depends(get_session),
-) -> list[dict[str, object]]:
+) -> list[KnowledgeSourceRead]:
     return await list_sources(session)
+
+
+@router.get("/sources/{source_id}", response_model=KnowledgeSourceDetail)
+async def knowledge_source_detail(
+    source_id: UUID,
+    session: AsyncSession = Depends(get_session),
+) -> KnowledgeSourceDetail:
+    try:
+        return await get_source_detail(session, str(source_id))
+    except SourceNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.patch("/sources/{source_id}", response_model=KnowledgeSourceDetail)
+async def patch_knowledge_source(
+    source_id: UUID,
+    payload: KnowledgeSourcePatchRequest,
+    session: AsyncSession = Depends(get_session),
+    embedding_client: EmbeddingClient = Depends(get_embedding_client),
+) -> KnowledgeSourceDetail:
+    try:
+        source, _chunks_created = await update_source(
+            session=session,
+            source_id=str(source_id),
+            embedding_client=embedding_client,
+            title=payload.title,
+            category_ids=payload.category_ids,
+            content=payload.content,
+        )
+        return source
+    except SourceNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except CategoryNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except DuplicateSourceContentError as exc:
+        raise _duplicate_source_http_error(exc) from exc
+    except (EmptyDocumentError, KnowledgeIngestionError) as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except EmbeddingConfigurationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
+        ) from exc
+    except EmbeddingError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+
+@router.delete("/sources/{source_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_knowledge_source(
+    source_id: UUID,
+    confirm: bool = False,
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    try:
+        await delete_source(session, str(source_id), confirm=confirm)
+    except SourceDeleteConfirmationError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except SourceNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
 
 @router.get("/categories", response_model=list[CategoryRead])
@@ -249,3 +327,13 @@ async def delete_knowledge_category(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except CategoryInUseError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+
+def _duplicate_source_http_error(exc: DuplicateSourceContentError) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail={
+            "message": str(exc),
+            "existing_source_id": exc.existing_source.public_id,
+        },
+    )

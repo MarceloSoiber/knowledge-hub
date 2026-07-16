@@ -12,7 +12,9 @@ from mcp_server.tools.knowledge import (
     MCP_ALLOWED_METADATA_KEYS,
     MCPAuthorizationError,
     MCPIngestionError,
+    MCPSourceNotFoundError,
     MCPTextIngestRequest,
+    get_knowledge_source,
     ingest_mcp_text,
 )
 
@@ -81,7 +83,7 @@ async def test_ingest_mcp_text_creates_mcp_source(
         assert kwargs["metadata"] == {"note_type": "decision"}
         return (
             SimpleNamespace(
-                id=42,
+                public_id="11111111-1111-4111-8111-111111111111",
                 title="Architecture note",
                 categories=[
                     SimpleNamespace(id=2, name="docs"),
@@ -100,7 +102,7 @@ async def test_ingest_mcp_text_creates_mcp_source(
         metadata={"note_type": "decision"},
     )
 
-    assert result.source_id == 42
+    assert result.source_id == "11111111-1111-4111-8111-111111111111"
     assert result.title == "Architecture note"
     assert [category.name for category in result.categories] == ["docs", "ops"]
     assert result.chunks_created == 2
@@ -166,3 +168,43 @@ async def test_ingest_mcp_text_maps_embedding_failure_without_success(
 
     with pytest.raises(MCPIngestionError, match="Embedding provider failure"):
         await ingest_mcp_text(title="notes", content="content", category_ids=[1])
+
+
+@pytest.mark.asyncio
+async def test_get_knowledge_source_returns_detail(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_get_source_detail(_: object, source_id: str) -> dict[str, object]:
+        assert source_id == "22222222-2222-4222-8222-222222222222"
+        return {
+            "source_id": source_id,
+            "title": "notes",
+            "categories": [{"id": 1, "name": "docs"}],
+            "source_type": "text",
+            "uri": "text:notes",
+            "content_hash": "abc123",
+            "content": "stored content",
+        }
+
+    monkeypatch.setattr("mcp_server.tools.knowledge.get_source_detail", fake_get_source_detail)
+
+    result = await get_knowledge_source("22222222-2222-4222-8222-222222222222")
+
+    assert result.source_id == "22222222-2222-4222-8222-222222222222"
+    assert result.content == "stored content"
+    assert result.categories[0].name == "docs"
+
+
+@pytest.mark.asyncio
+async def test_get_knowledge_source_maps_missing_source(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_get_source_detail(_: object, __: str) -> dict[str, object]:
+        from backend.app.services.sources import SourceNotFoundError
+
+        raise SourceNotFoundError("Source does not exist.")
+
+    monkeypatch.setattr("mcp_server.tools.knowledge.get_source_detail", fake_get_source_detail)
+
+    with pytest.raises(MCPSourceNotFoundError, match="Source does not exist"):
+        await get_knowledge_source("22222222-2222-4222-8222-222222222222")

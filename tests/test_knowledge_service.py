@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from hashlib import sha256
 
 import pytest
 from pydantic import ValidationError
@@ -31,6 +32,7 @@ from backend.app.services.documents.extractors import UnsupportedFileTypeError, 
 from backend.app.services.ingestion import ingest_plain_text, ingest_uploaded_file
 from backend.app.services.rag import LLMConfigurationError, OpenAICompatibleAnswerClient
 from backend.app.services.search import answer_knowledge, search_knowledge
+from backend.app.services.sources import delete_source, get_source_detail, update_source
 
 
 class FakeEmbeddingClient:
@@ -40,6 +42,15 @@ class FakeEmbeddingClient:
     async def embed_texts(self, texts: list[str]) -> list[list[float]]:
         self.inputs.append(texts)
         return [[0.1, 0.2, 0.3] for _ in texts]
+
+
+class FailingEmbeddingClient:
+    def __init__(self) -> None:
+        self.inputs: list[list[str]] = []
+
+    async def embed_texts(self, texts: list[str]) -> list[list[float]]:
+        self.inputs.append(texts)
+        raise RuntimeError("embedding failed")
 
 
 class FakeAnswerClient:
@@ -79,17 +90,26 @@ class FakeSession:
     def __init__(
         self,
         existing_source: DocumentSource | None = None,
+        duplicate_source: DocumentSource | None = None,
+        source_by_public_id: DocumentSource | None = None,
         categories: list[Category] | None = None,
     ) -> None:
         self.existing_source = existing_source
+        self.duplicate_source = duplicate_source
+        self.source_by_public_id = source_by_public_id
         self.categories = categories or [Category(id=3, name="docs")]
         self.added: list[object] = []
         self.deleted_old_chunks = False
+        self.deleted_source = False
         self.committed = False
         self.rows = [FakeRow(id=1, source_id=2, content="stored content", distance=0.2)]
 
     async def scalar(self, statement: object) -> DocumentSource | None:
-        _ = statement
+        statement_text = str(statement)
+        if "WHERE document_sources.public_id" in statement_text:
+            return self.source_by_public_id
+        if "WHERE document_sources.content_hash" in statement_text:
+            return self.duplicate_source
         return self.existing_source
 
     async def get(self, entity: object, entity_id: int) -> Category | None:
@@ -100,8 +120,11 @@ class FakeSession:
         return None
 
     async def execute(self, statement: object) -> FakeExecuteResult:
-        if statement.__class__.__name__ == "Delete":
+        statement_text = str(statement)
+        if statement.__class__.__name__ == "Delete" and "knowledge_chunks" in statement_text:
             self.deleted_old_chunks = True
+        if statement.__class__.__name__ == "Delete" and "document_sources" in statement_text:
+            self.deleted_source = True
         if "categories" in str(statement):
             return FakeExecuteResult(self.categories)  # type: ignore[arg-type]
         return FakeExecuteResult(self.rows)
@@ -109,6 +132,8 @@ class FakeSession:
     def add(self, entity: object) -> None:
         if isinstance(entity, DocumentSource) and entity.id is None:
             entity.id = 99
+        if isinstance(entity, DocumentSource) and entity.public_id is None:
+            entity.public_id = "11111111-1111-4111-8111-111111111111"
         self.added.append(entity)
 
     async def flush(self) -> None:
@@ -321,19 +346,22 @@ def test_auth_token_validation_rejects_paste_garbage() -> None:
 
 
 @pytest.mark.asyncio
-async def test_ingest_uploaded_file_replaces_existing_source() -> None:
+async def test_ingest_uploaded_file_creates_same_title_source_when_content_differs() -> None:
     source = DocumentSource(
         id=7,
+        public_id="22222222-2222-4222-8222-222222222222",
         title="old.md",
         source_type="upload",
         uri="upload:notes.md",
+        content_text="old content",
+        content_hash=sha256(b"old content").hexdigest(),
     )
     session = FakeSession(
         existing_source=source,
         categories=[Category(id=3, name="manuals"), Category(id=4, name="docs")],
     )
 
-    updated_source, chunks_created = await ingest_uploaded_file(
+    created_source, chunks_created = await ingest_uploaded_file(
         session=session,
         filename="notes.md",
         content=b"new content",
@@ -341,11 +369,12 @@ async def test_ingest_uploaded_file_replaces_existing_source() -> None:
         embedding_client=FakeEmbeddingClient(),
     )
 
-    assert updated_source.id == 7
-    assert updated_source.title == "notes.md"
-    assert [category.id for category in updated_source.categories] == [3, 4]
+    assert created_source.id == 99
+    assert created_source.title == "notes.md"
+    assert [category.id for category in created_source.categories] == [3, 4]
+    assert created_source.public_id == "11111111-1111-4111-8111-111111111111"
     assert chunks_created == 1
-    assert session.deleted_old_chunks is True
+    assert session.deleted_old_chunks is False
     assert session.committed is True
 
 
@@ -367,6 +396,8 @@ async def test_ingest_plain_text_creates_text_source() -> None:
     assert [category.id for category in source.categories] == [3]
     assert source.source_type == "text"
     assert source.uri == "text:Meeting notes"
+    assert source.content_text == "Linha um.\nLinha dois."
+    assert source.content_hash == sha256("Linha um.\nLinha dois.".encode()).hexdigest()
     assert chunks_created == 1
     assert embedding_client.inputs == [["Linha um.\nLinha dois."]]
     assert session.committed is True
@@ -395,30 +426,30 @@ async def test_ingest_plain_text_can_create_mcp_source() -> None:
 
 
 @pytest.mark.asyncio
-async def test_ingest_plain_text_replaces_existing_text_source() -> None:
-    source = DocumentSource(
+async def test_ingest_plain_text_rejects_duplicate_content() -> None:
+    duplicate = DocumentSource(
         id=8,
+        public_id="33333333-3333-4333-8333-333333333333",
         title="old title",
         source_type="text",
         uri="text:notes",
+        content_text="updated content",
+        content_hash=sha256(b"updated content").hexdigest(),
     )
-    session = FakeSession(existing_source=source)
+    session = FakeSession(duplicate_source=duplicate)
+    embedding_client = FakeEmbeddingClient()
 
-    updated_source, chunks_created = await ingest_plain_text(
-        session=session,
-        title="notes",
-        content="updated content",
-        category_ids=[3],
-        embedding_client=FakeEmbeddingClient(),
-    )
+    with pytest.raises(Exception, match="identical content"):
+        await ingest_plain_text(
+            session=session,
+            title="notes",
+            content="updated content",
+            category_ids=[3],
+            embedding_client=embedding_client,
+        )
 
-    assert updated_source.id == 8
-    assert updated_source.title == "notes"
-    assert [category.id for category in updated_source.categories] == [3]
-    assert updated_source.source_type == "text"
-    assert chunks_created == 1
-    assert session.deleted_old_chunks is True
-    assert session.committed is True
+    assert embedding_client.inputs == []
+    assert session.committed is False
 
 
 @pytest.mark.asyncio
@@ -455,6 +486,130 @@ async def test_list_categories_returns_id_and_name() -> None:
         {"id": 2, "name": "engineering"},
         {"id": 1, "name": "finance"},
     ]
+
+
+@pytest.mark.asyncio
+async def test_get_source_detail_returns_public_contract() -> None:
+    source = DocumentSource(
+        id=10,
+        public_id="44444444-4444-4444-8444-444444444444",
+        title="notes",
+        source_type="text",
+        uri="text:notes",
+        content_text="source content",
+        content_hash=sha256(b"source content").hexdigest(),
+    )
+    source.categories = [Category(id=3, name="docs")]
+
+    detail = await get_source_detail(  # type: ignore[arg-type]
+        FakeSession(source_by_public_id=source), source.public_id
+    )
+
+    assert detail["source_id"] == "44444444-4444-4444-8444-444444444444"
+    assert detail["content"] == "source content"
+    assert detail["categories"] == [{"id": 3, "name": "docs"}]
+
+
+@pytest.mark.asyncio
+async def test_update_source_metadata_does_not_call_embeddings() -> None:
+    source = DocumentSource(
+        id=10,
+        public_id="55555555-5555-4555-8555-555555555555",
+        title="old",
+        source_type="text",
+        uri="text:old",
+        content_text="same content",
+        content_hash=sha256(b"same content").hexdigest(),
+    )
+    source.categories = [Category(id=3, name="docs")]
+    embedding_client = FakeEmbeddingClient()
+
+    detail, chunks_created = await update_source(
+        session=FakeSession(source_by_public_id=source),
+        source_id=source.public_id,
+        title="new",
+        category_ids=[3],
+        embedding_client=embedding_client,
+    )
+
+    assert detail["title"] == "new"
+    assert chunks_created is None
+    assert embedding_client.inputs == []
+
+
+@pytest.mark.asyncio
+async def test_update_source_content_replaces_chunks() -> None:
+    source = DocumentSource(
+        id=10,
+        public_id="66666666-6666-4666-8666-666666666666",
+        title="old",
+        source_type="text",
+        uri="text:old",
+        content_text="old content",
+        content_hash=sha256(b"old content").hexdigest(),
+    )
+    source.categories = [Category(id=3, name="docs")]
+    session = FakeSession(source_by_public_id=source)
+    embedding_client = FakeEmbeddingClient()
+
+    detail, chunks_created = await update_source(
+        session=session,
+        source_id=source.public_id,
+        content="new content",
+        embedding_client=embedding_client,
+    )
+
+    assert detail["content"] == "new content"
+    assert detail["content_hash"] == sha256(b"new content").hexdigest()
+    assert chunks_created == 1
+    assert session.deleted_old_chunks is True
+    assert embedding_client.inputs == [["new content"]]
+
+
+@pytest.mark.asyncio
+async def test_update_source_content_embedding_failure_leaves_source_unchanged() -> None:
+    source = DocumentSource(
+        id=10,
+        public_id="77777777-7777-4777-8777-777777777777",
+        title="old",
+        source_type="text",
+        uri="text:old",
+        content_text="old content",
+        content_hash=sha256(b"old content").hexdigest(),
+    )
+    source.categories = [Category(id=3, name="docs")]
+    session = FakeSession(source_by_public_id=source)
+
+    with pytest.raises(RuntimeError, match="embedding failed"):
+        await update_source(
+            session=session,
+            source_id=source.public_id,
+            content="new content",
+            embedding_client=FailingEmbeddingClient(),  # type: ignore[arg-type]
+        )
+
+    assert source.content_text == "old content"
+    assert session.deleted_old_chunks is False
+    assert session.committed is False
+
+
+@pytest.mark.asyncio
+async def test_delete_source_removes_source_when_confirmed() -> None:
+    source = DocumentSource(
+        id=10,
+        public_id="88888888-8888-4888-8888-888888888888",
+        title="old",
+        source_type="text",
+        uri="text:old",
+        content_text="old content",
+        content_hash=sha256(b"old content").hexdigest(),
+    )
+    session = FakeSession(source_by_public_id=source)
+
+    await delete_source(session, source.public_id, confirm=True)
+
+    assert session.deleted_source is True
+    assert session.committed is True
 
 
 @pytest.mark.asyncio

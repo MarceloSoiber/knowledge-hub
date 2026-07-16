@@ -12,7 +12,9 @@ from .tools.knowledge import (
     KnowledgeCategory,
     KnowledgeSource,
     MCPTextIngestResult,
+    KnowledgeSourceDetail,
     get_knowledge_categories,
+    get_knowledge_source,
     get_knowledge_sources,
     get_workspace_overview,
     ingest_mcp_text,
@@ -97,6 +99,11 @@ async def search(
 @mcp.tool()
 async def sources() -> list[KnowledgeSource]:
     return await get_knowledge_sources()
+
+
+@mcp.tool(description="Consulta uma fonte detalhada por UUID publico.")
+async def source(source_id: str) -> KnowledgeSourceDetail:
+    return await get_knowledge_source(source_id)
 
 
 @mcp.tool()

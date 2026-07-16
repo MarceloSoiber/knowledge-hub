@@ -16,7 +16,9 @@ from backend.app.services.categories import (
     CategoryInUseError,
     CategoryNotFoundError,
 )
+from backend.app.services.ingestion import DuplicateSourceContentError
 from backend.app.services.rag import LLMConfigurationError
+from backend.app.services.sources import SourceDeleteConfirmationError, SourceNotFoundError
 
 
 class FakeSession:
@@ -260,7 +262,7 @@ async def test_text_ingestion_response_contract(
     async def fake_ingest_text(**_: object) -> tuple[object, int]:
         return (
             SimpleNamespace(
-                id=12,
+                public_id="11111111-1111-4111-8111-111111111111",
                 title="meeting-notes",
                 categories=[SimpleNamespace(id=2, name="docs"), SimpleNamespace(id=3, name="ops")],
             ),
@@ -283,7 +285,7 @@ async def test_text_ingestion_response_contract(
 
     assert response.status_code == 201
     assert response.json() == {
-        "source_id": 12,
+        "source_id": "11111111-1111-4111-8111-111111111111",
         "title": "meeting-notes",
         "categories": [{"id": 2, "name": "docs"}, {"id": 3, "name": "ops"}],
         "chunks_created": 3,
@@ -302,7 +304,7 @@ async def test_text_ingestion_accepts_form_data(
         assert kwargs["category_ids"] == [1]
         return (
             SimpleNamespace(
-                id=13,
+                public_id="22222222-2222-4222-8222-222222222222",
                 title="market-notes",
                 categories=[SimpleNamespace(id=1, name="financeiro")],
             ),
@@ -325,7 +327,7 @@ async def test_text_ingestion_accepts_form_data(
 
     assert response.status_code == 201
     assert response.json() == {
-        "source_id": 13,
+        "source_id": "22222222-2222-4222-8222-222222222222",
         "title": "market-notes",
         "categories": [{"id": 1, "name": "financeiro"}],
         "chunks_created": 1,
@@ -341,11 +343,14 @@ async def test_sources_response_contract(
     async def fake_list_sources(_: object) -> list[dict[str, object]]:
         return [
             {
-                "id": 1,
+                "source_id": "33333333-3333-4333-8333-333333333333",
                 "title": "onboarding-guide",
                 "categories": [{"id": 4, "name": "docs"}],
                 "source_type": "upload",
                 "uri": "upload:onboarding-guide.pdf",
+                "content_hash": "abc123",
+                "created_at": None,
+                "updated_at": None,
             }
         ]
 
@@ -358,13 +363,111 @@ async def test_sources_response_contract(
     assert response.status_code == 200
     assert response.json() == [
         {
-            "id": 1,
+            "source_id": "33333333-3333-4333-8333-333333333333",
             "title": "onboarding-guide",
             "categories": [{"id": 4, "name": "docs"}],
             "source_type": "upload",
             "uri": "upload:onboarding-guide.pdf",
+            "content_hash": "abc123",
+            "created_at": None,
+            "updated_at": None,
         }
     ]
+
+
+@pytest.mark.asyncio
+async def test_source_lifecycle_response_contracts(
+    app: Any,
+    transport: httpx.ASGITransport,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_id = "44444444-4444-4444-8444-444444444444"
+    payload = {
+        "source_id": source_id,
+        "title": "runbook",
+        "categories": [{"id": 4, "name": "docs"}],
+        "source_type": "text",
+        "uri": "text:runbook",
+        "content_hash": "abc123",
+        "created_at": None,
+        "updated_at": None,
+        "content": "hello",
+    }
+
+    async def fake_get_source_detail(_: object, requested_source_id: str) -> dict[str, object]:
+        assert requested_source_id == source_id
+        return payload
+
+    async def fake_update_source(**kwargs: object) -> tuple[dict[str, object], int | None]:
+        assert kwargs["source_id"] == source_id
+        assert kwargs["title"] == "new title"
+        assert kwargs["category_ids"] == [4]
+        updated = dict(payload)
+        updated["title"] = "new title"
+        return updated, None
+
+    async def fake_delete_source(_: object, requested_source_id: str, confirm: bool) -> None:
+        assert requested_source_id == source_id
+        assert confirm is True
+
+    app.dependency_overrides[require_auth_token] = no_auth
+    app.dependency_overrides[get_embedding_client] = fake_embedding_client
+    monkeypatch.setattr("backend.app.api.routes.knowledge.get_source_detail", fake_get_source_detail)
+    monkeypatch.setattr("backend.app.api.routes.knowledge.update_source", fake_update_source)
+    monkeypatch.setattr("backend.app.api.routes.knowledge.delete_source", fake_delete_source)
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        detail = await client.get(f"/api/v1/knowledge/sources/{source_id}")
+        patched = await client.patch(
+            f"/api/v1/knowledge/sources/{source_id}",
+            json={"title": "new title", "category_ids": [4]},
+        )
+        deleted = await client.delete(f"/api/v1/knowledge/sources/{source_id}?confirm=true")
+
+    assert detail.status_code == 200
+    assert detail.json() == payload
+    assert patched.status_code == 200
+    assert patched.json()["title"] == "new title"
+    assert deleted.status_code == 204
+
+
+@pytest.mark.asyncio
+async def test_source_lifecycle_status_mapping(
+    app: Any,
+    transport: httpx.ASGITransport,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_id = "55555555-5555-4555-8555-555555555555"
+
+    async def missing_source(_: object, __: str) -> dict[str, object]:
+        raise SourceNotFoundError("Source does not exist.")
+
+    async def duplicate_update(**_: object) -> tuple[dict[str, object], int | None]:
+        existing = SimpleNamespace(public_id="66666666-6666-4666-8666-666666666666")
+        raise DuplicateSourceContentError(existing)  # type: ignore[arg-type]
+
+    async def unconfirmed_delete(_: object, __: str, confirm: bool) -> None:
+        assert confirm is False
+        raise SourceDeleteConfirmationError("Use confirm=true to delete a source.")
+
+    app.dependency_overrides[require_auth_token] = no_auth
+    app.dependency_overrides[get_embedding_client] = fake_embedding_client
+    monkeypatch.setattr("backend.app.api.routes.knowledge.get_source_detail", missing_source)
+    monkeypatch.setattr("backend.app.api.routes.knowledge.update_source", duplicate_update)
+    monkeypatch.setattr("backend.app.api.routes.knowledge.delete_source", unconfirmed_delete)
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        missing = await client.get(f"/api/v1/knowledge/sources/{source_id}")
+        duplicate = await client.patch(
+            f"/api/v1/knowledge/sources/{source_id}",
+            json={"content": "duplicate"},
+        )
+        unconfirmed = await client.delete(f"/api/v1/knowledge/sources/{source_id}")
+
+    assert missing.status_code == 404
+    assert duplicate.status_code == 409
+    assert duplicate.json()["detail"]["existing_source_id"] == "66666666-6666-4666-8666-666666666666"
+    assert unconfirmed.status_code == 400
 
 
 @pytest.mark.asyncio
