@@ -3,6 +3,10 @@ from __future__ import annotations
 import re
 
 PDF_PAGE_COUNTER_PATTERN = re.compile(r"^\s*\d+\s*/\s*\d+\s*$")
+PDF_GENERATOR_FOOTER_PATTERN = re.compile(
+    r"^\s*powered\s+by\s+tcpdf(?:\s*\([^)]*\))?\s*$",
+    re.IGNORECASE,
+)
 
 
 def normalize_text(text: str) -> str:
@@ -22,6 +26,7 @@ def normalize_pdf_text(text: str) -> str:
             " ".join(line.split())
             for line in paragraph.splitlines()
             if not PDF_PAGE_COUNTER_PATTERN.fullmatch(line)
+            and not PDF_GENERATOR_FOOTER_PATTERN.fullmatch(line)
         ]
         paragraph_text = " ".join(line for line in lines if line)
         if paragraph_text:
