@@ -20,6 +20,8 @@ dependencies = [
   "httpx>=0.27",
   "python-multipart>=0.0.9",
   "pypdf>=4.3",
+  "pdf2image>=1.17",
+  "pytesseract>=0.3",
   "mcp>=1.12.4,<1.13",
 ]
 

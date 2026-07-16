@@ -147,6 +147,49 @@ def test_extract_text_reads_pdf(monkeypatch: pytest.MonkeyPatch) -> None:
     assert extract_text("paper.pdf", b"%PDF") == "pdf page"
 
 
+def test_extract_text_prefers_pdf_native_text_over_ocr(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FakePage:
+        def extract_text(self, extraction_mode: str | None = None) -> str:
+            assert extraction_mode == "layout"
+            return "native pdf text"
+
+    class FakePdfReader:
+        def __init__(self, stream: object) -> None:
+            _ = stream
+            self.pages = [FakePage()]
+
+    def fail_ocr(_: bytes) -> str:
+        raise AssertionError("OCR should not run when native PDF text is available.")
+
+    monkeypatch.setattr("backend.app.services.documents.extractors.build_pdf_reader", FakePdfReader)
+    monkeypatch.setattr("backend.app.services.documents.extractors.extract_pdf_ocr_text", fail_ocr)
+
+    assert extract_text("paper.pdf", b"%PDF") == "native pdf text"
+
+
+def test_extract_text_uses_ocr_when_pdf_native_text_is_empty(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakePage:
+        def extract_text(self, extraction_mode: str | None = None) -> str:
+            assert extraction_mode == "layout"
+            return "Powered by TCPDF (www.tcpdf.org)"
+
+    class FakePdfReader:
+        def __init__(self, stream: object) -> None:
+            _ = stream
+            self.pages = [FakePage()]
+
+    def fake_ocr(content: bytes) -> str:
+        assert content == b"%PDF"
+        return "Texto extraido por OCR"
+
+    monkeypatch.setattr("backend.app.services.documents.extractors.build_pdf_reader", FakePdfReader)
+    monkeypatch.setattr("backend.app.services.documents.extractors.extract_pdf_ocr_text", fake_ocr)
+
+    assert extract_text("paper.pdf", b"%PDF") == "Texto extraido por OCR"
+
+
 def test_extract_text_normalizes_pdf_layout(monkeypatch: pytest.MonkeyPatch) -> None:
     class FakePage:
         def extract_text(self, extraction_mode: str | None = None) -> str:
