@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import json
+from hashlib import sha256
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db.models import Category, DocumentSource
-from ..repositories.chunks import add_source_chunks, delete_chunks_for_source
-from ..repositories.sources import get_source_by_uri
+from ..repositories.chunks import add_source_chunks
+from ..repositories.sources import get_source_by_content_hash
 from .categories import get_categories
 from .documents.chunker import chunk_text
 from .documents.extractors import (
@@ -22,6 +23,19 @@ from .embeddings import EmbeddingClient
 
 class KnowledgeIngestionError(ValueError):
     pass
+
+
+class DuplicateSourceContentError(KnowledgeIngestionError):
+    def __init__(self, existing_source: DocumentSource) -> None:
+        self.existing_source = existing_source
+        super().__init__(
+            "A source with identical content already exists: "
+            f"{existing_source.public_id}."
+        )
+
+
+def compute_content_hash(text: str) -> str:
+    return sha256(text.encode("utf-8")).hexdigest()
 
 
 async def ingest_uploaded_file(
@@ -92,25 +106,24 @@ async def ingest_text_source(
     embedding_client: EmbeddingClient,
     extra_metadata: dict[str, str] | None = None,
 ) -> tuple[DocumentSource, int]:
+    content_hash = compute_content_hash(text)
+    existing_source = await get_source_by_content_hash(session, content_hash)
+    if existing_source is not None:
+        raise DuplicateSourceContentError(existing_source)
+
     chunks = chunk_text(text)
     embeddings = await embedding_client.embed_texts(chunks)
 
-    existing_source = await get_source_by_uri(session, uri)
-    if existing_source is not None:
-        await delete_chunks_for_source(session, existing_source.id)
-        source = existing_source
-        source.title = title
-        source.source_type = source_type
-        source.categories = categories
-    else:
-        source = DocumentSource(
-            title=title,
-            source_type=source_type,
-            uri=uri,
-        )
-        source.categories = categories
-        session.add(source)
-        await session.flush()
+    source = DocumentSource(
+        title=title,
+        source_type=source_type,
+        uri=uri,
+        content_text=text,
+        content_hash=content_hash,
+    )
+    source.categories = categories
+    session.add(source)
+    await session.flush()
 
     category_payload = [{"id": category.id, "name": category.name} for category in categories]
     metadata = []

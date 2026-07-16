@@ -1,4 +1,5 @@
 from datetime import datetime
+from uuid import uuid4
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Table, Text, func
@@ -39,10 +40,18 @@ class DocumentSource(Base):
     __tablename__ = "document_sources"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    public_id: Mapped[str] = mapped_column(
+        String(36), nullable=False, unique=True, default=lambda: str(uuid4())
+    )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     source_type: Mapped[str] = mapped_column(String(50), nullable=False, default="file")
-    uri: Mapped[str] = mapped_column(String(1024), nullable=False, unique=True)
+    uri: Mapped[str] = mapped_column(String(1024), nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    content_text: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
     chunks: Mapped[list["KnowledgeChunk"]] = relationship(
         back_populates="source", cascade="all, delete-orphan"

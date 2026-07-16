@@ -1,18 +1,60 @@
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ..db.models import DocumentSource
 
 
-async def get_source_by_uri(session: AsyncSession, uri: str) -> DocumentSource | None:
+def _source_options() -> tuple[object, ...]:
+    return (selectinload(DocumentSource.categories),)
+
+
+async def get_source_by_public_id(
+    session: AsyncSession, public_id: str
+) -> DocumentSource | None:
     return await session.scalar(
         select(DocumentSource)
-        .options(selectinload(DocumentSource.categories))
-        .where(DocumentSource.uri == uri)
+        .options(*_source_options())
+        .where(DocumentSource.public_id == public_id)
     )
+
+
+async def get_source_by_content_hash(
+    session: AsyncSession, content_hash: str, exclude_source_id: int | None = None
+) -> DocumentSource | None:
+    statement = (
+        select(DocumentSource)
+        .options(*_source_options())
+        .where(DocumentSource.content_hash == content_hash)
+    )
+    if exclude_source_id is not None:
+        statement = statement.where(DocumentSource.id != exclude_source_id)
+    return await session.scalar(statement)
+
+
+async def delete_source_by_id(session: AsyncSession, source_id: int) -> None:
+    await session.execute(delete(DocumentSource).where(DocumentSource.id == source_id))
+
+
+def serialize_source(source: DocumentSource, include_content: bool = False) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "source_id": source.public_id,
+        "title": source.title,
+        "categories": [
+            {"id": category.id, "name": category.name}
+            for category in sorted(source.categories, key=lambda category: category.name)
+        ],
+        "source_type": source.source_type,
+        "uri": source.uri,
+        "content_hash": source.content_hash,
+        "created_at": source.created_at,
+        "updated_at": source.updated_at,
+    }
+    if include_content:
+        payload["content"] = source.content_text
+    return payload
 
 
 async def list_sources(session: AsyncSession) -> list[dict[str, object]]:
@@ -20,7 +62,7 @@ async def list_sources(session: AsyncSession) -> list[dict[str, object]]:
         (
             await session.execute(
                 select(DocumentSource)
-                .options(selectinload(DocumentSource.categories))
+                .options(*_source_options())
                 .order_by(DocumentSource.created_at.desc())
             )
         )
@@ -28,16 +70,4 @@ async def list_sources(session: AsyncSession) -> list[dict[str, object]]:
         .all()
     )
 
-    return [
-        {
-            "id": source.id,
-            "title": source.title,
-            "categories": [
-                {"id": category.id, "name": category.name}
-                for category in sorted(source.categories, key=lambda category: category.name)
-            ],
-            "source_type": source.source_type,
-            "uri": source.uri,
-        }
-        for source in rows
-    ]
+    return [serialize_source(source) for source in rows]

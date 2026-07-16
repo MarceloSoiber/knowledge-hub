@@ -25,6 +25,7 @@ from backend.app.services.embeddings import (
 from backend.app.services.ingestion import KnowledgeIngestionError, ingest_plain_text
 from backend.app.services.search import list_sources
 from backend.app.services.search import search_knowledge as search_backend_knowledge
+from backend.app.services.sources import SourceNotFoundError, get_source_detail
 
 MCP_ALLOWED_METADATA_KEYS = {"client_id", "note_type"}
 MCP_WRITE_SCOPE = "knowledge:write"
@@ -51,11 +52,16 @@ class KnowledgeCategory(BaseModel):
 
 
 class KnowledgeSource(BaseModel):
-    id: int
+    source_id: str
     title: str
     categories: list[KnowledgeCategory]
     source_type: str
     uri: str
+    content_hash: str
+
+
+class KnowledgeSourceDetail(KnowledgeSource):
+    content: str
 
 
 class MCPTextIngestRequest(BaseModel):
@@ -86,7 +92,7 @@ class MCPTextIngestRequest(BaseModel):
 
 
 class MCPTextIngestResult(BaseModel):
-    source_id: int
+    source_id: str
     title: str
     categories: list[KnowledgeCategory]
     chunks_created: int
@@ -97,6 +103,10 @@ class MCPAuthorizationError(PermissionError):
 
 
 class MCPIngestionError(ValueError):
+    pass
+
+
+class MCPSourceNotFoundError(LookupError):
     pass
 
 
@@ -126,6 +136,15 @@ async def get_knowledge_sources() -> list[KnowledgeSource]:
     async with SessionLocal() as session:
         sources = await list_sources(session)
     return [KnowledgeSource(**source) for source in sources]
+
+
+async def get_knowledge_source(source_id: str) -> KnowledgeSourceDetail:
+    try:
+        async with SessionLocal() as session:
+            source = await get_source_detail(session, source_id)
+    except SourceNotFoundError as exc:
+        raise MCPSourceNotFoundError(str(exc)) from exc
+    return KnowledgeSourceDetail(**source)
 
 
 async def get_knowledge_categories() -> list[KnowledgeCategory]:
@@ -173,7 +192,7 @@ async def ingest_mcp_text(
         raise MCPIngestionError(f"Embedding provider failure: {exc}") from exc
 
     return MCPTextIngestResult(
-        source_id=source.id,
+        source_id=source.public_id,
         title=source.title,
         categories=source.categories,
         chunks_created=chunks_created,

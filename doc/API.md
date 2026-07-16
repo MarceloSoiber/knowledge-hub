@@ -68,7 +68,7 @@ Resposta:
 
 ```json
 {
-  "source_id": 42,
+  "source_id": "11111111-1111-4111-8111-111111111111",
   "title": "Decisão de arquitetura",
   "categories": [
     {
@@ -84,6 +84,9 @@ A tool grava conhecimento persistente. Clientes/agentes devem pedir confirmaçã
 explícita ao usuário antes de chamá-la e não devem usá-la para arquivar conversas
 automaticamente. `metadata` aceita apenas `client_id` e `note_type`.
 
+A tool `source(source_id)` consulta uma fonte detalhada por UUID público. O MCP
+não expõe ferramentas de atualização ou exclusão de fontes nesta versão.
+
 ## Resumo dos endpoints
 
 | Método | Endpoint | Descrição |
@@ -95,6 +98,9 @@ automaticamente. `metadata` aceita apenas `client_id` e `note_type`.
 | `PATCH` | `/api/v1/knowledge/categories/{id}` | Renomeia uma categoria. |
 | `DELETE` | `/api/v1/knowledge/categories/{id}` | Remove uma categoria sem documentos associados. |
 | `GET` | `/api/v1/knowledge/sources` | Lista os documentos cadastrados. |
+| `GET` | `/api/v1/knowledge/sources/{source_id}` | Consulta um documento por UUID público. |
+| `PATCH` | `/api/v1/knowledge/sources/{source_id}` | Atualiza título, categorias e/ou conteúdo. |
+| `DELETE` | `/api/v1/knowledge/sources/{source_id}?confirm=true` | Exclui definitivamente um documento. |
 | `POST` | `/api/v1/knowledge/uploads` | Cadastra um arquivo. |
 | `POST` | `/api/v1/knowledge/texts` | Cadastra conteúdo textual. |
 | `POST` | `/api/v1/knowledge/search` | Realiza uma busca semântica. |
@@ -209,7 +215,7 @@ Resposta `201 Created`:
 
 ```json
 {
-  "source_id": 10,
+  "source_id": "22222222-2222-4222-8222-222222222222",
   "title": "documento.pdf",
   "categories": [
     {
@@ -261,7 +267,7 @@ Resposta `201 Created`:
 
 ```json
 {
-  "source_id": 11,
+  "source_id": "33333333-3333-4333-8333-333333333333",
   "title": "Ata da reunião",
   "categories": [
     {
@@ -277,8 +283,9 @@ Resposta `201 Created`:
 }
 ```
 
-Se uma origem com a mesma identificação já existir, seus chunks anteriores serão
-substituídos pelo conteúdo novo.
+Novas ingestões criam novas fontes mesmo quando o título ou `uri` se repetem. Se
+o conteúdo canônico normalizado já existir em outra fonte, a API retorna
+`409 Conflict` com o UUID público da fonte existente.
 
 ## Consulta de conhecimento
 
@@ -390,7 +397,7 @@ Resposta `200 OK`:
 ```json
 [
   {
-    "id": 10,
+    "source_id": "22222222-2222-4222-8222-222222222222",
     "title": "documento.pdf",
     "categories": [
       {
@@ -399,10 +406,13 @@ Resposta `200 OK`:
       }
     ],
     "source_type": "upload",
-    "uri": "upload:documento.pdf"
+    "uri": "upload:documento.pdf",
+    "content_hash": "d2d2d2...",
+    "created_at": "2026-07-16T12:00:00Z",
+    "updated_at": "2026-07-16T12:00:00Z"
   },
   {
-    "id": 11,
+    "source_id": "33333333-3333-4333-8333-333333333333",
     "title": "Ata da reunião",
     "categories": [
       {
@@ -415,10 +425,71 @@ Resposta `200 OK`:
       }
     ],
     "source_type": "text",
-    "uri": "text:Ata da reunião"
+    "uri": "text:Ata da reunião",
+    "content_hash": "a1a1a1...",
+    "created_at": "2026-07-16T12:05:00Z",
+    "updated_at": "2026-07-16T12:05:00Z"
   }
 ]
 ```
+
+### Consultar documento
+
+```http
+GET /api/v1/knowledge/sources/{source_id}
+```
+
+`source_id` é o UUID público retornado na ingestão ou listagem.
+
+Resposta `200 OK`:
+
+```json
+{
+  "source_id": "33333333-3333-4333-8333-333333333333",
+  "title": "Ata da reunião",
+  "categories": [
+    {
+      "id": 2,
+      "name": "financeiro"
+    }
+  ],
+  "source_type": "text",
+  "uri": "text:Ata da reunião",
+  "content_hash": "a1a1a1...",
+  "created_at": "2026-07-16T12:05:00Z",
+  "updated_at": "2026-07-16T12:05:00Z",
+  "content": "Conteúdo canônico normalizado usado para chunking."
+}
+```
+
+### Atualizar documento
+
+```http
+PATCH /api/v1/knowledge/sources/{source_id}
+Content-Type: application/json
+```
+
+Corpo da requisição:
+
+| Campo | Tipo | Obrigatório | Regras |
+| --- | --- | --- | --- |
+| `title` | string | não | Entre 1 e 255 caracteres após remover espaços externos. |
+| `category_ids` | lista de inteiros | não | Não pode ser vazia quando informada; IDs devem existir. |
+| `content` | string | não | Quando informado, não pode ficar vazio após normalização. |
+
+Ao alterar apenas `title` ou `category_ids`, a API não recria embeddings. Ao
+alterar `content`, a API recalcula o hash e substitui chunks e embeddings em uma
+transação.
+
+### Excluir documento
+
+```http
+DELETE /api/v1/knowledge/sources/{source_id}?confirm=true
+```
+
+A exclusão é definitiva e remove chunks e associações de categoria. Sem
+`confirm=true`, a API retorna `400 Bad Request`. Faça backup externo antes de
+usar esta operação em dados importantes.
 
 ## Endpoints públicos
 
@@ -468,8 +539,8 @@ Principais códigos:
 | --- | --- |
 | `400 Bad Request` | Arquivo inválido, conteúdo vazio ou falha de ingestão. |
 | `401 Unauthorized` | Token Bearer ausente ou inválido quando a autenticação está ativa. |
-| `404 Not Found` | A categoria informada não existe. |
-| `409 Conflict` | Nome de categoria duplicado ou categoria em uso durante exclusão. |
+| `404 Not Found` | A categoria ou fonte informada não existe. |
+| `409 Conflict` | Nome de categoria duplicado, categoria em uso ou conteúdo duplicado. |
 | `413 Content Too Large` | O arquivo enviado ultrapassa 10 MB. |
 | `422 Unprocessable Entity` | O corpo ou os parâmetros não atendem ao schema. |
 | `502 Bad Gateway` | Falha ao consultar o serviço de embeddings ou o LLM. |

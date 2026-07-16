@@ -25,9 +25,21 @@ from .documents.extractors import (
     validate_upload,
 )
 from .documents.normalizer import normalize_pdf_text, normalize_text
-from .ingestion import KnowledgeIngestionError, ingest_plain_text, ingest_text_source
+from .ingestion import (
+    DuplicateSourceContentError,
+    KnowledgeIngestionError,
+    ingest_plain_text,
+    ingest_text_source,
+)
 from .ingestion import ingest_uploaded_file
 from .search import answer_knowledge, list_sources, search_knowledge
+from .sources import (
+    SourceDeleteConfirmationError,
+    SourceNotFoundError,
+    delete_source,
+    get_source_detail,
+    update_source,
+)
 
 __all__ = [
     "CategoryNotFoundError",
@@ -36,6 +48,7 @@ __all__ = [
     "EmptyDocumentError",
     "FileTooLargeError",
     "KnowledgeIngestionError",
+    "DuplicateSourceContentError",
     "UnsupportedFileTypeError",
     "answer_knowledge",
     "build_pdf_reader",
@@ -56,6 +69,11 @@ __all__ = [
     "normalize_pdf_text",
     "normalize_text",
     "search_knowledge",
+    "SourceDeleteConfirmationError",
+    "SourceNotFoundError",
+    "delete_source",
+    "get_source_detail",
+    "update_source",
     "update_category",
     "validate_upload",
 ]

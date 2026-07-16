@@ -1,7 +1,15 @@
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import Form
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    field_validator,
+    model_validator,
+)
 
 
 NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
@@ -23,11 +31,35 @@ class CategoryWrite(BaseModel):
 
 
 class KnowledgeSourceRead(BaseModel):
-    id: int
+    source_id: str
     title: str
     categories: list[CategoryRead]
     source_type: str
     uri: str
+    content_hash: str
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class KnowledgeSourceDetail(KnowledgeSourceRead):
+    content: str
+
+
+class KnowledgeSourcePatchRequest(BaseModel):
+    title: TitleStr | None = None
+    category_ids: list[int] | None = None
+    content: NonEmptyStr | None = None
+
+    @field_validator("category_ids")
+    @classmethod
+    def validate_category_ids(cls, value: list[int] | None) -> list[int] | None:
+        return validate_optional_category_ids(value)
+
+    @model_validator(mode="after")
+    def require_any_field(self) -> "KnowledgeSourcePatchRequest":
+        if self.title is None and self.category_ids is None and self.content is None:
+            raise ValueError("At least one source field must be provided.")
+        return self
 
 
 class KnowledgeChunkRead(BaseModel):
@@ -55,7 +87,7 @@ class KnowledgeSearchResponse(BaseModel):
 
 
 class KnowledgeUploadResponse(BaseModel):
-    source_id: int
+    source_id: str
     title: str
     categories: list[CategoryRead]
     chunks_created: int
