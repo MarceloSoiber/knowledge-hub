@@ -57,13 +57,6 @@ deploy:
         docker compose up -d --build --no-deps --force-recreate mcp
       }
 
-      restart_container_runtime() {
-        sudo -n systemctl stop docker.socket docker || true
-        sudo -n systemctl stop containerd || true
-        sudo -n systemctl start containerd
-        sudo -n systemctl start docker
-      }
-
       remove_recreate_containers() {
         if docker ps -aq \
           --filter name='^[0-9a-f]+_mcp-knowledge-hub-backend$' \
@@ -93,8 +86,6 @@ deploy:
         done
       }
 
-      echo "Restarting container runtime to clear stale container state before deploy."
-      restart_container_runtime
       remove_recreate_containers
       cleanup_containers
       release_service_ports
@@ -102,7 +93,7 @@ deploy:
       if docker ps -aq \
         --filter name=mcp-knowledge-hub-backend \
         --filter name=mcp-knowledge-hub-mcp | grep -q .; then
-        echo "Old containers are still stuck after container runtime restart."
+        echo "Old backend/MCP containers are still stuck after cleanup."
         docker ps -a \
           --filter name=mcp-knowledge-hub-backend \
           --filter name=mcp-knowledge-hub-mcp
@@ -110,8 +101,7 @@ deploy:
       fi
 
       if ! deploy_containers; then
-        echo "Docker failed while recreating containers; restarting container runtime and retrying once."
-        restart_container_runtime
+        echo "Docker failed while recreating containers; retrying backend/MCP cleanup once."
         remove_recreate_containers
         cleanup_containers
         release_service_ports
