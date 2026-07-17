@@ -14,7 +14,6 @@ deploy:
     - docker compose config --quiet
     - |
       cleanup_containers() {
-        docker compose down --remove-orphans || true
         docker rm -f mcp-knowledge-hub-backend mcp-knowledge-hub-mcp 2>/dev/null || true
       }
 
@@ -42,8 +41,21 @@ deploy:
 
       release_service_ports() {
         for port in 8000 8001; do
-          echo "Releasing possible stale listener on port ${port}."
-          sudo -n fuser -k "${port}/tcp" || true
+          if ss -H -ltn "sport = :${port}" | grep -q .; then
+            echo "Port ${port} is busy before deploy; releasing stale listener."
+            ss -H -ltnp "sport = :${port}" || true
+            sudo -n fuser -v "${port}/tcp" || true
+            sudo -n fuser -k "${port}/tcp"
+            sleep 2
+          fi
+
+          if ss -H -ltn "sport = :${port}" | grep -q .; then
+            echo "Port ${port} is still busy after release attempt."
+            ss -H -ltnp "sport = :${port}" || true
+            sudo -n fuser -v "${port}/tcp" || true
+            docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' || true
+            exit 1
+          fi
         done
       }
 
