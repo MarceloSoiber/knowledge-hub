@@ -19,7 +19,7 @@ deploy:
       }
 
       deploy_containers() {
-        docker compose up -d --build --remove-orphans
+        docker compose up -d --build --no-deps --force-recreate backend mcp
       }
 
       restart_container_runtime() {
