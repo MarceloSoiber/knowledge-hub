@@ -18,8 +18,37 @@ deploy:
         docker rm -f mcp-knowledge-hub-backend mcp-knowledge-hub-mcp 2>/dev/null || true
       }
 
+      diagnose_backend() {
+        echo "Backend container diagnostics:"
+        docker ps -a --filter name=mcp-knowledge-hub-backend || true
+        docker inspect mcp-knowledge-hub-backend \
+          --format '{{json .State.Health}}' || true
+        docker inspect mcp-knowledge-hub-backend \
+          --format '{{range .Config.Env}}{{println .}}{{end}}' | grep POSTGRES_DSN || true
+        docker logs --tail=160 mcp-knowledge-hub-backend || true
+      }
+
+      wait_for_backend_health() {
+        for _ in $(seq 1 30); do
+          status="$(docker inspect mcp-knowledge-hub-backend --format '{{.State.Health.Status}}' 2>/dev/null || true)"
+          if [ "${status}" = "healthy" ]; then
+            return 0
+          fi
+          if [ "${status}" = "unhealthy" ]; then
+            diagnose_backend
+            return 1
+          fi
+          sleep 2
+        done
+
+        diagnose_backend
+        return 1
+      }
+
       deploy_containers() {
-        docker compose up -d --build --no-deps --force-recreate backend mcp
+        docker compose up -d --build --no-deps --force-recreate backend
+        wait_for_backend_health
+        docker compose up -d --build --no-deps --force-recreate mcp
       }
 
       restart_container_runtime() {
