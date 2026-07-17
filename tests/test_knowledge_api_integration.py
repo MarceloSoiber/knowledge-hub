@@ -151,9 +151,21 @@ async def test_search_response_contract(
         return [
             {
                 "id": 10,
-                "source_id": 3,
+                "source_id": "33333333-3333-4333-8333-333333333333",
+                "source_title": "runbook.md",
+                "source_type": "upload",
+                "uri": "upload:runbook.md",
+                "categories": [{"id": 2, "name": "docs"}],
+                "location": {
+                    "chunk_index": 1,
+                    "page": None,
+                    "section": "Setup",
+                    "start_char": 20,
+                    "end_char": 60,
+                },
                 "content": "result content",
                 "score": 0.92,
+                "metadata": {"note_type": "decision"},
             }
         ]
 
@@ -174,11 +186,70 @@ async def test_search_response_contract(
         "results": [
             {
                 "id": 10,
-                "source_id": 3,
+                "source_id": "33333333-3333-4333-8333-333333333333",
+                "source_title": "runbook.md",
+                "source_type": "upload",
+                "uri": "upload:runbook.md",
+                "categories": [{"id": 2, "name": "docs"}],
+                "location": {
+                    "chunk_index": 1,
+                    "page": None,
+                    "section": "Setup",
+                    "start_char": 20,
+                    "end_char": 60,
+                },
                 "content": "result content",
                 "score": 0.92,
+                "metadata": {"note_type": "decision"},
             }
         ],
+    }
+
+
+@pytest.mark.asyncio
+async def test_answer_response_contract_includes_citation_sources(
+    app: Any,
+    transport: httpx.ASGITransport,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = {
+        "id": 10,
+        "source_id": "33333333-3333-4333-8333-333333333333",
+        "source_title": "runbook.md",
+        "source_type": "upload",
+        "uri": "upload:runbook.md",
+        "categories": [{"id": 2, "name": "docs"}],
+        "location": {
+            "chunk_index": 1,
+            "page": None,
+            "section": "Setup",
+            "start_char": 20,
+            "end_char": 60,
+        },
+        "content": "result content",
+        "score": 0.92,
+        "metadata": {},
+    }
+
+    async def fake_answer(**_: object) -> tuple[str, list[dict[str, object]]]:
+        return "answer with citation", [source]
+
+    app.dependency_overrides[require_auth_token] = no_auth
+    app.dependency_overrides[get_embedding_client] = fake_embedding_client
+    app.dependency_overrides[get_answer_client] = fake_answer_client
+    monkeypatch.setattr("backend.app.api.routes.knowledge.answer_knowledge", fake_answer)
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/api/v1/knowledge/answer",
+            json={"query": "summarize", "limit": 5},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "query": "summarize",
+        "answer": "answer with citation",
+        "sources": [source],
     }
 
 

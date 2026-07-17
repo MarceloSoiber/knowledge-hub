@@ -1,8 +1,10 @@
 from datetime import datetime
+from typing import Any
 from uuid import uuid4
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Table, Text, func
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
@@ -68,7 +70,7 @@ class KnowledgeChunk(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_id: Mapped[int] = mapped_column(ForeignKey("document_sources.id"), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    metadata_json: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     embedding: Mapped[list[float] | None] = mapped_column(
         Vector(EMBEDDING_DIMENSION), nullable=True
     )

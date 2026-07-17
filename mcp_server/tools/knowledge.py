@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Annotated
+from typing import Any
 
 from mcp.server.auth.middleware.auth_context import get_access_token
 from mcp.server.auth.provider import AccessToken
@@ -39,9 +40,15 @@ ContentStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=
 
 class KnowledgeHit(BaseModel):
     id: int = Field(description="ID do chunk encontrado")
-    source_id: int = Field(description="ID da origem do chunk")
+    source_id: str = Field(description="UUID publico da origem do chunk")
+    source_title: str = Field(description="Titulo da origem")
+    source_type: str = Field(description="Tipo da origem")
+    uri: str = Field(description="URI publica ou sanitizada da origem")
+    categories: list["KnowledgeCategory"] = Field(description="Categorias da origem")
+    location: "KnowledgeChunkLocation" = Field(description="Localizacao citavel do chunk")
     content: str = Field(description="Conteúdo encontrado")
     score: float | None = Field(default=None, description="Score de relevância")
+    metadata: dict[str, Any] = Field(default_factory=dict, description="Metadados publicos")
 
 
 class KnowledgeCategory(BaseModel):
@@ -49,6 +56,14 @@ class KnowledgeCategory(BaseModel):
 
     id: int
     name: str
+
+
+class KnowledgeChunkLocation(BaseModel):
+    chunk_index: int
+    page: int | None = None
+    section: str | None = None
+    start_char: int
+    end_char: int
 
 
 class KnowledgeSource(BaseModel):

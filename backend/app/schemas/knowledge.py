@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import Form
 from pydantic import (
@@ -62,11 +62,25 @@ class KnowledgeSourcePatchRequest(BaseModel):
         return self
 
 
+class KnowledgeChunkLocation(BaseModel):
+    chunk_index: int
+    page: int | None = None
+    section: str | None = None
+    start_char: int
+    end_char: int
+
+
 class KnowledgeChunkRead(BaseModel):
     id: int
-    source_id: int
+    source_id: str
+    source_title: str
+    source_type: str
+    uri: str
+    categories: list[CategoryRead]
+    location: KnowledgeChunkLocation
     content: str
     score: float | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class KnowledgeSearchRequest(BaseModel):

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db.models import DocumentSource
@@ -13,11 +11,16 @@ from ..repositories.sources import (
     serialize_source,
 )
 from .categories import get_categories
-from .documents.chunker import chunk_text
+from .documents.chunker import chunk_text_with_locations, detect_markdown_sections
 from .documents.extractors import EmptyDocumentError
 from .documents.normalizer import normalize_text
 from .embeddings import EmbeddingClient
-from .ingestion import DuplicateSourceContentError, KnowledgeIngestionError, compute_content_hash
+from .ingestion import (
+    DuplicateSourceContentError,
+    KnowledgeIngestionError,
+    build_chunk_metadata,
+    compute_content_hash,
+)
 
 
 class SourceNotFoundError(LookupError):
@@ -69,8 +72,9 @@ async def update_source(
     if duplicate is not None:
         raise DuplicateSourceContentError(duplicate)
 
-    chunks = chunk_text(text)
-    embeddings = await embedding_client.embed_texts(chunks)
+    chunks = chunk_text_with_locations(text, section_spans=detect_markdown_sections(text))
+    chunk_contents = [chunk.content for chunk in chunks]
+    embeddings = await embedding_client.embed_texts(chunk_contents)
 
     source.title = normalized_title
     source.categories = categories
@@ -80,13 +84,13 @@ async def update_source(
     add_source_chunks(
         session,
         source.id,
-        chunks,
+        chunk_contents,
         embeddings,
-        _build_chunk_metadata(
+        build_chunk_metadata(
             title=normalized_title,
             categories=categories,
             source_type=source.source_type,
-            chunk_count=len(chunks),
+            chunks=chunks,
         ),
     )
     await session.commit()
@@ -107,27 +111,3 @@ async def _get_source_or_raise(session: AsyncSession, source_id: str) -> Documen
     if source is None:
         raise SourceNotFoundError(f"Source {source_id} does not exist.")
     return source
-
-
-def _build_chunk_metadata(
-    title: str,
-    categories: list[object],
-    source_type: str,
-    chunk_count: int,
-) -> list[str]:
-    category_payload = [
-        {"id": category.id, "name": category.name}  # type: ignore[attr-defined]
-        for category in categories
-    ]
-    return [
-        json.dumps(
-            {
-                "title": title,
-                "category_ids": [category["id"] for category in category_payload],
-                "categories": category_payload,
-                "source_type": source_type,
-                "chunk_index": index,
-            }
-        )
-        for index in range(chunk_count)
-    ]

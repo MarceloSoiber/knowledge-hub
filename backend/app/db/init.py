@@ -156,6 +156,40 @@ async def init_db() -> None:
         )
         await connection.execute(
             text(
+                "CREATE OR REPLACE FUNCTION try_parse_jsonb(value text) "
+                "RETURNS jsonb AS $$ "
+                "BEGIN "
+                "RETURN value::jsonb; "
+                "EXCEPTION WHEN others THEN "
+                "RETURN '{}'::jsonb; "
+                "END; "
+                "$$ LANGUAGE plpgsql IMMUTABLE"
+            )
+        )
+        await connection.execute(
+            text(
+                "DO $$ "
+                "BEGIN "
+                "IF EXISTS ("
+                "SELECT 1 FROM information_schema.columns "
+                "WHERE table_schema = current_schema() "
+                "AND table_name = 'knowledge_chunks' "
+                "AND column_name = 'metadata_json' "
+                "AND data_type <> 'jsonb'"
+                ") THEN "
+                "ALTER TABLE knowledge_chunks "
+                "ALTER COLUMN metadata_json TYPE jsonb "
+                "USING CASE "
+                "WHEN metadata_json IS NULL THEN NULL "
+                "ELSE try_parse_jsonb(metadata_json) "
+                "END; "
+                "END IF; "
+                "END $$"
+            )
+        )
+        await connection.execute(text("DROP FUNCTION IF EXISTS try_parse_jsonb(text)"))
+        await connection.execute(
+            text(
                 "DO $$ "
                 "BEGIN "
                 "IF EXISTS ("

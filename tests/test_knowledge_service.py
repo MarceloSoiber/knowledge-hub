@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from hashlib import sha256
+from types import SimpleNamespace
 
 import pytest
 from pydantic import ValidationError
@@ -9,7 +10,7 @@ from pydantic import ValidationError
 from backend.app.cli.config import generate_auth_token, validate_auth_token
 from backend.app.core.auth import is_valid_token
 from backend.app.core.settings import Settings
-from backend.app.db.models import Category, DocumentSource
+from backend.app.db.models import Category, DocumentSource, KnowledgeChunk
 from backend.app.schemas.knowledge import (
     KnowledgeAnswerRequest,
     KnowledgeChunkRead,
@@ -27,8 +28,12 @@ from backend.app.services.categories import (
     create_category,
     list_categories,
 )
-from backend.app.services.documents.chunker import chunk_text
-from backend.app.services.documents.extractors import UnsupportedFileTypeError, extract_text
+from backend.app.services.documents.chunker import chunk_text, chunk_text_with_locations
+from backend.app.services.documents.extractors import (
+    UnsupportedFileTypeError,
+    extract_document,
+    extract_text,
+)
 from backend.app.services.ingestion import ingest_plain_text, ingest_uploaded_file
 from backend.app.services.rag import LLMConfigurationError, OpenAICompatibleAnswerClient
 from backend.app.services.search import answer_knowledge, search_knowledge
@@ -60,10 +65,12 @@ class FakeAnswerClient:
 
 @dataclass
 class FakeRow:
-    id: int
-    source_id: int
-    content: str
+    KnowledgeChunk: KnowledgeChunk
+    DocumentSource: DocumentSource
     distance: float
+
+    def __getitem__(self, index: int) -> object:
+        return (self.KnowledgeChunk, self.DocumentSource, self.distance)[index]
 
 
 class FakeExecuteResult:
@@ -102,7 +109,32 @@ class FakeSession:
         self.deleted_old_chunks = False
         self.deleted_source = False
         self.committed = False
-        self.rows = [FakeRow(id=1, source_id=2, content="stored content", distance=0.2)]
+        source = DocumentSource(
+            id=2,
+            public_id="99999999-9999-4999-8999-999999999999",
+            title="Stored Source",
+            source_type="text",
+            uri="text:Stored Source",
+            content_text="stored content",
+            content_hash=sha256(b"stored content").hexdigest(),
+        )
+        source.categories = [Category(id=3, name="docs")]
+        chunk = KnowledgeChunk(
+            id=1,
+            source_id=2,
+            content="stored content",
+            metadata_json={
+                "location": {
+                    "chunk_index": 0,
+                    "start_char": 0,
+                    "end_char": 14,
+                    "page": None,
+                    "section": "Intro",
+                },
+                "metadata": {"note_type": "decision", "unsafe": "secret"},
+            },
+        )
+        self.rows = [FakeRow(KnowledgeChunk=chunk, DocumentSource=source, distance=0.2)]
 
     async def scalar(self, statement: object) -> DocumentSource | None:
         statement_text = str(statement)
@@ -256,6 +288,31 @@ def test_extract_text_removes_pdf_page_counters(monkeypatch: pytest.MonkeyPatch)
     )
 
 
+def test_extract_document_preserves_pdf_page_spans(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FakePage:
+        def __init__(self, text: str) -> None:
+            self.text = text
+
+        def extract_text(self, extraction_mode: str | None = None) -> str:
+            assert extraction_mode == "layout"
+            return self.text
+
+    class FakePdfReader:
+        def __init__(self, stream: object) -> None:
+            _ = stream
+            self.pages = [FakePage("Pagina um"), FakePage("Pagina dois")]
+
+    monkeypatch.setattr("backend.app.services.documents.extractors.build_pdf_reader", FakePdfReader)
+
+    document = extract_document("paper.pdf", b"%PDF")
+
+    assert document.text == "Pagina um\n\nPagina dois"
+    assert [(span.page, span.start_char, span.end_char) for span in document.page_spans] == [
+        (1, 0, 9),
+        (2, 11, 22),
+    ]
+
+
 def test_extract_text_removes_pdf_generator_footer(monkeypatch: pytest.MonkeyPatch) -> None:
     class FakePage:
         def extract_text(self, extraction_mode: str | None = None) -> str:
@@ -282,6 +339,25 @@ def test_chunk_text_prefers_sentence_boundaries() -> None:
     chunks = chunk_text("Primeira frase. Segunda frase. Terceira frase.", chunk_size=32, overlap=0)
 
     assert chunks == ["Primeira frase. Segunda frase.", "Terceira frase."]
+
+
+def test_chunk_text_with_locations_tracks_offsets_and_sections() -> None:
+    text = "# Intro\nPrimeira frase. Segunda frase.\n\n# Final\nTerceira frase."
+
+    chunks = chunk_text_with_locations(
+        text,
+        chunk_size=36,
+        overlap=0,
+        section_spans=[
+            SimpleNamespace(start_char=0, end_char=39, section="Intro"),
+            SimpleNamespace(start_char=39, end_char=len(text), section="Final"),
+        ],  # type: ignore[list-item]
+    )
+
+    assert chunks[0].location.chunk_index == 0
+    assert chunks[0].location.start_char == 0
+    assert chunks[0].location.end_char <= len(text)
+    assert chunks[0].location.section == "Intro"
 
 
 def test_knowledge_schemas_trim_and_reject_blank_values() -> None:
@@ -423,6 +499,9 @@ async def test_ingest_plain_text_can_create_mcp_source() -> None:
     assert source.uri == "mcp:Confirmed note"
     assert chunks_created == 1
     assert session.committed is True
+    chunk = next(entity for entity in session.added if isinstance(entity, KnowledgeChunk))
+    assert chunk.metadata_json["location"]["chunk_index"] == 0  # type: ignore[index]
+    assert chunk.metadata_json["metadata"] == {"note_type": "decision"}  # type: ignore[index]
 
 
 @pytest.mark.asyncio
@@ -659,7 +738,24 @@ async def test_search_knowledge_returns_similarity_scores() -> None:
     )
 
     assert results == [
-        KnowledgeChunkRead(id=1, source_id=2, content="stored content", score=0.8)
+        KnowledgeChunkRead(
+            id=1,
+            source_id="99999999-9999-4999-8999-999999999999",
+            source_title="Stored Source",
+            source_type="text",
+            uri="text:Stored Source",
+            categories=[{"id": 3, "name": "docs"}],
+            location={
+                "chunk_index": 0,
+                "page": None,
+                "section": "Intro",
+                "start_char": 0,
+                "end_char": 14,
+            },
+            content="stored content",
+            score=0.8,
+            metadata={"note_type": "decision"},
+        )
     ]
 
 
