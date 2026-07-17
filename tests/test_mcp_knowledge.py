@@ -8,6 +8,7 @@ from mcp.server.auth.provider import AccessToken
 from backend.app.services.categories import CategoryNotFoundError
 from backend.app.services.documents.extractors import EmptyDocumentError
 from backend.app.services.embeddings import EmbeddingError
+from backend.app.schemas.knowledge import KnowledgeChunkRead
 from mcp_server.tools.knowledge import (
     MCP_ALLOWED_METADATA_KEYS,
     MCPAuthorizationError,
@@ -16,6 +17,7 @@ from mcp_server.tools.knowledge import (
     MCPTextIngestRequest,
     get_knowledge_source,
     ingest_mcp_text,
+    search_knowledge,
 )
 
 
@@ -67,6 +69,54 @@ def test_mcp_text_ingest_schema_validates_fields() -> None:
             category_ids=[1],
             metadata={"unsafe": "value"},
         )
+
+
+@pytest.mark.asyncio
+async def test_search_knowledge_returns_citation_context(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_search_backend_knowledge(**_: object) -> list[KnowledgeChunkRead]:
+        return [
+            KnowledgeChunkRead(
+                id=10,
+                source_id="33333333-3333-4333-8333-333333333333",
+                source_title="runbook.md",
+                source_type="upload",
+                uri="upload:runbook.md",
+                categories=[{"id": 2, "name": "docs"}],
+                location={
+                    "chunk_index": 1,
+                    "page": None,
+                    "section": "Setup",
+                    "start_char": 20,
+                    "end_char": 60,
+                },
+                content="result content",
+                score=0.92,
+                metadata={"note_type": "decision"},
+            )
+        ]
+
+    class FakeSessionLocal:
+        async def __aenter__(self) -> object:
+            return object()
+
+        async def __aexit__(self, *_: object) -> None:
+            return None
+
+    monkeypatch.setattr("mcp_server.tools.knowledge.SessionLocal", FakeSessionLocal)
+    monkeypatch.setattr(
+        "mcp_server.tools.knowledge.search_backend_knowledge",
+        fake_search_backend_knowledge,
+    )
+    monkeypatch.setattr("mcp_server.tools.knowledge.build_embedding_client", lambda: object())
+
+    results = await search_knowledge("find", limit=1, category_ids=[2])
+
+    assert results[0].source_id == "33333333-3333-4333-8333-333333333333"
+    assert results[0].source_title == "runbook.md"
+    assert results[0].location.section == "Setup"
+    assert results[0].metadata == {"note_type": "decision"}
 
 
 @pytest.mark.asyncio

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import json
+from typing import Any
 from hashlib import sha256
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,13 +9,19 @@ from ..db.models import Category, DocumentSource
 from ..repositories.chunks import add_source_chunks
 from ..repositories.sources import get_source_by_content_hash
 from .categories import get_categories
-from .documents.chunker import chunk_text
+from .documents.chunker import (
+    PageSpan,
+    SectionSpan,
+    TextChunk,
+    chunk_text_with_locations,
+    detect_markdown_sections,
+)
 from .documents.extractors import (
     DocumentExtractionError,
     EmptyDocumentError,
     FileTooLargeError,
     UnsupportedFileTypeError,
-    extract_text,
+    extract_document,
 )
 from .documents.normalizer import normalize_text
 from .embeddings import EmbeddingClient
@@ -48,7 +54,7 @@ async def ingest_uploaded_file(
     categories = await get_categories(session, category_ids)
 
     try:
-        text = extract_text(filename, content)
+        document = extract_document(filename, content)
     except (EmptyDocumentError, FileTooLargeError, UnsupportedFileTypeError):
         raise
     except DocumentExtractionError as exc:
@@ -58,11 +64,15 @@ async def ingest_uploaded_file(
     return await ingest_text_source(
         session=session,
         title=filename,
-        text=text,
+        text=document.text,
         categories=categories,
         source_type="upload",
         uri=uri,
         embedding_client=embedding_client,
+        page_spans=document.page_spans,
+        section_spans=detect_markdown_sections(document.text)
+        if document.document_type == "md"
+        else None,
     )
 
 
@@ -93,6 +103,7 @@ async def ingest_plain_text(
         uri=uri,
         embedding_client=embedding_client,
         extra_metadata=metadata,
+        section_spans=detect_markdown_sections(text),
     )
 
 
@@ -105,14 +116,21 @@ async def ingest_text_source(
     uri: str,
     embedding_client: EmbeddingClient,
     extra_metadata: dict[str, str] | None = None,
+    page_spans: list[PageSpan] | None = None,
+    section_spans: list[SectionSpan] | None = None,
 ) -> tuple[DocumentSource, int]:
     content_hash = compute_content_hash(text)
     existing_source = await get_source_by_content_hash(session, content_hash)
     if existing_source is not None:
         raise DuplicateSourceContentError(existing_source)
 
-    chunks = chunk_text(text)
-    embeddings = await embedding_client.embed_texts(chunks)
+    chunks = chunk_text_with_locations(
+        text,
+        page_spans=page_spans,
+        section_spans=section_spans,
+    )
+    chunk_contents = [chunk.content for chunk in chunks]
+    embeddings = await embedding_client.embed_texts(chunk_contents)
 
     source = DocumentSource(
         title=title,
@@ -125,20 +143,53 @@ async def ingest_text_source(
     session.add(source)
     await session.flush()
 
-    category_payload = [{"id": category.id, "name": category.name} for category in categories]
-    metadata = []
-    for index, _ in enumerate(chunks):
-        chunk_metadata = {
-            "title": title,
-            "category_ids": [category.id for category in categories],
-            "categories": category_payload,
-            "source_type": source_type,
-            "chunk_index": index,
-        }
-        if extra_metadata:
-            chunk_metadata["metadata"] = extra_metadata
-        metadata.append(json.dumps(chunk_metadata))
-    add_source_chunks(session, source.id, chunks, embeddings, metadata)
+    add_source_chunks(
+        session,
+        source.id,
+        chunk_contents,
+        embeddings,
+        build_chunk_metadata(
+            title=title,
+            categories=categories,
+            source_type=source_type,
+            chunks=chunks,
+            extra_metadata=extra_metadata,
+        ),
+    )
 
     await session.commit()
     return source, len(chunks)
+
+
+def build_chunk_metadata(
+    title: str,
+    categories: list[object],
+    source_type: str,
+    chunks: list[TextChunk],
+    extra_metadata: dict[str, str] | None = None,
+) -> list[dict[str, Any]]:
+    category_payload = [
+        {"id": category.id, "name": category.name}  # type: ignore[attr-defined]
+        for category in categories
+    ]
+    metadata = []
+    for chunk in chunks:
+        location = {
+            "chunk_index": chunk.location.chunk_index,
+            "page": chunk.location.page,
+            "section": chunk.location.section,
+            "start_char": chunk.location.start_char,
+            "end_char": chunk.location.end_char,
+        }
+        metadata_payload: dict[str, Any] = {
+            "title": title,
+            "category_ids": [category["id"] for category in category_payload],
+            "categories": category_payload,
+            "source_type": source_type,
+            "chunk_index": chunk.location.chunk_index,
+            "location": location,
+        }
+        if extra_metadata:
+            metadata_payload["metadata"] = extra_metadata
+        metadata.append(metadata_payload)
+    return metadata

@@ -43,10 +43,7 @@ class OpenAICompatibleAnswerClient(AnswerClient):
             model = self.settings.local_llm_model
             headers = {}
 
-        context = "\n\n".join(
-            f"[source_id={source.source_id}; chunk_id={source.id}]\n{source.content}"
-            for source in sources
-        )
+        context = "\n\n".join(format_source_context(source) for source in sources)
         payload = {
             "model": model,
             "messages": [
@@ -55,7 +52,9 @@ class OpenAICompatibleAnswerClient(AnswerClient):
                     "content": (
                         "Responda usando apenas o contexto fornecido. "
                         "Se o contexto nao contiver a resposta, "
-                        "diga que nao encontrou essa informacao."
+                        "diga que nao encontrou essa informacao. "
+                        "Quando usar uma fonte, cite o titulo e a localizacao "
+                        "indicados no contexto."
                     ),
                 },
                 {
@@ -82,3 +81,17 @@ class OpenAICompatibleAnswerClient(AnswerClient):
 
 def build_answer_client(settings: Settings | None = None) -> AnswerClient:
     return OpenAICompatibleAnswerClient(settings)
+
+
+def format_source_context(source: KnowledgeChunkRead) -> str:
+    location_parts = [f"chunk {source.location.chunk_index}"]
+    if source.location.page is not None:
+        location_parts.append(f"pagina {source.location.page}")
+    if source.location.section:
+        location_parts.append(f"secao {source.location.section}")
+    location = ", ".join(location_parts)
+    return (
+        f"[source_id={source.source_id}; chunk_id={source.id}; "
+        f"titulo={source.source_title}; localizacao={location}]\n"
+        f"{source.content}"
+    )

@@ -87,6 +87,10 @@ automaticamente. `metadata` aceita apenas `client_id` e `note_type`.
 A tool `source(source_id)` consulta uma fonte detalhada por UUID público. O MCP
 não expõe ferramentas de atualização ou exclusão de fontes nesta versão.
 
+A tool `search` retorna o mesmo contrato citável de `/api/v1/knowledge/search`:
+UUID público da fonte, título, URI sanitizada, categorias, localização do chunk,
+conteúdo, score e metadados públicos permitidos.
+
 ## Resumo dos endpoints
 
 | Método | Endpoint | Descrição |
@@ -326,13 +330,38 @@ Resposta `200 OK`:
   "results": [
     {
       "id": 30,
-      "source_id": 10,
+      "source_id": "33333333-3333-4333-8333-333333333333",
+      "source_title": "contratos.md",
+      "source_type": "upload",
+      "uri": "upload:contratos.md",
+      "categories": [
+        {
+          "id": 2,
+          "name": "juridico"
+        },
+        {
+          "id": 3,
+          "name": "financeiro"
+        }
+      ],
+      "location": {
+        "chunk_index": 2,
+        "page": null,
+        "section": "Prazos",
+        "start_char": 1200,
+        "end_char": 1840
+      },
       "content": "Trecho do documento encontrado...",
-      "score": 0.87
+      "score": 0.87,
+      "metadata": {}
     }
   ]
 }
 ```
+
+Cada resultado usa o UUID publico da fonte em `source_id` e inclui metadados
+suficientes para citacao. URIs baseadas em caminhos locais sao sanitizadas antes
+de sair da API.
 
 ### Gerar resposta com LLM
 
@@ -371,13 +400,33 @@ Resposta `200 OK`:
   "sources": [
     {
       "id": 30,
-      "source_id": 10,
+      "source_id": "33333333-3333-4333-8333-333333333333",
+      "source_title": "contratos.md",
+      "source_type": "upload",
+      "uri": "upload:contratos.md",
+      "categories": [
+        {
+          "id": 2,
+          "name": "juridico"
+        }
+      ],
+      "location": {
+        "chunk_index": 2,
+        "page": null,
+        "section": "Prazos",
+        "start_char": 1200,
+        "end_char": 1840
+      },
       "content": "Trecho utilizado para produzir a resposta...",
-      "score": 0.87
+      "score": 0.87,
+      "metadata": {}
     }
   ]
 }
 ```
+
+O prompt de resposta recebe titulo e localizacao de cada fonte recuperada, e a
+lista `sources` contem somente os chunks usados como contexto para o LLM.
 
 ### Listar documentos
 
