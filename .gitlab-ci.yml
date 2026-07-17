@@ -8,7 +8,7 @@ deploy:
   resource_group: production
   variables:
     COMPOSE_PROJECT_NAME: mcp-knowledge-hub
-    POSTGRES_DSN: "postgresql+asyncpg://postgres:postgres@host.docker.internal:15432/knowledge_hub"
+    POSTGRES_DSN: "postgresql+asyncpg://postgres:postgres@192.168.15.125:15432/knowledge_hub"
     DOCKER_LOCAL_LLM_BASE_URL: "http://192.168.15.114:1234"
     MCP_PUBLIC_URL: "http://192.168.15.125:8001"
   script:
@@ -57,6 +57,15 @@ deploy:
         docker compose up -d --build --no-deps --force-recreate mcp
       }
 
+      verify_database_port() {
+        if ! timeout 5 bash -c '</dev/tcp/192.168.15.125/15432'; then
+          echo "Postgres is not reachable at 192.168.15.125:15432."
+          docker ps -a --filter name=mcp-knowledge-hub-postgres || true
+          ss -H -ltn "sport = :15432" || true
+          exit 1
+        fi
+      }
+
       remove_recreate_containers() {
         if docker ps -aq \
           --filter name='^[0-9a-f]+_mcp-knowledge-hub-backend$' \
@@ -89,6 +98,7 @@ deploy:
       remove_recreate_containers
       cleanup_containers
       release_service_ports
+      verify_database_port
 
       if docker ps -aq \
         --filter name=mcp-knowledge-hub-backend \
