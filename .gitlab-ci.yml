@@ -29,10 +29,16 @@ deploy:
       }
 
       wait_for_backend_health() {
+        healthy_checks=0
         for _ in $(seq 1 30); do
           status="$(docker inspect mcp-knowledge-hub-backend --format '{{.State.Health.Status}}' 2>/dev/null || true)"
           if [ "${status}" = "healthy" ]; then
-            return 0
+            healthy_checks=$((healthy_checks + 1))
+            if [ "${healthy_checks}" -ge 3 ]; then
+              return 0
+            fi
+          else
+            healthy_checks=0
           fi
           if [ "${status}" = "unhealthy" ]; then
             diagnose_backend
@@ -123,7 +129,17 @@ deploy:
         deploy_containers
       fi
     - docker compose ps
-    - docker compose exec -T backend python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5).read()"
+    - |
+      if ! docker compose exec -T backend python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5).read()"; then
+        echo "Final backend healthcheck failed."
+        docker compose ps || true
+        docker inspect mcp-knowledge-hub-backend \
+          --format '{{json .State}}' || true
+        docker inspect mcp-knowledge-hub-backend \
+          --format '{{range .Config.Env}}{{println .}}{{end}}' | grep POSTGRES_DSN || true
+        docker logs --tail=200 mcp-knowledge-hub-backend || true
+        exit 1
+      fi
   environment:
     name: production
   rules:
