@@ -35,20 +35,34 @@ deploy:
         fi
 
         echo "Docker daemon could not kill ${name}; asking PID 1 inside the container to exit."
-        docker exec "${name}" sh -c 'kill -TERM 1' || true
-        for _ in $(seq 1 15); do
+        docker update --restart=no "${name}" || true
+        docker exec -u 0 "${name}" sh -c 'kill -TERM 1' || true
+        for _ in $(seq 1 10); do
           running="$(docker inspect "${name}" --format '{{.State.Running}}' 2>/dev/null || true)"
           if [ "${running}" != "true" ]; then
             break
           fi
           sleep 1
         done
+        running="$(docker inspect "${name}" --format '{{.State.Running}}' 2>/dev/null || true)"
+        if [ "${running}" = "true" ]; then
+          echo "${name} ignored TERM; sending SIGKILL from inside the container."
+          docker exec -u 0 "${name}" sh -c 'kill -KILL 1' || true
+          for _ in $(seq 1 10); do
+            running="$(docker inspect "${name}" --format '{{.State.Running}}' 2>/dev/null || true)"
+            if [ "${running}" != "true" ]; then
+              break
+            fi
+            sleep 1
+          done
+        fi
 
         if docker rm -f "${name}"; then
           return 0
         fi
 
-        echo "Could not remove ${name}; container state follows."
+        echo "Could not remove ${name}; the Docker runner may need daemon-level cleanup."
+        echo "Container state follows."
         docker inspect "${name}" --format '{{json .State}}' || true
         return 1
       }
