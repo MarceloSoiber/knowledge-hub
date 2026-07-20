@@ -13,7 +13,7 @@ services:
       APP_NAME: "MCP Knowledge Hub"
       ENVIRONMENT: development
       FRONTEND_ORIGIN: "${FRONTEND_ORIGIN:-http://localhost:5173}"
-      POSTGRES_DSN: "${POSTGRES_DSN:-postgresql+asyncpg://postgres:postgres@postgres:5432/knowledge_hub}"
+      POSTGRES_DSN: "${POSTGRES_DSN:-postgresql+asyncpg://postgres:postgres@mcp-knowledge-hub-postgres:5432/knowledge_hub}"
       LLM_PROVIDER: "${LLM_PROVIDER:-local}"
       LOCAL_LLM_BASE_URL: "${DOCKER_LOCAL_LLM_BASE_URL:-http://host.docker.internal:1234}"
       LOCAL_LLM_MODEL: "${LOCAL_LLM_MODEL:-gemma-4-12b-it}"
@@ -54,7 +54,7 @@ services:
     environment:
       APP_NAME: "MCP Knowledge Hub"
       ENVIRONMENT: development
-      POSTGRES_DSN: "${POSTGRES_DSN:-postgresql+asyncpg://postgres:postgres@postgres:5432/knowledge_hub}"
+      POSTGRES_DSN: "${POSTGRES_DSN:-postgresql+asyncpg://postgres:postgres@mcp-knowledge-hub-postgres:5432/knowledge_hub}"
       LLM_PROVIDER: "${LLM_PROVIDER:-local}"
       LOCAL_LLM_BASE_URL: "${DOCKER_LOCAL_LLM_BASE_URL:-http://host.docker.internal:1234}"
       LOCAL_LLM_MODEL: "${LOCAL_LLM_MODEL:-gemma-4-12b-it}"
