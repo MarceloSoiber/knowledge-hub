@@ -21,10 +21,29 @@ deploy:
 
         for name in mcp-knowledge-hub-backend mcp-knowledge-hub-mcp; do
           if docker container inspect "${name}" >/dev/null 2>&1; then
-            docker rm -f "${name}" || return 1
+            remove_container_by_name "${name}" || return 1
           fi
         done
         sleep 2
+      }
+
+      remove_container_by_name() {
+        name="$1"
+        echo "Removing container ${name}."
+        if docker rm -f "${name}"; then
+          return 0
+        fi
+
+        echo "Regular docker removal failed for ${name}; retrying with sudo."
+        sudo -n docker stop "${name}" || true
+        if sudo -n docker rm -f "${name}"; then
+          return 0
+        fi
+
+        echo "Could not remove ${name}; container state follows."
+        docker inspect "${name}" --format '{{json .State}}' || true
+        sudo -n docker inspect "${name}" --format '{{json .State}}' || true
+        return 1
       }
 
       has_service_containers() {
