@@ -21,6 +21,7 @@ from .ingestion import (
     build_chunk_metadata,
     compute_content_hash,
 )
+from .projects import get_projects
 from .tags import get_tags
 
 
@@ -44,6 +45,7 @@ async def update_source(
     title: str | None = None,
     category_ids: list[int] | None = None,
     tag_ids: list[int] | None = None,
+    project_ids: list[int] | None = None,
     content: str | None = None,
 ) -> tuple[dict[str, object], int | None]:
     source = await _get_source_or_raise(session, source_id)
@@ -57,6 +59,11 @@ async def update_source(
         if tag_ids is not None
         else list(source.tags)
     )
+    projects = (
+        await get_projects(session, project_ids)
+        if project_ids is not None
+        else list(source.projects)
+    )
     normalized_title = title.strip() if title is not None else source.title
     if not normalized_title:
         raise KnowledgeIngestionError("Title must not be empty.")
@@ -65,6 +72,7 @@ async def update_source(
         source.title = normalized_title
         source.categories = categories
         source.tags = tags
+        source.projects = projects
         await session.commit()
         await session.refresh(source)
         return serialize_source(source, include_content=True), None
@@ -87,6 +95,7 @@ async def update_source(
     source.title = normalized_title
     source.categories = categories
     source.tags = tags
+    source.projects = projects
     source.content_text = text
     source.content_hash = content_hash
     await delete_chunks_for_source(session, source.id)
@@ -99,6 +108,7 @@ async def update_source(
             title=normalized_title,
             categories=categories,
             tags=tags,
+            projects=projects,
             source_type=source.source_type,
             chunks=chunks,
         ),

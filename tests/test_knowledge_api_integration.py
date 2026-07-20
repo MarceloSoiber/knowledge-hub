@@ -16,6 +16,11 @@ from backend.app.services.categories import (
     CategoryInUseError,
     CategoryNotFoundError,
 )
+from backend.app.services.projects import (
+    ProjectConflictError,
+    ProjectNotFoundError,
+    ProjectStatusError,
+)
 from backend.app.services.tags import TagConflictError, TagInUseError, TagNotFoundError
 from backend.app.services.ingestion import DuplicateSourceContentError
 from backend.app.services.rag import LLMConfigurationError
@@ -161,6 +166,16 @@ async def test_search_response_contract(
                 "uri": "upload:runbook.md",
                 "categories": [{"id": 2, "name": "docs"}],
                 "tags": [{"id": 7, "name": "postgres"}],
+                "projects": [
+                    {
+                        "id": 9,
+                        "name": "hub",
+                        "description": None,
+                        "status": "active",
+                        "created_at": None,
+                        "updated_at": None,
+                    }
+                ],
                 "location": {
                     "chunk_index": 1,
                     "page": None,
@@ -186,6 +201,7 @@ async def test_search_response_contract(
                 "limit": 5,
                 "category_ids": [2, 3],
                 "tag_ids": [7],
+                "project_ids": [9],
                 "min_score": 0.42,
             },
         )
@@ -193,6 +209,7 @@ async def test_search_response_contract(
     assert response.status_code == 200
     assert captured_kwargs["min_score"] == 0.42
     assert captured_kwargs["tag_ids"] == [7]
+    assert captured_kwargs["project_ids"] == [9]
     assert captured_kwargs["include_match_reasons"] is False
     assert response.json() == {
         "query": "find this",
@@ -202,10 +219,20 @@ async def test_search_response_contract(
                 "id": 10,
                 "source_id": "33333333-3333-4333-8333-333333333333",
                 "source_title": "runbook.md",
-                    "source_type": "upload",
-                    "uri": "upload:runbook.md",
-                    "categories": [{"id": 2, "name": "docs"}],
-                    "tags": [{"id": 7, "name": "postgres"}],
+                "source_type": "upload",
+                "uri": "upload:runbook.md",
+                "categories": [{"id": 2, "name": "docs"}],
+                "tags": [{"id": 7, "name": "postgres"}],
+                "projects": [
+                    {
+                        "id": 9,
+                        "name": "hub",
+                        "description": None,
+                        "status": "active",
+                        "created_at": None,
+                        "updated_at": None,
+                    }
+                ],
                 "location": {
                     "chunk_index": 1,
                     "page": None,
@@ -333,6 +360,16 @@ async def test_answer_response_contract_includes_citation_sources(
         "uri": "upload:runbook.md",
         "categories": [{"id": 2, "name": "docs"}],
         "tags": [{"id": 7, "name": "postgres"}],
+        "projects": [
+            {
+                "id": 9,
+                "name": "hub",
+                "description": None,
+                "status": "active",
+                "created_at": None,
+                "updated_at": None,
+            }
+        ],
         "location": {
             "chunk_index": 1,
             "page": None,
@@ -357,12 +394,19 @@ async def test_answer_response_contract_includes_citation_sources(
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.post(
             "/api/v1/knowledge/answer",
-            json={"query": "summarize", "limit": 5, "tag_ids": [7], "min_score": 0.45},
+            json={
+                "query": "summarize",
+                "limit": 5,
+                "tag_ids": [7],
+                "project_ids": [9],
+                "min_score": 0.45,
+            },
         )
 
     assert response.status_code == 200
     assert captured_kwargs["min_score"] == 0.45
     assert captured_kwargs["tag_ids"] == [7]
+    assert captured_kwargs["project_ids"] == [9]
     assert response.json() == {
         "query": "summarize",
         "answer": "answer with citation",
@@ -472,6 +516,7 @@ async def test_text_ingestion_response_contract(
                 title="meeting-notes",
                 categories=[SimpleNamespace(id=2, name="docs"), SimpleNamespace(id=3, name="ops")],
                 tags=[SimpleNamespace(id=7, name="postgres")],
+                projects=[SimpleNamespace(id=9, name="hub", status="active")],
             ),
             3,
         )
@@ -487,6 +532,7 @@ async def test_text_ingestion_response_contract(
                 "title": "meeting-notes",
                 "category_ids": [2, 3],
                 "tag_ids": [7],
+                "project_ids": [9],
                 "content": "first line\nsecond line",
             },
         )
@@ -497,6 +543,7 @@ async def test_text_ingestion_response_contract(
         "title": "meeting-notes",
         "categories": [{"id": 2, "name": "docs"}, {"id": 3, "name": "ops"}],
         "tags": [{"id": 7, "name": "postgres"}],
+        "projects": [{"id": 9, "name": "hub", "description": None, "status": "active", "created_at": None, "updated_at": None}],
         "chunks_created": 3,
     }
 
@@ -512,12 +559,14 @@ async def test_text_ingestion_accepts_form_data(
         assert kwargs["content"] == "ações e dividendos"
         assert kwargs["category_ids"] == [1]
         assert kwargs["tag_ids"] == [8]
+        assert kwargs["project_ids"] == [9]
         return (
             SimpleNamespace(
                 public_id="22222222-2222-4222-8222-222222222222",
                 title="market-notes",
                 categories=[SimpleNamespace(id=1, name="financeiro")],
                 tags=[SimpleNamespace(id=8, name="imposto")],
+                projects=[SimpleNamespace(id=9, name="hub", status="active")],
             ),
             1,
         )
@@ -534,6 +583,7 @@ async def test_text_ingestion_accepts_form_data(
                 "content": "ações e dividendos",
                 "category_ids": "1",
                 "tag_ids": "8",
+                "project_ids": "9",
             },
         )
 
@@ -543,6 +593,7 @@ async def test_text_ingestion_accepts_form_data(
         "title": "market-notes",
         "categories": [{"id": 1, "name": "financeiro"}],
         "tags": [{"id": 8, "name": "imposto"}],
+        "projects": [{"id": 9, "name": "hub", "description": None, "status": "active", "created_at": None, "updated_at": None}],
         "chunks_created": 1,
     }
 
@@ -560,6 +611,7 @@ async def test_sources_response_contract(
                 "title": "onboarding-guide",
                 "categories": [{"id": 4, "name": "docs"}],
                 "tags": [{"id": 5, "name": "python"}],
+                "projects": [{"id": 9, "name": "hub", "status": "active"}],
                 "source_type": "upload",
                 "uri": "upload:onboarding-guide.pdf",
                 "content_hash": "abc123",
@@ -578,10 +630,11 @@ async def test_sources_response_contract(
     assert response.json() == [
         {
             "source_id": "33333333-3333-4333-8333-333333333333",
-                "title": "onboarding-guide",
-                "categories": [{"id": 4, "name": "docs"}],
-                "tags": [{"id": 5, "name": "python"}],
-                "source_type": "upload",
+            "title": "onboarding-guide",
+            "categories": [{"id": 4, "name": "docs"}],
+            "tags": [{"id": 5, "name": "python"}],
+            "projects": [{"id": 9, "name": "hub", "description": None, "status": "active", "created_at": None, "updated_at": None}],
+            "source_type": "upload",
             "uri": "upload:onboarding-guide.pdf",
             "content_hash": "abc123",
             "created_at": None,
@@ -602,6 +655,7 @@ async def test_source_lifecycle_response_contracts(
         "title": "runbook",
         "categories": [{"id": 4, "name": "docs"}],
         "tags": [{"id": 5, "name": "python"}],
+        "projects": [{"id": 9, "name": "hub", "status": "active"}],
         "source_type": "text",
         "uri": "text:runbook",
         "content_hash": "abc123",
@@ -619,6 +673,7 @@ async def test_source_lifecycle_response_contracts(
         assert kwargs["title"] == "new title"
         assert kwargs["category_ids"] == [4]
         assert kwargs["tag_ids"] == [5]
+        assert kwargs["project_ids"] == [9]
         updated = dict(payload)
         updated["title"] = "new title"
         return updated, None
@@ -637,12 +692,12 @@ async def test_source_lifecycle_response_contracts(
         detail = await client.get(f"/api/v1/knowledge/sources/{source_id}")
         patched = await client.patch(
             f"/api/v1/knowledge/sources/{source_id}",
-            json={"title": "new title", "category_ids": [4], "tag_ids": [5]},
+            json={"title": "new title", "category_ids": [4], "tag_ids": [5], "project_ids": [9]},
         )
         deleted = await client.delete(f"/api/v1/knowledge/sources/{source_id}?confirm=true")
 
     assert detail.status_code == 200
-    assert detail.json() == payload
+    assert detail.json()["projects"][0]["id"] == 9
     assert patched.status_code == 200
     assert patched.json()["title"] == "new title"
     assert deleted.status_code == 204
@@ -741,6 +796,131 @@ async def test_category_conflicts_map_to_409(
 
     assert create_response.status_code == 409
     assert delete_response.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_project_lifecycle_and_sources_contracts(
+    app: Any,
+    transport: httpx.ASGITransport,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project_payload = {
+        "id": 9,
+        "name": "hub",
+        "description": "contexto",
+        "status": "active",
+        "created_at": None,
+        "updated_at": None,
+    }
+
+    async def fake_list_projects(_: object, status: str | None = None) -> list[dict[str, object]]:
+        assert status == "active"
+        return [project_payload]
+
+    async def fake_create_project(_: object, name: str, description: str | None = None) -> object:
+        assert name == "Hub"
+        assert description == "contexto"
+        return SimpleNamespace(**project_payload)
+
+    async def fake_update_project(
+        _: object,
+        project_id: int,
+        name: str | None = None,
+        description: str | None = None,
+    ) -> object:
+        assert project_id == 9
+        assert name == "Hub 2"
+        assert description == "novo"
+        return SimpleNamespace(**{**project_payload, "name": "hub 2", "description": "novo"})
+
+    async def fake_archive_project(_: object, project_id: int) -> object:
+        assert project_id == 9
+        return SimpleNamespace(**{**project_payload, "status": "archived"})
+
+    async def fake_reactivate_project(_: object, project_id: int) -> object:
+        assert project_id == 9
+        return SimpleNamespace(**project_payload)
+
+    async def fake_project_sources(_: object, project_id: int) -> list[dict[str, object]]:
+        assert project_id == 9
+        return [
+            {
+                "source_id": "33333333-3333-4333-8333-333333333333",
+                "title": "notes",
+                "categories": [{"id": 1, "name": "docs"}],
+                "tags": [],
+                "projects": [project_payload],
+                "source_type": "text",
+                "uri": "text:notes",
+                "content_hash": "abc123",
+                "created_at": None,
+                "updated_at": None,
+            }
+        ]
+
+    app.dependency_overrides[require_auth_token] = no_auth
+    monkeypatch.setattr("backend.app.api.routes.knowledge.list_projects", fake_list_projects)
+    monkeypatch.setattr("backend.app.api.routes.knowledge.create_project", fake_create_project)
+    monkeypatch.setattr("backend.app.api.routes.knowledge.update_project", fake_update_project)
+    monkeypatch.setattr("backend.app.api.routes.knowledge.archive_project", fake_archive_project)
+    monkeypatch.setattr("backend.app.api.routes.knowledge.reactivate_project", fake_reactivate_project)
+    monkeypatch.setattr("backend.app.api.routes.knowledge.list_project_sources", fake_project_sources)
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        listed = await client.get("/api/v1/knowledge/projects?status=active")
+        created = await client.post(
+            "/api/v1/knowledge/projects",
+            json={"name": " Hub ", "description": "contexto"},
+        )
+        updated = await client.patch(
+            "/api/v1/knowledge/projects/9",
+            json={"name": "Hub 2", "description": "novo"},
+        )
+        archived = await client.post("/api/v1/knowledge/projects/9/archive")
+        reactivated = await client.post("/api/v1/knowledge/projects/9/reactivate")
+        sources = await client.get("/api/v1/knowledge/projects/9/sources")
+
+    assert listed.status_code == 200
+    assert listed.json() == [project_payload]
+    assert created.status_code == 201
+    assert created.json() == project_payload
+    assert updated.status_code == 200
+    assert updated.json()["name"] == "hub 2"
+    assert archived.status_code == 200
+    assert archived.json()["status"] == "archived"
+    assert reactivated.status_code == 200
+    assert sources.status_code == 200
+    assert sources.json()[0]["projects"] == [project_payload]
+
+
+@pytest.mark.asyncio
+async def test_project_status_mapping(
+    app: Any,
+    transport: httpx.ASGITransport,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def duplicate_project(_: object, __: str, ___: str | None = None) -> object:
+        raise ProjectConflictError("Project 'hub' already exists.")
+
+    async def missing_project(_: object, __: int, **___: object) -> object:
+        raise ProjectNotFoundError("Project 9 does not exist.")
+
+    async def invalid_status(_: object, status: str | None = None) -> list[dict[str, object]]:
+        raise ProjectStatusError(f"Invalid project status: {status}.")
+
+    app.dependency_overrides[require_auth_token] = no_auth
+    monkeypatch.setattr("backend.app.api.routes.knowledge.create_project", duplicate_project)
+    monkeypatch.setattr("backend.app.api.routes.knowledge.update_project", missing_project)
+    monkeypatch.setattr("backend.app.api.routes.knowledge.list_projects", invalid_status)
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        create_response = await client.post("/api/v1/knowledge/projects", json={"name": "hub"})
+        update_response = await client.patch("/api/v1/knowledge/projects/9", json={"name": "hub"})
+        list_response = await client.get("/api/v1/knowledge/projects?status=bad")
+
+    assert create_response.status_code == 409
+    assert update_response.status_code == 404
+    assert list_response.status_code == 422
 
 
 @pytest.mark.asyncio

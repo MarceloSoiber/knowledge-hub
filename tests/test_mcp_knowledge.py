@@ -89,6 +89,7 @@ async def test_search_knowledge_returns_citation_context(
                 uri="upload:runbook.md",
                 categories=[{"id": 2, "name": "docs"}],
                 tags=[{"id": 7, "name": "postgres"}],
+                projects=[{"id": 9, "name": "hub", "status": "active"}],
                 location={
                     "chunk_index": 1,
                     "page": None,
@@ -120,10 +121,12 @@ async def test_search_knowledge_returns_citation_context(
 
     assert captured_kwargs["min_score"] == 0.55
     assert captured_kwargs["tag_ids"] is None
+    assert captured_kwargs["project_ids"] is None
     assert captured_kwargs["include_match_reasons"] is False
     assert results[0].source_id == "33333333-3333-4333-8333-333333333333"
     assert results[0].source_title == "runbook.md"
     assert results[0].tags[0].name == "postgres"
+    assert results[0].projects[0].name == "hub"
     assert results[0].location.section == "Setup"
     assert results[0].metadata == {"note_type": "decision"}
     assert results[0].match_reasons is None
@@ -215,6 +218,7 @@ async def test_registered_search_tool_forwards_min_score(
         limit=3,
         category_ids=[2],
         tag_ids=[7],
+        project_ids=[9],
         min_score=0.6,
     )
 
@@ -224,9 +228,37 @@ async def test_registered_search_tool_forwards_min_score(
         "limit": 3,
         "category_ids": [2],
         "tag_ids": [7],
+        "project_ids": [9],
         "min_score": 0.6,
         "include_match_reasons": False,
     }
+
+
+@pytest.mark.asyncio
+async def test_registered_project_tools_forward_to_helpers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from mcp_server import server
+
+    captured: dict[str, object] = {}
+
+    async def fake_get_projects(status: str | None = None) -> list[object]:
+        captured["status"] = status
+        return [SimpleNamespace(id=9, name="hub", status="active")]
+
+    async def fake_get_project_sources(project_id: int) -> list[object]:
+        captured["project_id"] = project_id
+        return []
+
+    monkeypatch.setattr(server, "get_knowledge_projects", fake_get_projects)
+    monkeypatch.setattr(server, "get_knowledge_project_sources", fake_get_project_sources)
+
+    projects = await server.projects(status="active")
+    sources = await server.project_sources(project_id=9)
+
+    assert projects[0].name == "hub"
+    assert sources == []
+    assert captured == {"status": "active", "project_id": 9}
 
 
 @pytest.mark.asyncio
@@ -240,6 +272,7 @@ async def test_ingest_mcp_text_creates_mcp_source(
         assert kwargs["content"] == "Keep MCP tools thin."
         assert kwargs["category_ids"] == [2, 3]
         assert kwargs["tag_ids"] == [7]
+        assert kwargs["project_ids"] == [9]
         assert kwargs["source_type"] == "mcp"
         assert kwargs["metadata"] == {"note_type": "decision"}
         return (
@@ -251,6 +284,7 @@ async def test_ingest_mcp_text_creates_mcp_source(
                     SimpleNamespace(id=3, name="ops"),
                 ],
                 tags=[SimpleNamespace(id=7, name="postgres")],
+                projects=[SimpleNamespace(id=9, name="hub", status="active")],
             ),
             2,
         )
@@ -262,6 +296,7 @@ async def test_ingest_mcp_text_creates_mcp_source(
         content="Keep MCP tools thin.",
         category_ids=[2, 3],
         tag_ids=[7],
+        project_ids=[9],
         metadata={"note_type": "decision"},
     )
 
@@ -269,6 +304,7 @@ async def test_ingest_mcp_text_creates_mcp_source(
     assert result.title == "Architecture note"
     assert [category.name for category in result.categories] == ["docs", "ops"]
     assert [tag.name for tag in result.tags] == ["postgres"]
+    assert [project.name for project in result.projects] == ["hub"]
     assert result.chunks_created == 2
 
 
@@ -345,6 +381,7 @@ async def test_get_knowledge_source_returns_detail(
             "title": "notes",
             "categories": [{"id": 1, "name": "docs"}],
             "tags": [{"id": 4, "name": "rag"}],
+            "projects": [{"id": 9, "name": "hub", "status": "active"}],
             "source_type": "text",
             "uri": "text:notes",
             "content_hash": "abc123",
@@ -359,6 +396,7 @@ async def test_get_knowledge_source_returns_detail(
     assert result.content == "stored content"
     assert result.categories[0].name == "docs"
     assert result.tags[0].name == "rag"
+    assert result.projects[0].name == "hub"
 
 
 @pytest.mark.asyncio

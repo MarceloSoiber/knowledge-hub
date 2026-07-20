@@ -13,6 +13,7 @@ from ..db.models import (
     DocumentSource,
     KnowledgeChunk,
     document_source_categories,
+    document_source_projects,
     document_source_tags,
 )
 from ..schemas.knowledge import KnowledgeChunkRead
@@ -55,6 +56,7 @@ async def search_similar_chunks(
     limit: int,
     category_ids: list[int] | None = None,
     tag_ids: list[int] | None = None,
+    project_ids: list[int] | None = None,
 ) -> list[KnowledgeChunkRead]:
     distance = KnowledgeChunk.embedding.cosine_distance(query_embedding)
 
@@ -65,7 +67,11 @@ async def search_similar_chunks(
             distance.label("distance"),
         )
         .join(DocumentSource, KnowledgeChunk.source_id == DocumentSource.id)
-        .options(selectinload(DocumentSource.categories), selectinload(DocumentSource.tags))
+        .options(
+            selectinload(DocumentSource.categories),
+            selectinload(DocumentSource.tags),
+            selectinload(DocumentSource.projects),
+        )
         .where(KnowledgeChunk.embedding.is_not(None))
     )
     if category_ids is not None:
@@ -79,6 +85,12 @@ async def search_similar_chunks(
             exists()
             .where(document_source_tags.c.document_source_id == DocumentSource.id)
             .where(document_source_tags.c.tag_id.in_(tag_ids))
+        )
+    if project_ids is not None:
+        statement = statement.where(
+            exists()
+            .where(document_source_projects.c.document_source_id == DocumentSource.id)
+            .where(document_source_projects.c.project_id.in_(project_ids))
         )
     statement = statement.order_by(distance).limit(limit)
 
@@ -95,6 +107,7 @@ async def search_text_chunks(
     limit: int,
     category_ids: list[int] | None = None,
     tag_ids: list[int] | None = None,
+    project_ids: list[int] | None = None,
 ) -> list[TextSearchChunk]:
     ts_query = func.plainto_tsquery(TEXT_SEARCH_CONFIG, query)
     text_rank = func.ts_rank_cd(KnowledgeChunk.search_vector, ts_query)
@@ -106,7 +119,11 @@ async def search_text_chunks(
             text_rank.label("text_rank"),
         )
         .join(DocumentSource, KnowledgeChunk.source_id == DocumentSource.id)
-        .options(selectinload(DocumentSource.categories), selectinload(DocumentSource.tags))
+        .options(
+            selectinload(DocumentSource.categories),
+            selectinload(DocumentSource.tags),
+            selectinload(DocumentSource.projects),
+        )
         .where(KnowledgeChunk.search_vector.op("@@")(ts_query))
     )
     if category_ids is not None:
@@ -120,6 +137,12 @@ async def search_text_chunks(
             exists()
             .where(document_source_tags.c.document_source_id == DocumentSource.id)
             .where(document_source_tags.c.tag_id.in_(tag_ids))
+        )
+    if project_ids is not None:
+        statement = statement.where(
+            exists()
+            .where(document_source_projects.c.document_source_id == DocumentSource.id)
+            .where(document_source_projects.c.project_id.in_(project_ids))
         )
     statement = statement.order_by(text_rank.desc(), KnowledgeChunk.id).limit(limit)
 
@@ -156,6 +179,17 @@ def build_chunk_read(row: object) -> KnowledgeChunkRead:
             {"id": tag.id, "name": tag.name}
             for tag in sorted(getattr(source, "tags", []), key=lambda tag: tag.name)
         ],
+        projects=[
+            {
+                "id": project.id,
+                "name": project.name,
+                "description": project.description,
+                "status": project.status,
+                "created_at": project.created_at,
+                "updated_at": project.updated_at,
+            }
+            for project in sorted(getattr(source, "projects", []), key=lambda project: project.name)
+        ],
         location=build_location(metadata, getattr(chunk, "content")),
         content=getattr(chunk, "content"),
         score=1 - float(distance),
@@ -184,6 +218,17 @@ def build_text_chunk_read(row: object) -> KnowledgeChunkRead:
         tags=[
             {"id": tag.id, "name": tag.name}
             for tag in sorted(getattr(source, "tags", []), key=lambda tag: tag.name)
+        ],
+        projects=[
+            {
+                "id": project.id,
+                "name": project.name,
+                "description": project.description,
+                "status": project.status,
+                "created_at": project.created_at,
+                "updated_at": project.updated_at,
+            }
+            for project in sorted(getattr(source, "projects", []), key=lambda project: project.name)
         ],
         location=build_location(metadata, getattr(chunk, "content")),
         content=getattr(chunk, "content"),

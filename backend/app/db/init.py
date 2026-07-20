@@ -1,7 +1,7 @@
 from sqlalchemy import text
 
 from .base import Base
-from .models import AppConfig, Category, DocumentSource, KnowledgeChunk, Tag  # noqa: F401
+from .models import AppConfig, Category, DocumentSource, KnowledgeChunk, Project, Tag  # noqa: F401
 from .session import engine
 
 
@@ -110,6 +110,63 @@ async def init_db() -> None:
             text(
                 "CREATE INDEX IF NOT EXISTS ix_document_source_tags_tag_id "
                 "ON document_source_tags (tag_id)"
+            )
+        )
+        await connection.execute(
+            text(
+                "ALTER TABLE projects ADD COLUMN IF NOT EXISTS normalized_name VARCHAR(150)"
+            )
+        )
+        await connection.execute(
+            text(
+                "UPDATE projects SET normalized_name = lower(btrim(name)) "
+                "WHERE normalized_name IS NULL"
+            )
+        )
+        await connection.execute(
+            text("ALTER TABLE projects ALTER COLUMN normalized_name SET NOT NULL")
+        )
+        await connection.execute(
+            text(
+                "ALTER TABLE projects ADD COLUMN IF NOT EXISTS description TEXT"
+            )
+        )
+        await connection.execute(
+            text(
+                "ALTER TABLE projects ADD COLUMN IF NOT EXISTS status VARCHAR(32) DEFAULT 'active'"
+            )
+        )
+        await connection.execute(
+            text("UPDATE projects SET status = 'active' WHERE status IS NULL")
+        )
+        await connection.execute(
+            text("ALTER TABLE projects ALTER COLUMN status SET NOT NULL")
+        )
+        await connection.execute(
+            text(
+                "ALTER TABLE projects "
+                "ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()"
+            )
+        )
+        await connection.execute(
+            text("UPDATE projects SET updated_at = created_at WHERE updated_at IS NULL")
+        )
+        await connection.execute(
+            text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_projects_normalized_name "
+                "ON projects (normalized_name)"
+            )
+        )
+        await connection.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_projects_status "
+                "ON projects (status)"
+            )
+        )
+        await connection.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_document_source_projects_project_id "
+                "ON document_source_projects (project_id)"
             )
         )
         await connection.execute(

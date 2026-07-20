@@ -10,12 +10,15 @@ from backend.app.services.config import get_auth_token
 from .tools.knowledge import (
     KnowledgeHit,
     KnowledgeCategory,
+    KnowledgeProject,
     KnowledgeTag,
     KnowledgeSource,
     MinScore,
     MCPTextIngestResult,
     KnowledgeSourceDetail,
     get_knowledge_categories,
+    get_knowledge_project_sources,
+    get_knowledge_projects,
     get_knowledge_source,
     get_knowledge_sources,
     get_knowledge_tags,
@@ -97,6 +100,7 @@ async def search(
     limit: int = 5,
     category_ids: list[int] | None = None,
     tag_ids: list[int] | None = None,
+    project_ids: list[int] | None = None,
     min_score: MinScore | None = None,
     include_match_reasons: bool = False,
 ) -> list[KnowledgeHit]:
@@ -105,6 +109,7 @@ async def search(
         limit=limit,
         category_ids=category_ids,
         tag_ids=tag_ids,
+        project_ids=project_ids,
         min_score=min_score,
         include_match_reasons=include_match_reasons,
     )
@@ -131,6 +136,16 @@ async def tags() -> list[KnowledgeTag]:
 
 
 @mcp.tool()
+async def projects(status: str | None = None) -> list[KnowledgeProject]:
+    return await get_knowledge_projects(status)
+
+
+@mcp.tool()
+async def project_sources(project_id: int) -> list[KnowledgeSource]:
+    return await get_knowledge_project_sources(project_id)
+
+
+@mcp.tool()
 async def tag_autocomplete(query: str, limit: int = 10) -> list[KnowledgeTag]:
     return await autocomplete_knowledge_tags(query, limit)
 
@@ -148,6 +163,7 @@ async def ingest_text(
     content: str,
     category_ids: list[int],
     tag_ids: list[int] | None = None,
+    project_ids: list[int] | None = None,
     metadata: dict[str, str] | None = None,
 ) -> MCPTextIngestResult:
     return await ingest_mcp_text(
@@ -155,6 +171,7 @@ async def ingest_text(
         content=content,
         category_ids=category_ids,
         tag_ids=tag_ids,
+        project_ids=project_ids,
         metadata=metadata,
     )
 

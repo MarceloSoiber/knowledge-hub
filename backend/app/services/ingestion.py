@@ -5,7 +5,7 @@ from hashlib import sha256
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..db.models import Category, DocumentSource, Tag
+from ..db.models import Category, DocumentSource, Project, Tag
 from ..repositories.chunks import add_source_chunks
 from ..repositories.sources import get_source_by_content_hash
 from .categories import get_categories
@@ -25,6 +25,7 @@ from .documents.extractors import (
 )
 from .documents.normalizer import normalize_text
 from .embeddings import EmbeddingClient
+from .projects import get_projects
 from .tags import get_tags
 
 
@@ -52,9 +53,11 @@ async def ingest_uploaded_file(
     category_ids: list[int],
     embedding_client: EmbeddingClient,
     tag_ids: list[int] | None = None,
+    project_ids: list[int] | None = None,
 ) -> tuple[DocumentSource, int]:
     categories = await get_categories(session, category_ids)
     tags = await get_tags(session, tag_ids) if tag_ids is not None else []
+    projects = await get_projects(session, project_ids) if project_ids is not None else []
 
     try:
         document = extract_document(filename, content)
@@ -70,6 +73,7 @@ async def ingest_uploaded_file(
         text=document.text,
         categories=categories,
         tags=tags,
+        projects=projects,
         source_type="upload",
         uri=uri,
         embedding_client=embedding_client,
@@ -87,6 +91,7 @@ async def ingest_plain_text(
     category_ids: list[int],
     embedding_client: EmbeddingClient,
     tag_ids: list[int] | None = None,
+    project_ids: list[int] | None = None,
     source_type: str = "text",
     metadata: dict[str, str] | None = None,
 ) -> tuple[DocumentSource, int]:
@@ -95,6 +100,7 @@ async def ingest_plain_text(
         raise KnowledgeIngestionError("Title must not be empty.")
     categories = await get_categories(session, category_ids)
     tags = await get_tags(session, tag_ids) if tag_ids is not None else []
+    projects = await get_projects(session, project_ids) if project_ids is not None else []
     text = normalize_text(content)
     if not text:
         raise EmptyDocumentError("Text content does not contain readable text.")
@@ -106,6 +112,7 @@ async def ingest_plain_text(
         text=text,
         categories=categories,
         tags=tags,
+        projects=projects,
         source_type=source_type,
         uri=uri,
         embedding_client=embedding_client,
@@ -120,6 +127,7 @@ async def ingest_text_source(
     text: str,
     categories: list[Category],
     tags: list[Tag],
+    projects: list[Project],
     source_type: str,
     uri: str,
     embedding_client: EmbeddingClient,
@@ -149,6 +157,7 @@ async def ingest_text_source(
     )
     source.categories = categories
     source.tags = tags
+    source.projects = projects
     session.add(source)
     await session.flush()
 
@@ -161,6 +170,7 @@ async def ingest_text_source(
             title=title,
             categories=categories,
             tags=tags,
+            projects=projects,
             source_type=source_type,
             chunks=chunks,
             extra_metadata=extra_metadata,
@@ -175,6 +185,7 @@ def build_chunk_metadata(
     title: str,
     categories: list[object],
     tags: list[object] | None,
+    projects: list[object] | None,
     source_type: str,
     chunks: list[TextChunk],
     extra_metadata: dict[str, str] | None = None,
@@ -186,6 +197,10 @@ def build_chunk_metadata(
     tag_payload = [
         {"id": tag.id, "name": tag.name}  # type: ignore[attr-defined]
         for tag in (tags or [])
+    ]
+    project_payload = [
+        {"id": project.id, "name": project.name, "status": project.status}  # type: ignore[attr-defined]
+        for project in (projects or [])
     ]
     metadata = []
     for chunk in chunks:
@@ -202,6 +217,8 @@ def build_chunk_metadata(
             "categories": category_payload,
             "tag_ids": [tag["id"] for tag in tag_payload],
             "tags": tag_payload,
+            "project_ids": [project["id"] for project in project_payload],
+            "projects": project_payload,
             "source_type": source_type,
             "chunk_index": chunk.location.chunk_index,
             "location": location,
