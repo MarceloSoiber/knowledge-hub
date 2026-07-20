@@ -59,6 +59,7 @@ Com escrita ativa, a tool `ingest_text` exige `knowledge:write` e aceita:
   "content": "Texto confirmado pelo usuário para persistência.",
   "category_ids": [1, 2],
   "tag_ids": [3],
+  "project_ids": [4],
   "metadata": {
     "note_type": "decision"
   }
@@ -83,6 +84,13 @@ Resposta:
       "name": "rag"
     }
   ],
+  "projects": [
+    {
+      "id": 4,
+      "name": "mcp knowledge hub",
+      "status": "active"
+    }
+  ],
   "chunks_created": 2
 }
 ```
@@ -94,15 +102,18 @@ automaticamente. `metadata` aceita apenas `client_id` e `note_type`.
 A tool `source(source_id)` consulta uma fonte detalhada por UUID público. O MCP
 não expõe ferramentas de atualização ou exclusão de fontes nesta versão.
 
-A tool `search` aceita `query`, `limit`, `category_ids`, `tag_ids`, `min_score` e
+A tool `search` aceita `query`, `limit`, `category_ids`, `tag_ids`,
+`project_ids`, `min_score` e
 `include_match_reasons`, retornando o mesmo contrato citável de
 `/api/v1/knowledge/search`: UUID público da fonte, título, URI sanitizada,
-categorias, tags, localização do chunk, conteúdo, score e metadados públicos
+categorias, tags, projetos, localização do chunk, conteúdo, score e metadados públicos
 permitidos. Quando `include_match_reasons=true`, cada resultado pode indicar se
 veio de match `vector`, `text` ou ambos.
 
 As tools `tags()` e `tag_autocomplete(query, limit)` listam tags existentes para
 que clientes MCP escolham `tag_ids` validos antes de ingerir ou buscar.
+As tools `projects(status)` e `project_sources(project_id)` listam projetos e
+fontes associadas para que agentes restrinjam consultas ao contexto atual.
 
 ## Resumo dos endpoints
 
@@ -114,6 +125,12 @@ que clientes MCP escolham `tag_ids` validos antes de ingerir ou buscar.
 | `POST` | `/api/v1/knowledge/categories` | Cria uma categoria. |
 | `PATCH` | `/api/v1/knowledge/categories/{id}` | Renomeia uma categoria. |
 | `DELETE` | `/api/v1/knowledge/categories/{id}` | Remove uma categoria sem documentos associados. |
+| `GET` | `/api/v1/knowledge/projects` | Lista projetos. |
+| `POST` | `/api/v1/knowledge/projects` | Cria um projeto. |
+| `PATCH` | `/api/v1/knowledge/projects/{id}` | Atualiza nome ou descrição de um projeto. |
+| `POST` | `/api/v1/knowledge/projects/{id}/archive` | Arquiva um projeto sem excluir conhecimento. |
+| `POST` | `/api/v1/knowledge/projects/{id}/reactivate` | Reativa um projeto arquivado. |
+| `GET` | `/api/v1/knowledge/projects/{id}/sources` | Lista fontes associadas a um projeto. |
 | `GET` | `/api/v1/knowledge/tags` | Lista as tags disponíveis. |
 | `GET` | `/api/v1/knowledge/tags/autocomplete` | Sugere tags por prefixo. |
 | `POST` | `/api/v1/knowledge/tags` | Cria uma tag. |
@@ -271,6 +288,69 @@ DELETE /api/v1/knowledge/tags/{id}
 
 Tags associadas a documentos não podem ser excluídas e retornam `409 Conflict`.
 
+## Projetos
+
+Projetos representam contexto de trabalho. Categorias continuam descrevendo
+assunto amplo e tags continuam descrevendo marcadores granulares; projetos
+servem para restringir conhecimento ao contexto atual sem duplicar fontes.
+
+Projetos têm status `active` ou `archived`. Arquivar um projeto não remove
+fontes, chunks nem associações; apenas marca o contexto como arquivado.
+
+### Listar projetos
+
+```http
+GET /api/v1/knowledge/projects?status=active
+```
+
+O filtro `status` é opcional. Sem filtro, a API retorna todos os projetos.
+
+### Criar projeto
+
+```http
+POST /api/v1/knowledge/projects
+Content-Type: application/json
+```
+
+```json
+{
+  "name": "MCP Knowledge Hub",
+  "description": "Contexto de desenvolvimento do hub"
+}
+```
+
+Resposta `201 Created`:
+
+```json
+{
+  "id": 4,
+  "name": "mcp knowledge hub",
+  "description": "Contexto de desenvolvimento do hub",
+  "status": "active",
+  "created_at": "2026-07-20T12:00:00Z",
+  "updated_at": "2026-07-20T12:00:00Z"
+}
+```
+
+### Atualizar, arquivar e reativar projeto
+
+```http
+PATCH /api/v1/knowledge/projects/{id}
+POST /api/v1/knowledge/projects/{id}/archive
+POST /api/v1/knowledge/projects/{id}/reactivate
+```
+
+Nomes duplicados retornam `409 Conflict`. Projeto inexistente retorna `404`.
+
+### Listar fontes de um projeto
+
+```http
+GET /api/v1/knowledge/projects/{id}/sources
+```
+
+Retorna o mesmo contrato de `GET /knowledge/sources`, filtrado pelas fontes
+associadas ao projeto.
+
 ## Cadastro de conhecimento
 
 O cadastro pode ser feito por arquivo ou por texto. Nos dois casos, o conteúdo é
@@ -290,6 +370,7 @@ Campos:
 | `file` | arquivo | sim | Formatos `.txt`, `.md` ou `.pdf`; máximo de 10 MB. |
 | `category_ids` | inteiros repetidos | sim | Cada valor deve ser maior que zero, sem duplicatas, e apontar para uma categoria existente. |
 | `tag_ids` | inteiros repetidos | não | Cada valor deve ser maior que zero, sem duplicatas, e apontar para uma tag existente. |
+| `project_ids` | inteiros repetidos | não | Cada valor deve ser maior que zero, sem duplicatas, e apontar para um projeto existente. |
 
 Exemplo:
 
@@ -300,6 +381,7 @@ curl -X POST \
   -F "category_ids=2" \
   -F "category_ids=3" \
   -F "tag_ids=1" \
+  -F "project_ids=4" \
   http://localhost:8000/api/v1/knowledge/uploads
 ```
 
@@ -325,6 +407,13 @@ Resposta `201 Created`:
       "name": "postgres"
     }
   ],
+  "projects": [
+    {
+      "id": 4,
+      "name": "mcp knowledge hub",
+      "status": "active"
+    }
+  ],
   "chunks_created": 8
 }
 ```
@@ -337,7 +426,7 @@ Content-Type: application/json
 ```
 
 Tambem aceita `multipart/form-data` ou `application/x-www-form-urlencoded` com os
-mesmos campos. Em formulario, envie `category_ids` e `tag_ids` como campos
+mesmos campos. Em formulario, envie `category_ids`, `tag_ids` e `project_ids` como campos
 repetidos quando houver mais de um valor.
 
 Corpo da requisição:
@@ -347,6 +436,7 @@ Corpo da requisição:
 | `title` | string | sim | Entre 1 e 255 caracteres após remover espaços externos. |
 | `category_ids` | lista de inteiros | sim | Deve conter pelo menos um ID maior que zero, sem duplicatas, e apontar para categorias existentes. |
 | `tag_ids` | lista de inteiros | não | Quando informada, deve conter IDs maiores que zero, sem duplicatas, e apontar para tags existentes. |
+| `project_ids` | lista de inteiros | não | Quando informada, deve conter IDs maiores que zero, sem duplicatas, e apontar para projetos existentes. |
 | `content` | string | sim | Não pode ficar vazio após a normalização. |
 
 Exemplo:
@@ -359,6 +449,7 @@ curl -X POST http://localhost:8000/api/v1/knowledge/texts \
     "title": "Ata da reunião",
     "category_ids": [2, 3],
     "tag_ids": [1],
+    "project_ids": [4],
     "content": "Este é o conteúdo que será armazenado na base de conhecimento."
   }'
 ```
@@ -383,6 +474,13 @@ Resposta `201 Created`:
     {
       "id": 1,
       "name": "postgres"
+    }
+  ],
+  "projects": [
+    {
+      "id": 4,
+      "name": "mcp knowledge hub",
+      "status": "active"
     }
   ],
   "chunks_created": 1
@@ -410,6 +508,7 @@ Corpo da requisição:
 | `limit` | inteiro | não | Padrão `5`; mínimo `1`; máximo `50`. |
 | `category_ids` | lista de inteiros | não | Filtra documentos que pertençam a qualquer uma das categorias informadas. |
 | `tag_ids` | lista de inteiros | não | Filtra documentos que tenham qualquer uma das tags informadas. Combina com categorias como outra dimensão obrigatória. |
+| `project_ids` | lista de inteiros | não | Filtra documentos associados a qualquer um dos projetos informados. Quando presente, conhecimento geral sem projeto fica fora do resultado. |
 | `min_score` | número | não | Override por requisição; mínimo `0.0`; máximo `1.0`. Quando omitido, usa `SEARCH_MIN_SCORE` (`0.35`). |
 | `include_match_reasons` | booleano | não | Padrão `false`. Quando `true`, inclui motivos diagnósticos do match por resultado. |
 
@@ -424,6 +523,7 @@ curl -X POST http://localhost:8000/api/v1/knowledge/search \
     "limit": 5,
     "category_ids": [2, 3],
     "tag_ids": [1],
+    "project_ids": [4],
     "min_score": 0.35,
     "include_match_reasons": true
   }'
@@ -458,6 +558,13 @@ Resposta `200 OK`:
           "name": "postgres"
         }
       ],
+      "projects": [
+        {
+          "id": 4,
+          "name": "mcp knowledge hub",
+          "status": "active"
+        }
+      ],
       "location": {
         "chunk_index": 2,
         "page": null,
@@ -485,7 +592,7 @@ sinal de similaridade vetorial para ordenacao e calibracao, nao uma probabilidad
 nem o score hibrido interno. O valor padrao `SEARCH_MIN_SCORE=0.35` e conservador
 e deve ser recalibrado ao trocar o modelo de embeddings ou o dominio do
 conhecimento. O campo `match_reasons` so aparece quando solicitado.
-Filtros de categorias e tags são aplicados antes dos limites de candidatos.
+Filtros de categorias, tags e projetos são aplicados antes dos limites de candidatos.
 Dentro de cada dimensão, a semântica é ANY; entre dimensões, a combinação é AND.
 
 ### Gerar resposta com LLM
@@ -503,6 +610,7 @@ Corpo da requisição:
 | `limit` | inteiro | não | Padrão `5`; mínimo `1`; máximo `20`. |
 | `category_ids` | lista de inteiros | não | Filtra documentos usados na resposta por semântica qualquer categoria. |
 | `tag_ids` | lista de inteiros | não | Filtra documentos usados na resposta por semântica qualquer tag. |
+| `project_ids` | lista de inteiros | não | Filtra documentos usados na resposta por semântica qualquer projeto. |
 | `min_score` | número | não | Override por requisição; mínimo `0.0`; máximo `1.0`. Quando omitido, usa `SEARCH_MIN_SCORE` (`0.35`). |
 | `include_match_reasons` | booleano | não | Padrão `false`. Quando `true`, inclui motivos diagnósticos nas fontes recuperadas. |
 
@@ -517,6 +625,7 @@ curl -X POST http://localhost:8000/api/v1/knowledge/answer \
     "limit": 5,
     "category_ids": [2, 3],
     "tag_ids": [1],
+    "project_ids": [4],
     "min_score": 0.35
   }'
 ```
@@ -544,6 +653,13 @@ Resposta `200 OK`:
         {
           "id": 1,
           "name": "postgres"
+        }
+      ],
+      "projects": [
+        {
+          "id": 4,
+          "name": "mcp knowledge hub",
+          "status": "active"
         }
       ],
       "location": {
@@ -598,6 +714,13 @@ Resposta `200 OK`:
         "name": "postgres"
       }
     ],
+    "projects": [
+      {
+        "id": 4,
+        "name": "mcp knowledge hub",
+        "status": "active"
+      }
+    ],
     "source_type": "upload",
     "uri": "upload:documento.pdf",
     "content_hash": "d2d2d2...",
@@ -618,6 +741,7 @@ Resposta `200 OK`:
       }
     ],
     "tags": [],
+    "projects": [],
     "source_type": "text",
     "uri": "text:Ata da reunião",
     "content_hash": "a1a1a1...",
@@ -653,6 +777,13 @@ Resposta `200 OK`:
       "name": "postgres"
     }
   ],
+  "projects": [
+    {
+      "id": 4,
+      "name": "mcp knowledge hub",
+      "status": "active"
+    }
+  ],
   "source_type": "text",
   "uri": "text:Ata da reunião",
   "content_hash": "a1a1a1...",
@@ -676,9 +807,10 @@ Corpo da requisição:
 | `title` | string | não | Entre 1 e 255 caracteres após remover espaços externos. |
 | `category_ids` | lista de inteiros | não | Não pode ser vazia quando informada; IDs devem existir. |
 | `tag_ids` | lista de inteiros | não | IDs devem existir e não podem repetir. Lista vazia remove todas as tags da fonte. |
+| `project_ids` | lista de inteiros | não | IDs devem existir e não podem repetir. Lista vazia remove todos os projetos da fonte. |
 | `content` | string | não | Quando informado, não pode ficar vazio após normalização. |
 
-Ao alterar apenas `title`, `category_ids` ou `tag_ids`, a API não recria
+Ao alterar apenas `title`, `category_ids`, `tag_ids` ou `project_ids`, a API não recria
 embeddings. Ao alterar `content`, a API recalcula o hash e substitui chunks e
 embeddings em uma transação.
 
@@ -688,7 +820,7 @@ embeddings em uma transação.
 DELETE /api/v1/knowledge/sources/{source_id}?confirm=true
 ```
 
-A exclusão é definitiva e remove chunks e associações de categoria e tags. Sem
+A exclusão é definitiva e remove chunks e associações de categoria, tags e projetos. Sem
 `confirm=true`, a API retorna `400 Bad Request`. Faça backup externo antes de
 usar esta operação em dados importantes.
 
@@ -740,8 +872,8 @@ Principais códigos:
 | --- | --- |
 | `400 Bad Request` | Arquivo inválido, conteúdo vazio ou falha de ingestão. |
 | `401 Unauthorized` | Token Bearer ausente ou inválido quando a autenticação está ativa. |
-| `404 Not Found` | A categoria, tag ou fonte informada não existe. |
-| `409 Conflict` | Nome de categoria/tag duplicado, categoria/tag em uso ou conteúdo duplicado. |
+| `404 Not Found` | A categoria, tag, projeto ou fonte informada não existe. |
+| `409 Conflict` | Nome de categoria/tag/projeto duplicado, categoria/tag em uso ou conteúdo duplicado. |
 | `413 Content Too Large` | O arquivo enviado ultrapassa 10 MB. |
 | `422 Unprocessable Entity` | O corpo ou os parâmetros não atendem ao schema. |
 | `502 Bad Gateway` | Falha ao consultar o serviço de embeddings ou o LLM. |

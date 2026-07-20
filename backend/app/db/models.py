@@ -37,6 +37,18 @@ document_source_tags = Table(
 )
 
 
+document_source_projects = Table(
+    "document_source_projects",
+    Base.metadata,
+    Column(
+        "document_source_id",
+        ForeignKey("document_sources.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column("project_id", ForeignKey("projects.id"), primary_key=True),
+)
+
+
 class Category(Base):
     __tablename__ = "categories"
 
@@ -47,6 +59,25 @@ class Category(Base):
     sources: Mapped[list["DocumentSource"]] = relationship(
         secondary=document_source_categories,
         back_populates="categories",
+    )
+
+
+class Project(Base):
+    __tablename__ = "projects"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(150), nullable=False)
+    normalized_name: Mapped[str] = mapped_column(String(150), nullable=False, unique=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="active")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    sources: Mapped[list["DocumentSource"]] = relationship(
+        secondary=document_source_projects,
+        back_populates="projects",
     )
 
 
@@ -90,6 +121,10 @@ class DocumentSource(Base):
     )
     tags: Mapped[list[Tag]] = relationship(
         secondary=document_source_tags,
+        back_populates="sources",
+    )
+    projects: Mapped[list[Project]] = relationship(
+        secondary=document_source_projects,
         back_populates="sources",
     )
 

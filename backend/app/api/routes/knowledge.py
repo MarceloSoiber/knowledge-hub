@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
 from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,6 +20,9 @@ from ...schemas.knowledge import (
     KnowledgeTextIngestRequest,
     KnowledgeUploadRequest,
     KnowledgeUploadResponse,
+    ProjectPatch,
+    ProjectRead,
+    ProjectWrite,
     TagRead,
     TagWrite,
 )
@@ -48,6 +51,17 @@ from ...services.ingestion import (
     ingest_plain_text,
 )
 from ...services.ingestion import ingest_uploaded_file
+from ...services.projects import (
+    ProjectConflictError,
+    ProjectNotFoundError,
+    ProjectStatusError,
+    archive_project,
+    create_project,
+    list_project_sources,
+    list_projects,
+    reactivate_project,
+    update_project,
+)
 from ...services.rag import AnswerClient, LLMConfigurationError, LLMError
 from ...services.search import answer_knowledge, list_sources, search_knowledge
 from ...services.sources import (
@@ -83,6 +97,9 @@ async def parse_text_ingest_payload(request: Request) -> KnowledgeTextIngestRequ
         tag_ids = form.getlist("tag_ids")
         if tag_ids:
             payload["tag_ids"] = tag_ids
+        project_ids = form.getlist("project_ids")
+        if project_ids:
+            payload["project_ids"] = project_ids
     else:
         payload = await request.json()
 
@@ -105,6 +122,7 @@ async def knowledge_search(
             limit=payload.limit,
             category_ids=payload.category_ids,
             tag_ids=payload.tag_ids,
+            project_ids=payload.project_ids,
             min_score=payload.min_score,
             include_match_reasons=payload.include_match_reasons,
             embedding_client=embedding_client,
@@ -112,6 +130,8 @@ async def knowledge_search(
     except CategoryNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except TagNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ProjectNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except EmbeddingConfigurationError as exc:
         raise HTTPException(
@@ -142,6 +162,7 @@ async def upload_knowledge_file(
             content=content,
             category_ids=payload.category_ids,
             tag_ids=payload.tag_ids,
+            project_ids=payload.project_ids,
             embedding_client=embedding_client,
         )
     except FileTooLargeError as exc:
@@ -151,6 +172,8 @@ async def upload_knowledge_file(
     except CategoryNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except TagNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ProjectNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except DuplicateSourceContentError as exc:
         raise _duplicate_source_http_error(exc) from exc
@@ -168,6 +191,7 @@ async def upload_knowledge_file(
         title=source.title,
         categories=source.categories,
         tags=getattr(source, "tags", []),
+        projects=getattr(source, "projects", []),
         chunks_created=chunks_created,
     )
 
@@ -189,11 +213,14 @@ async def ingest_knowledge_text(
             content=payload.content,
             category_ids=payload.category_ids,
             tag_ids=payload.tag_ids,
+            project_ids=payload.project_ids,
             embedding_client=embedding_client,
         )
     except CategoryNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except TagNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ProjectNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except DuplicateSourceContentError as exc:
         raise _duplicate_source_http_error(exc) from exc
@@ -211,6 +238,7 @@ async def ingest_knowledge_text(
         title=source.title,
         categories=source.categories,
         tags=getattr(source, "tags", []),
+        projects=getattr(source, "projects", []),
         chunks_created=chunks_created,
     )
 
@@ -229,6 +257,7 @@ async def knowledge_answer(
             limit=payload.limit,
             category_ids=payload.category_ids,
             tag_ids=payload.tag_ids,
+            project_ids=payload.project_ids,
             min_score=payload.min_score,
             include_match_reasons=payload.include_match_reasons,
             embedding_client=embedding_client,
@@ -237,6 +266,8 @@ async def knowledge_answer(
     except CategoryNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except TagNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ProjectNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except (EmbeddingConfigurationError, LLMConfigurationError) as exc:
         raise HTTPException(
@@ -281,6 +312,7 @@ async def patch_knowledge_source(
             title=payload.title,
             category_ids=payload.category_ids,
             tag_ids=payload.tag_ids,
+            project_ids=payload.project_ids,
             content=payload.content,
         )
         return source
@@ -289,6 +321,8 @@ async def patch_knowledge_source(
     except CategoryNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except TagNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ProjectNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except DuplicateSourceContentError as exc:
         raise _duplicate_source_http_error(exc) from exc
@@ -321,6 +355,87 @@ async def knowledge_categories(
     session: AsyncSession = Depends(get_session),
 ) -> list[dict[str, str | int]]:
     return await list_categories(session)
+
+
+@router.get("/projects", response_model=list[ProjectRead])
+async def knowledge_projects(
+    status_filter: str | None = Query(default=None, alias="status"),
+    session: AsyncSession = Depends(get_session),
+) -> list[dict[str, object]]:
+    try:
+        return await list_projects(session, status=status_filter)
+    except ProjectStatusError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+
+
+@router.post(
+    "/projects",
+    response_model=ProjectRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_knowledge_project(
+    payload: ProjectWrite,
+    session: AsyncSession = Depends(get_session),
+) -> ProjectRead:
+    try:
+        return await create_project(session, payload.name, payload.description)
+    except ProjectConflictError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+
+@router.patch("/projects/{project_id}", response_model=ProjectRead)
+async def update_knowledge_project(
+    project_id: int,
+    payload: ProjectPatch,
+    session: AsyncSession = Depends(get_session),
+) -> ProjectRead:
+    try:
+        return await update_project(
+            session,
+            project_id,
+            name=payload.name,
+            description=payload.description,
+        )
+    except ProjectNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ProjectConflictError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+
+@router.post("/projects/{project_id}/archive", response_model=ProjectRead)
+async def archive_knowledge_project(
+    project_id: int,
+    session: AsyncSession = Depends(get_session),
+) -> ProjectRead:
+    try:
+        return await archive_project(session, project_id)
+    except ProjectNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.post("/projects/{project_id}/reactivate", response_model=ProjectRead)
+async def reactivate_knowledge_project(
+    project_id: int,
+    session: AsyncSession = Depends(get_session),
+) -> ProjectRead:
+    try:
+        return await reactivate_project(session, project_id)
+    except ProjectNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.get("/projects/{project_id}/sources", response_model=list[KnowledgeSourceRead])
+async def knowledge_project_sources(
+    project_id: int,
+    session: AsyncSession = Depends(get_session),
+) -> list[dict[str, object]]:
+    try:
+        return await list_project_sources(session, project_id)
+    except ProjectNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
 
 @router.get("/tags", response_model=list[TagRead])
