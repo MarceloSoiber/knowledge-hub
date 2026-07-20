@@ -24,6 +24,7 @@ pyproject.toml
 ./backend/app/services/llm.py
 ./backend/app/services/rag.py
 ./backend/app/services/search.py
+./backend/app/services/sources.py
 ./backend/app/services/documents/__init__.py
 ./backend/app/services/documents/chunker.py
 ./backend/app/services/documents/extractors.py

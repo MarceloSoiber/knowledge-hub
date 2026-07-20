@@ -118,10 +118,62 @@ async def test_search_knowledge_returns_citation_context(
     results = await search_knowledge("find", limit=1, category_ids=[2], min_score=0.55)
 
     assert captured_kwargs["min_score"] == 0.55
+    assert captured_kwargs["include_match_reasons"] is False
     assert results[0].source_id == "33333333-3333-4333-8333-333333333333"
     assert results[0].source_title == "runbook.md"
     assert results[0].location.section == "Setup"
     assert results[0].metadata == {"note_type": "decision"}
+    assert results[0].match_reasons is None
+
+
+@pytest.mark.asyncio
+async def test_search_knowledge_can_return_match_reasons(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured_kwargs: dict[str, object] = {}
+
+    async def fake_search_backend_knowledge(**kwargs: object) -> list[KnowledgeChunkRead]:
+        captured_kwargs.update(kwargs)
+        return [
+            KnowledgeChunkRead(
+                id=10,
+                source_id="33333333-3333-4333-8333-333333333333",
+                source_title="runbook.md",
+                source_type="upload",
+                uri="upload:runbook.md",
+                categories=[{"id": 2, "name": "docs"}],
+                location={
+                    "chunk_index": 1,
+                    "page": None,
+                    "section": "Setup",
+                    "start_char": 20,
+                    "end_char": 60,
+                },
+                content="ERR_CONN_RESET",
+                score=0.92,
+                metadata={},
+                match_reasons=["vector", "text"],
+            )
+        ]
+
+    class FakeSessionLocal:
+        async def __aenter__(self) -> object:
+            return object()
+
+        async def __aexit__(self, *_: object) -> None:
+            return None
+
+    monkeypatch.setattr("mcp_server.tools.knowledge.SessionLocal", FakeSessionLocal)
+    monkeypatch.setattr(
+        "mcp_server.tools.knowledge.search_backend_knowledge",
+        fake_search_backend_knowledge,
+    )
+    monkeypatch.setattr("mcp_server.tools.knowledge.build_embedding_client", lambda: object())
+
+    results = await search_knowledge("ERR_CONN_RESET", include_match_reasons=True)
+
+    assert captured_kwargs["include_match_reasons"] is True
+    assert results[0].match_reasons == ["vector", "text"]
 
 
 @pytest.mark.asyncio
@@ -168,6 +220,7 @@ async def test_registered_search_tool_forwards_min_score(
         "limit": 3,
         "category_ids": [2],
         "min_score": 0.6,
+        "include_match_reasons": False,
     }
 
 

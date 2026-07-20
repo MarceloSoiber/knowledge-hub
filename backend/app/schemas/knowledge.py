@@ -71,6 +71,8 @@ class KnowledgeChunkLocation(BaseModel):
 
 
 class KnowledgeChunkRead(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     id: int
     source_id: str
     source_title: str
@@ -88,6 +90,7 @@ class KnowledgeSearchRequest(BaseModel):
     limit: int = Field(default=5, ge=1, le=50)
     category_ids: list[int] | None = Field(default=None)
     min_score: float | None = Field(default=None, ge=0.0, le=1.0, allow_inf_nan=False)
+    include_match_reasons: bool = Field(default=False)
 
     @field_validator("category_ids")
     @classmethod
@@ -139,6 +142,7 @@ class KnowledgeAnswerRequest(BaseModel):
     limit: int = Field(default=5, ge=1, le=20)
     category_ids: list[int] | None = Field(default=None)
     min_score: float | None = Field(default=None, ge=0.0, le=1.0, allow_inf_nan=False)
+    include_match_reasons: bool = Field(default=False)
 
     @field_validator("category_ids")
     @classmethod

@@ -52,6 +52,10 @@ class KnowledgeHit(BaseModel):
     content: str = Field(description="Conteúdo encontrado")
     score: float | None = Field(default=None, description="Score de relevância")
     metadata: dict[str, Any] = Field(default_factory=dict, description="Metadados publicos")
+    match_reasons: list[str] | None = Field(
+        default=None,
+        description="Motivos opcionais do match quando diagnostico e solicitado",
+    )
 
 
 class KnowledgeCategory(BaseModel):
@@ -139,6 +143,7 @@ async def search_knowledge(
     limit: int = 5,
     category_ids: list[int] | None = None,
     min_score: MinScore | None = None,
+    include_match_reasons: bool = False,
 ) -> list[KnowledgeHit]:
     validated_min_score = min_score_adapter.validate_python(min_score)
     async with SessionLocal() as session:
@@ -148,6 +153,7 @@ async def search_knowledge(
             limit=limit,
             category_ids=category_ids,
             min_score=validated_min_score,
+            include_match_reasons=include_match_reasons,
             embedding_client=build_embedding_client(),
         )
     return [KnowledgeHit(**result.model_dump()) for result in results]

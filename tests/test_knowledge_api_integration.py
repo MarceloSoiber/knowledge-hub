@@ -189,6 +189,7 @@ async def test_search_response_contract(
 
     assert response.status_code == 200
     assert captured_kwargs["min_score"] == 0.42
+    assert captured_kwargs["include_match_reasons"] is False
     assert response.json() == {
         "query": "find this",
         "limit": 5,
@@ -213,6 +214,57 @@ async def test_search_response_contract(
             }
         ],
     }
+
+
+@pytest.mark.asyncio
+async def test_search_response_includes_match_reasons_when_requested(
+    app: Any,
+    transport: httpx.ASGITransport,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured_kwargs: dict[str, object] = {}
+
+    async def fake_search(**kwargs: object) -> list[dict[str, object]]:
+        captured_kwargs.update(kwargs)
+        return [
+            {
+                "id": 10,
+                "source_id": "33333333-3333-4333-8333-333333333333",
+                "source_title": "runbook.md",
+                "source_type": "upload",
+                "uri": "upload:runbook.md",
+                "categories": [{"id": 2, "name": "docs"}],
+                "location": {
+                    "chunk_index": 1,
+                    "page": None,
+                    "section": "Setup",
+                    "start_char": 20,
+                    "end_char": 60,
+                },
+                "content": "ERR_CONN_RESET",
+                "score": 0.92,
+                "metadata": {},
+                "match_reasons": ["vector", "text"],
+            }
+        ]
+
+    app.dependency_overrides[require_auth_token] = no_auth
+    app.dependency_overrides[get_embedding_client] = fake_embedding_client
+    monkeypatch.setattr("backend.app.api.routes.knowledge.search_knowledge", fake_search)
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/api/v1/knowledge/search",
+            json={
+                "query": "ERR_CONN_RESET",
+                "limit": 5,
+                "include_match_reasons": True,
+            },
+        )
+
+    assert response.status_code == 200
+    assert captured_kwargs["include_match_reasons"] is True
+    assert response.json()["results"][0]["match_reasons"] == ["vector", "text"]
 
 
 @pytest.mark.asyncio
