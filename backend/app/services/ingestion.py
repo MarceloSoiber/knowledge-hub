@@ -5,7 +5,7 @@ from hashlib import sha256
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..db.models import Category, DocumentSource
+from ..db.models import Category, DocumentSource, Tag
 from ..repositories.chunks import add_source_chunks
 from ..repositories.sources import get_source_by_content_hash
 from .categories import get_categories
@@ -25,6 +25,7 @@ from .documents.extractors import (
 )
 from .documents.normalizer import normalize_text
 from .embeddings import EmbeddingClient
+from .tags import get_tags
 
 
 class KnowledgeIngestionError(ValueError):
@@ -50,8 +51,10 @@ async def ingest_uploaded_file(
     content: bytes,
     category_ids: list[int],
     embedding_client: EmbeddingClient,
+    tag_ids: list[int] | None = None,
 ) -> tuple[DocumentSource, int]:
     categories = await get_categories(session, category_ids)
+    tags = await get_tags(session, tag_ids) if tag_ids is not None else []
 
     try:
         document = extract_document(filename, content)
@@ -66,6 +69,7 @@ async def ingest_uploaded_file(
         title=filename,
         text=document.text,
         categories=categories,
+        tags=tags,
         source_type="upload",
         uri=uri,
         embedding_client=embedding_client,
@@ -82,6 +86,7 @@ async def ingest_plain_text(
     content: str,
     category_ids: list[int],
     embedding_client: EmbeddingClient,
+    tag_ids: list[int] | None = None,
     source_type: str = "text",
     metadata: dict[str, str] | None = None,
 ) -> tuple[DocumentSource, int]:
@@ -89,6 +94,7 @@ async def ingest_plain_text(
     if not normalized_title:
         raise KnowledgeIngestionError("Title must not be empty.")
     categories = await get_categories(session, category_ids)
+    tags = await get_tags(session, tag_ids) if tag_ids is not None else []
     text = normalize_text(content)
     if not text:
         raise EmptyDocumentError("Text content does not contain readable text.")
@@ -99,6 +105,7 @@ async def ingest_plain_text(
         title=normalized_title,
         text=text,
         categories=categories,
+        tags=tags,
         source_type=source_type,
         uri=uri,
         embedding_client=embedding_client,
@@ -112,6 +119,7 @@ async def ingest_text_source(
     title: str,
     text: str,
     categories: list[Category],
+    tags: list[Tag],
     source_type: str,
     uri: str,
     embedding_client: EmbeddingClient,
@@ -140,6 +148,7 @@ async def ingest_text_source(
         content_hash=content_hash,
     )
     source.categories = categories
+    source.tags = tags
     session.add(source)
     await session.flush()
 
@@ -151,6 +160,7 @@ async def ingest_text_source(
         build_chunk_metadata(
             title=title,
             categories=categories,
+            tags=tags,
             source_type=source_type,
             chunks=chunks,
             extra_metadata=extra_metadata,
@@ -164,6 +174,7 @@ async def ingest_text_source(
 def build_chunk_metadata(
     title: str,
     categories: list[object],
+    tags: list[object] | None,
     source_type: str,
     chunks: list[TextChunk],
     extra_metadata: dict[str, str] | None = None,
@@ -171,6 +182,10 @@ def build_chunk_metadata(
     category_payload = [
         {"id": category.id, "name": category.name}  # type: ignore[attr-defined]
         for category in categories
+    ]
+    tag_payload = [
+        {"id": tag.id, "name": tag.name}  # type: ignore[attr-defined]
+        for tag in (tags or [])
     ]
     metadata = []
     for chunk in chunks:
@@ -185,6 +200,8 @@ def build_chunk_metadata(
             "title": title,
             "category_ids": [category["id"] for category in category_payload],
             "categories": category_payload,
+            "tag_ids": [tag["id"] for tag in tag_payload],
+            "tags": tag_payload,
             "source_type": source_type,
             "chunk_index": chunk.location.chunk_index,
             "location": location,

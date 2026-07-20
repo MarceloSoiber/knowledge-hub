@@ -8,7 +8,7 @@ from ..db.models import DocumentSource
 
 
 def _source_options() -> tuple[object, ...]:
-    return (selectinload(DocumentSource.categories),)
+    return (selectinload(DocumentSource.categories), selectinload(DocumentSource.tags))
 
 
 async def get_source_by_public_id(
@@ -45,6 +45,10 @@ def serialize_source(source: DocumentSource, include_content: bool = False) -> d
         "categories": [
             {"id": category.id, "name": category.name}
             for category in sorted(source.categories, key=lambda category: category.name)
+        ],
+        "tags": [
+            {"id": tag.id, "name": tag.name}
+            for tag in sorted(source.tags, key=lambda tag: tag.name)
         ],
         "source_type": source.source_type,
         "uri": source.uri,

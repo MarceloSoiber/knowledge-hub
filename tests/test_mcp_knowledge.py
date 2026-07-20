@@ -88,6 +88,7 @@ async def test_search_knowledge_returns_citation_context(
                 source_type="upload",
                 uri="upload:runbook.md",
                 categories=[{"id": 2, "name": "docs"}],
+                tags=[{"id": 7, "name": "postgres"}],
                 location={
                     "chunk_index": 1,
                     "page": None,
@@ -118,9 +119,11 @@ async def test_search_knowledge_returns_citation_context(
     results = await search_knowledge("find", limit=1, category_ids=[2], min_score=0.55)
 
     assert captured_kwargs["min_score"] == 0.55
+    assert captured_kwargs["tag_ids"] is None
     assert captured_kwargs["include_match_reasons"] is False
     assert results[0].source_id == "33333333-3333-4333-8333-333333333333"
     assert results[0].source_title == "runbook.md"
+    assert results[0].tags[0].name == "postgres"
     assert results[0].location.section == "Setup"
     assert results[0].metadata == {"note_type": "decision"}
     assert results[0].match_reasons is None
@@ -211,6 +214,7 @@ async def test_registered_search_tool_forwards_min_score(
         query="find",
         limit=3,
         category_ids=[2],
+        tag_ids=[7],
         min_score=0.6,
     )
 
@@ -219,6 +223,7 @@ async def test_registered_search_tool_forwards_min_score(
         "query": "find",
         "limit": 3,
         "category_ids": [2],
+        "tag_ids": [7],
         "min_score": 0.6,
         "include_match_reasons": False,
     }
@@ -234,6 +239,7 @@ async def test_ingest_mcp_text_creates_mcp_source(
         assert kwargs["title"] == "Architecture note"
         assert kwargs["content"] == "Keep MCP tools thin."
         assert kwargs["category_ids"] == [2, 3]
+        assert kwargs["tag_ids"] == [7]
         assert kwargs["source_type"] == "mcp"
         assert kwargs["metadata"] == {"note_type": "decision"}
         return (
@@ -244,6 +250,7 @@ async def test_ingest_mcp_text_creates_mcp_source(
                     SimpleNamespace(id=2, name="docs"),
                     SimpleNamespace(id=3, name="ops"),
                 ],
+                tags=[SimpleNamespace(id=7, name="postgres")],
             ),
             2,
         )
@@ -254,12 +261,14 @@ async def test_ingest_mcp_text_creates_mcp_source(
         title="Architecture note",
         content="Keep MCP tools thin.",
         category_ids=[2, 3],
+        tag_ids=[7],
         metadata={"note_type": "decision"},
     )
 
     assert result.source_id == "11111111-1111-4111-8111-111111111111"
     assert result.title == "Architecture note"
     assert [category.name for category in result.categories] == ["docs", "ops"]
+    assert [tag.name for tag in result.tags] == ["postgres"]
     assert result.chunks_created == 2
 
 
@@ -335,6 +344,7 @@ async def test_get_knowledge_source_returns_detail(
             "source_id": source_id,
             "title": "notes",
             "categories": [{"id": 1, "name": "docs"}],
+            "tags": [{"id": 4, "name": "rag"}],
             "source_type": "text",
             "uri": "text:notes",
             "content_hash": "abc123",
@@ -348,6 +358,7 @@ async def test_get_knowledge_source_returns_detail(
     assert result.source_id == "22222222-2222-4222-8222-222222222222"
     assert result.content == "stored content"
     assert result.categories[0].name == "docs"
+    assert result.tags[0].name == "rag"
 
 
 @pytest.mark.asyncio

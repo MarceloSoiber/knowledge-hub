@@ -58,6 +58,7 @@ Com escrita ativa, a tool `ingest_text` exige `knowledge:write` e aceita:
   "title": "Decisão de arquitetura",
   "content": "Texto confirmado pelo usuário para persistência.",
   "category_ids": [1, 2],
+  "tag_ids": [3],
   "metadata": {
     "note_type": "decision"
   }
@@ -76,6 +77,12 @@ Resposta:
       "name": "docs"
     }
   ],
+  "tags": [
+    {
+      "id": 3,
+      "name": "rag"
+    }
+  ],
   "chunks_created": 2
 }
 ```
@@ -87,12 +94,15 @@ automaticamente. `metadata` aceita apenas `client_id` e `note_type`.
 A tool `source(source_id)` consulta uma fonte detalhada por UUID público. O MCP
 não expõe ferramentas de atualização ou exclusão de fontes nesta versão.
 
-A tool `search` aceita `query`, `limit`, `category_ids`, `min_score` e
+A tool `search` aceita `query`, `limit`, `category_ids`, `tag_ids`, `min_score` e
 `include_match_reasons`, retornando o mesmo contrato citável de
 `/api/v1/knowledge/search`: UUID público da fonte, título, URI sanitizada,
-categorias, localização do chunk, conteúdo, score e metadados públicos
+categorias, tags, localização do chunk, conteúdo, score e metadados públicos
 permitidos. Quando `include_match_reasons=true`, cada resultado pode indicar se
 veio de match `vector`, `text` ou ambos.
+
+As tools `tags()` e `tag_autocomplete(query, limit)` listam tags existentes para
+que clientes MCP escolham `tag_ids` validos antes de ingerir ou buscar.
 
 ## Resumo dos endpoints
 
@@ -104,6 +114,11 @@ veio de match `vector`, `text` ou ambos.
 | `POST` | `/api/v1/knowledge/categories` | Cria uma categoria. |
 | `PATCH` | `/api/v1/knowledge/categories/{id}` | Renomeia uma categoria. |
 | `DELETE` | `/api/v1/knowledge/categories/{id}` | Remove uma categoria sem documentos associados. |
+| `GET` | `/api/v1/knowledge/tags` | Lista as tags disponíveis. |
+| `GET` | `/api/v1/knowledge/tags/autocomplete` | Sugere tags por prefixo. |
+| `POST` | `/api/v1/knowledge/tags` | Cria uma tag. |
+| `PATCH` | `/api/v1/knowledge/tags/{id}` | Renomeia uma tag. |
+| `DELETE` | `/api/v1/knowledge/tags/{id}` | Remove uma tag sem documentos associados. |
 | `GET` | `/api/v1/knowledge/sources` | Lista os documentos cadastrados. |
 | `GET` | `/api/v1/knowledge/sources/{source_id}` | Consulta um documento por UUID público. |
 | `PATCH` | `/api/v1/knowledge/sources/{source_id}` | Atualiza título, categorias e/ou conteúdo. |
@@ -188,6 +203,74 @@ DELETE /api/v1/knowledge/categories/{id}
 
 Categorias associadas a documentos não podem ser excluídas e retornam `409 Conflict`.
 
+## Tags
+
+Tags são marcadores livres e granulares, como `python`, `postgres`, `imposto` ou
+`rag`. Elas complementam categorias, mas não substituem a taxonomia controlada:
+categorias seguem sendo obrigatórias no cadastro, enquanto tags são opcionais.
+
+Nomes de tags são normalizados com remoção de espaços externos, letras minúsculas,
+colapso de espaços internos e comparação sem acentos. Assim, `PósTgres` e
+`postgres` representam a mesma tag.
+
+### Listar tags
+
+```http
+GET /api/v1/knowledge/tags
+```
+
+Resposta `200 OK`:
+
+```json
+[
+  {
+    "id": 1,
+    "name": "postgres"
+  }
+]
+```
+
+### Autocomplete de tags
+
+```http
+GET /api/v1/knowledge/tags/autocomplete?q=po&limit=10
+```
+
+`limit` deve ficar entre `1` e `50`.
+
+### Criar tag
+
+```http
+POST /api/v1/knowledge/tags
+Content-Type: application/json
+```
+
+```json
+{
+  "name": "Postgres"
+}
+```
+
+Resposta `201 Created`:
+
+```json
+{
+  "id": 1,
+  "name": "postgres"
+}
+```
+
+Nomes equivalentes pela normalização retornam `409 Conflict`.
+
+### Renomear ou excluir tag
+
+```http
+PATCH /api/v1/knowledge/tags/{id}
+DELETE /api/v1/knowledge/tags/{id}
+```
+
+Tags associadas a documentos não podem ser excluídas e retornam `409 Conflict`.
+
 ## Cadastro de conhecimento
 
 O cadastro pode ser feito por arquivo ou por texto. Nos dois casos, o conteúdo é
@@ -206,6 +289,7 @@ Campos:
 | --- | --- | --- | --- |
 | `file` | arquivo | sim | Formatos `.txt`, `.md` ou `.pdf`; máximo de 10 MB. |
 | `category_ids` | inteiros repetidos | sim | Cada valor deve ser maior que zero, sem duplicatas, e apontar para uma categoria existente. |
+| `tag_ids` | inteiros repetidos | não | Cada valor deve ser maior que zero, sem duplicatas, e apontar para uma tag existente. |
 
 Exemplo:
 
@@ -215,6 +299,7 @@ curl -X POST \
   -F "file=@./documento.pdf" \
   -F "category_ids=2" \
   -F "category_ids=3" \
+  -F "tag_ids=1" \
   http://localhost:8000/api/v1/knowledge/uploads
 ```
 
@@ -234,6 +319,12 @@ Resposta `201 Created`:
       "name": "contratos"
     }
   ],
+  "tags": [
+    {
+      "id": 1,
+      "name": "postgres"
+    }
+  ],
   "chunks_created": 8
 }
 ```
@@ -246,8 +337,8 @@ Content-Type: application/json
 ```
 
 Tambem aceita `multipart/form-data` ou `application/x-www-form-urlencoded` com os
-mesmos campos. Em formulario, envie `category_ids` como campo repetido quando
-houver mais de uma categoria.
+mesmos campos. Em formulario, envie `category_ids` e `tag_ids` como campos
+repetidos quando houver mais de um valor.
 
 Corpo da requisição:
 
@@ -255,6 +346,7 @@ Corpo da requisição:
 | --- | --- | --- | --- |
 | `title` | string | sim | Entre 1 e 255 caracteres após remover espaços externos. |
 | `category_ids` | lista de inteiros | sim | Deve conter pelo menos um ID maior que zero, sem duplicatas, e apontar para categorias existentes. |
+| `tag_ids` | lista de inteiros | não | Quando informada, deve conter IDs maiores que zero, sem duplicatas, e apontar para tags existentes. |
 | `content` | string | sim | Não pode ficar vazio após a normalização. |
 
 Exemplo:
@@ -266,6 +358,7 @@ curl -X POST http://localhost:8000/api/v1/knowledge/texts \
   -d '{
     "title": "Ata da reunião",
     "category_ids": [2, 3],
+    "tag_ids": [1],
     "content": "Este é o conteúdo que será armazenado na base de conhecimento."
   }'
 ```
@@ -284,6 +377,12 @@ Resposta `201 Created`:
     {
       "id": 3,
       "name": "contratos"
+    }
+  ],
+  "tags": [
+    {
+      "id": 1,
+      "name": "postgres"
     }
   ],
   "chunks_created": 1
@@ -310,6 +409,7 @@ Corpo da requisição:
 | `query` | string | sim | Não pode ser vazia. |
 | `limit` | inteiro | não | Padrão `5`; mínimo `1`; máximo `50`. |
 | `category_ids` | lista de inteiros | não | Filtra documentos que pertençam a qualquer uma das categorias informadas. |
+| `tag_ids` | lista de inteiros | não | Filtra documentos que tenham qualquer uma das tags informadas. Combina com categorias como outra dimensão obrigatória. |
 | `min_score` | número | não | Override por requisição; mínimo `0.0`; máximo `1.0`. Quando omitido, usa `SEARCH_MIN_SCORE` (`0.35`). |
 | `include_match_reasons` | booleano | não | Padrão `false`. Quando `true`, inclui motivos diagnósticos do match por resultado. |
 
@@ -323,6 +423,7 @@ curl -X POST http://localhost:8000/api/v1/knowledge/search \
     "query": "Quais documentos mencionam contratos?",
     "limit": 5,
     "category_ids": [2, 3],
+    "tag_ids": [1],
     "min_score": 0.35,
     "include_match_reasons": true
   }'
@@ -349,6 +450,12 @@ Resposta `200 OK`:
         {
           "id": 3,
           "name": "financeiro"
+        }
+      ],
+      "tags": [
+        {
+          "id": 1,
+          "name": "postgres"
         }
       ],
       "location": {
@@ -378,6 +485,8 @@ sinal de similaridade vetorial para ordenacao e calibracao, nao uma probabilidad
 nem o score hibrido interno. O valor padrao `SEARCH_MIN_SCORE=0.35` e conservador
 e deve ser recalibrado ao trocar o modelo de embeddings ou o dominio do
 conhecimento. O campo `match_reasons` so aparece quando solicitado.
+Filtros de categorias e tags são aplicados antes dos limites de candidatos.
+Dentro de cada dimensão, a semântica é ANY; entre dimensões, a combinação é AND.
 
 ### Gerar resposta com LLM
 
@@ -393,6 +502,7 @@ Corpo da requisição:
 | `query` | string | sim | Não pode ser vazia. |
 | `limit` | inteiro | não | Padrão `5`; mínimo `1`; máximo `20`. |
 | `category_ids` | lista de inteiros | não | Filtra documentos usados na resposta por semântica qualquer categoria. |
+| `tag_ids` | lista de inteiros | não | Filtra documentos usados na resposta por semântica qualquer tag. |
 | `min_score` | número | não | Override por requisição; mínimo `0.0`; máximo `1.0`. Quando omitido, usa `SEARCH_MIN_SCORE` (`0.35`). |
 | `include_match_reasons` | booleano | não | Padrão `false`. Quando `true`, inclui motivos diagnósticos nas fontes recuperadas. |
 
@@ -406,6 +516,7 @@ curl -X POST http://localhost:8000/api/v1/knowledge/answer \
     "query": "Resuma os pontos principais dos contratos.",
     "limit": 5,
     "category_ids": [2, 3],
+    "tag_ids": [1],
     "min_score": 0.35
   }'
 ```
@@ -427,6 +538,12 @@ Resposta `200 OK`:
         {
           "id": 2,
           "name": "juridico"
+        }
+      ],
+      "tags": [
+        {
+          "id": 1,
+          "name": "postgres"
         }
       ],
       "location": {
@@ -475,6 +592,12 @@ Resposta `200 OK`:
         "name": "financeiro"
       }
     ],
+    "tags": [
+      {
+        "id": 1,
+        "name": "postgres"
+      }
+    ],
     "source_type": "upload",
     "uri": "upload:documento.pdf",
     "content_hash": "d2d2d2...",
@@ -494,6 +617,7 @@ Resposta `200 OK`:
         "name": "contratos"
       }
     ],
+    "tags": [],
     "source_type": "text",
     "uri": "text:Ata da reunião",
     "content_hash": "a1a1a1...",
@@ -523,6 +647,12 @@ Resposta `200 OK`:
       "name": "financeiro"
     }
   ],
+  "tags": [
+    {
+      "id": 1,
+      "name": "postgres"
+    }
+  ],
   "source_type": "text",
   "uri": "text:Ata da reunião",
   "content_hash": "a1a1a1...",
@@ -545,11 +675,12 @@ Corpo da requisição:
 | --- | --- | --- | --- |
 | `title` | string | não | Entre 1 e 255 caracteres após remover espaços externos. |
 | `category_ids` | lista de inteiros | não | Não pode ser vazia quando informada; IDs devem existir. |
+| `tag_ids` | lista de inteiros | não | IDs devem existir e não podem repetir. Lista vazia remove todas as tags da fonte. |
 | `content` | string | não | Quando informado, não pode ficar vazio após normalização. |
 
-Ao alterar apenas `title` ou `category_ids`, a API não recria embeddings. Ao
-alterar `content`, a API recalcula o hash e substitui chunks e embeddings em uma
-transação.
+Ao alterar apenas `title`, `category_ids` ou `tag_ids`, a API não recria
+embeddings. Ao alterar `content`, a API recalcula o hash e substitui chunks e
+embeddings em uma transação.
 
 ### Excluir documento
 
@@ -557,7 +688,7 @@ transação.
 DELETE /api/v1/knowledge/sources/{source_id}?confirm=true
 ```
 
-A exclusão é definitiva e remove chunks e associações de categoria. Sem
+A exclusão é definitiva e remove chunks e associações de categoria e tags. Sem
 `confirm=true`, a API retorna `400 Bad Request`. Faça backup externo antes de
 usar esta operação em dados importantes.
 
@@ -609,8 +740,8 @@ Principais códigos:
 | --- | --- |
 | `400 Bad Request` | Arquivo inválido, conteúdo vazio ou falha de ingestão. |
 | `401 Unauthorized` | Token Bearer ausente ou inválido quando a autenticação está ativa. |
-| `404 Not Found` | A categoria ou fonte informada não existe. |
-| `409 Conflict` | Nome de categoria duplicado, categoria em uso ou conteúdo duplicado. |
+| `404 Not Found` | A categoria, tag ou fonte informada não existe. |
+| `409 Conflict` | Nome de categoria/tag duplicado, categoria/tag em uso ou conteúdo duplicado. |
 | `413 Content Too Large` | O arquivo enviado ultrapassa 10 MB. |
 | `422 Unprocessable Entity` | O corpo ou os parâmetros não atendem ao schema. |
 | `502 Bad Gateway` | Falha ao consultar o serviço de embeddings ou o LLM. |

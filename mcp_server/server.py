@@ -10,6 +10,7 @@ from backend.app.services.config import get_auth_token
 from .tools.knowledge import (
     KnowledgeHit,
     KnowledgeCategory,
+    KnowledgeTag,
     KnowledgeSource,
     MinScore,
     MCPTextIngestResult,
@@ -17,7 +18,9 @@ from .tools.knowledge import (
     get_knowledge_categories,
     get_knowledge_source,
     get_knowledge_sources,
+    get_knowledge_tags,
     get_workspace_overview,
+    autocomplete_knowledge_tags,
     ingest_mcp_text,
     search_knowledge,
 )
@@ -93,6 +96,7 @@ async def search(
     query: str,
     limit: int = 5,
     category_ids: list[int] | None = None,
+    tag_ids: list[int] | None = None,
     min_score: MinScore | None = None,
     include_match_reasons: bool = False,
 ) -> list[KnowledgeHit]:
@@ -100,6 +104,7 @@ async def search(
         query=query,
         limit=limit,
         category_ids=category_ids,
+        tag_ids=tag_ids,
         min_score=min_score,
         include_match_reasons=include_match_reasons,
     )
@@ -120,6 +125,16 @@ async def categories() -> list[KnowledgeCategory]:
     return await get_knowledge_categories()
 
 
+@mcp.tool()
+async def tags() -> list[KnowledgeTag]:
+    return await get_knowledge_tags()
+
+
+@mcp.tool()
+async def tag_autocomplete(query: str, limit: int = 10) -> list[KnowledgeTag]:
+    return await autocomplete_knowledge_tags(query, limit)
+
+
 @mcp.tool(
     description=(
         "Persiste uma nota textual no Knowledge Hub somente depois de confirmacao "
@@ -132,12 +147,14 @@ async def ingest_text(
     title: str,
     content: str,
     category_ids: list[int],
+    tag_ids: list[int] | None = None,
     metadata: dict[str, str] | None = None,
 ) -> MCPTextIngestResult:
     return await ingest_mcp_text(
         title=title,
         content=content,
         category_ids=category_ids,
+        tag_ids=tag_ids,
         metadata=metadata,
     )
 

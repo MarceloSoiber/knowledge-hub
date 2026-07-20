@@ -17,6 +17,7 @@ from pydantic import (
 
 from backend.app.db.session import SessionLocal
 from backend.app.schemas.knowledge import validate_required_category_ids
+from backend.app.schemas.knowledge import validate_optional_tag_ids
 from backend.app.services.categories import CategoryNotFoundError, list_categories
 from backend.app.services.documents.extractors import EmptyDocumentError
 from backend.app.services.embeddings import (
@@ -28,6 +29,7 @@ from backend.app.services.ingestion import KnowledgeIngestionError, ingest_plain
 from backend.app.services.search import list_sources
 from backend.app.services.search import search_knowledge as search_backend_knowledge
 from backend.app.services.sources import SourceNotFoundError, get_source_detail
+from backend.app.services.tags import TagNotFoundError, autocomplete_tags, list_tags
 
 MCP_ALLOWED_METADATA_KEYS = {"client_id", "note_type"}
 MCP_WRITE_SCOPE = "knowledge:write"
@@ -48,6 +50,7 @@ class KnowledgeHit(BaseModel):
     source_type: str = Field(description="Tipo da origem")
     uri: str = Field(description="URI publica ou sanitizada da origem")
     categories: list["KnowledgeCategory"] = Field(description="Categorias da origem")
+    tags: list["KnowledgeTag"] = Field(default_factory=list, description="Tags da origem")
     location: "KnowledgeChunkLocation" = Field(description="Localizacao citavel do chunk")
     content: str = Field(description="Conteúdo encontrado")
     score: float | None = Field(default=None, description="Score de relevância")
@@ -59,6 +62,13 @@ class KnowledgeHit(BaseModel):
 
 
 class KnowledgeCategory(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+
+
+class KnowledgeTag(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -77,6 +87,7 @@ class KnowledgeSource(BaseModel):
     source_id: str
     title: str
     categories: list[KnowledgeCategory]
+    tags: list[KnowledgeTag] = Field(default_factory=list)
     source_type: str
     uri: str
     content_hash: str
@@ -90,6 +101,7 @@ class MCPTextIngestRequest(BaseModel):
     title: TitleStr = Field(description="Titulo da nota confirmada pelo usuario")
     content: ContentStr = Field(description="Conteudo textual confirmado para persistencia")
     category_ids: list[int] = Field(description="IDs das categorias existentes")
+    tag_ids: list[int] | None = Field(default=None, description="IDs das tags existentes")
     metadata: dict[str, str] | None = Field(
         default=None,
         description="Metadados opcionais permitidos: client_id, note_type",
@@ -99,6 +111,11 @@ class MCPTextIngestRequest(BaseModel):
     @classmethod
     def validate_category_ids(cls, value: list[int]) -> list[int]:
         return validate_required_category_ids(value)
+
+    @field_validator("tag_ids")
+    @classmethod
+    def validate_tag_ids(cls, value: list[int] | None) -> list[int] | None:
+        return validate_optional_tag_ids(value)
 
     @field_validator("metadata")
     @classmethod
@@ -117,6 +134,7 @@ class MCPTextIngestResult(BaseModel):
     source_id: str
     title: str
     categories: list[KnowledgeCategory]
+    tags: list[KnowledgeTag] = Field(default_factory=list)
     chunks_created: int
 
 
@@ -142,16 +160,19 @@ async def search_knowledge(
     query: str,
     limit: int = 5,
     category_ids: list[int] | None = None,
+    tag_ids: list[int] | None = None,
     min_score: MinScore | None = None,
     include_match_reasons: bool = False,
 ) -> list[KnowledgeHit]:
     validated_min_score = min_score_adapter.validate_python(min_score)
+    validated_tag_ids = validate_optional_tag_ids(tag_ids)
     async with SessionLocal() as session:
         results = await search_backend_knowledge(
             session=session,
             query=query,
             limit=limit,
             category_ids=category_ids,
+            tag_ids=validated_tag_ids,
             min_score=validated_min_score,
             include_match_reasons=include_match_reasons,
             embedding_client=build_embedding_client(),
@@ -180,10 +201,23 @@ async def get_knowledge_categories() -> list[KnowledgeCategory]:
     return [KnowledgeCategory(**category) for category in categories]
 
 
+async def get_knowledge_tags() -> list[KnowledgeTag]:
+    async with SessionLocal() as session:
+        tags = await list_tags(session)
+    return [KnowledgeTag(**tag) for tag in tags]
+
+
+async def autocomplete_knowledge_tags(query: str, limit: int = 10) -> list[KnowledgeTag]:
+    async with SessionLocal() as session:
+        tags = await autocomplete_tags(session, query, limit)
+    return [KnowledgeTag(**tag) for tag in tags]
+
+
 async def ingest_mcp_text(
     title: str,
     content: str,
     category_ids: list[int],
+    tag_ids: list[int] | None = None,
     metadata: dict[str, str] | None = None,
 ) -> MCPTextIngestResult:
     require_mcp_scope(MCP_WRITE_SCOPE)
@@ -193,6 +227,7 @@ async def ingest_mcp_text(
             title=title,
             content=content,
             category_ids=category_ids,
+            tag_ids=tag_ids,
             metadata=metadata,
         )
     except ValidationError as exc:
@@ -205,11 +240,12 @@ async def ingest_mcp_text(
                 title=payload.title,
                 content=payload.content,
                 category_ids=payload.category_ids,
+                tag_ids=payload.tag_ids,
                 embedding_client=build_embedding_client(),
                 source_type="mcp",
                 metadata=payload.metadata,
             )
-    except CategoryNotFoundError as exc:
+    except (CategoryNotFoundError, TagNotFoundError) as exc:
         raise MCPIngestionError(str(exc)) from exc
     except (EmptyDocumentError, KnowledgeIngestionError) as exc:
         raise MCPIngestionError(str(exc)) from exc
@@ -222,6 +258,7 @@ async def ingest_mcp_text(
         source_id=source.public_id,
         title=source.title,
         categories=source.categories,
+        tags=getattr(source, "tags", []),
         chunks_created=chunks_created,
     )
 

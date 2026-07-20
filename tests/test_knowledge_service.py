@@ -12,8 +12,12 @@ from pydantic import ValidationError
 from backend.app.cli.config import generate_auth_token, validate_auth_token
 from backend.app.core.auth import is_valid_token
 from backend.app.core.settings import Settings
-from backend.app.db.models import Category, DocumentSource, KnowledgeChunk
-from backend.app.repositories.chunks import TextSearchChunk
+from backend.app.db.models import Category, DocumentSource, KnowledgeChunk, Tag
+from backend.app.repositories.chunks import (
+    TextSearchChunk,
+    search_similar_chunks as repository_search_similar_chunks,
+    search_text_chunks as repository_search_text_chunks,
+)
 from backend.app.schemas.knowledge import (
     KnowledgeAnswerRequest,
     KnowledgeChunkRead,
@@ -30,6 +34,14 @@ from backend.app.services.categories import (
     CategoryNotFoundError,
     create_category,
     list_categories,
+)
+from backend.app.services.tags import (
+    TagConflictError,
+    TagInUseError,
+    create_tag,
+    delete_tag,
+    normalize_tag_name,
+    update_tag,
 )
 from backend.app.services.documents.chunker import chunk_text, chunk_text_with_locations
 from backend.app.services.documents.extractors import (
@@ -112,11 +124,13 @@ class FakeSession:
         duplicate_source: DocumentSource | None = None,
         source_by_public_id: DocumentSource | None = None,
         categories: list[Category] | None = None,
+        tags: list[Tag] | None = None,
     ) -> None:
         self.existing_source = existing_source
         self.duplicate_source = duplicate_source
         self.source_by_public_id = source_by_public_id
         self.categories = categories or [Category(id=3, name="docs")]
+        self.tags = tags or []
         self.added: list[object] = []
         self.deleted_old_chunks = False
         self.deleted_source = False
@@ -131,6 +145,7 @@ class FakeSession:
             content_hash=sha256(b"stored content").hexdigest(),
         )
         source.categories = [Category(id=3, name="docs")]
+        source.tags = []
         chunk = KnowledgeChunk(
             id=1,
             source_id=2,
@@ -157,10 +172,14 @@ class FakeSession:
         return self.existing_source
 
     async def get(self, entity: object, entity_id: int) -> Category | None:
-        assert entity is Category
-        for category in self.categories:
-            if category.id == entity_id:
-                return category
+        if entity is Category:
+            for category in self.categories:
+                if category.id == entity_id:
+                    return category
+        if entity is Tag:
+            for tag in self.tags:
+                if tag.id == entity_id:
+                    return tag
         return None
 
     async def execute(self, statement: object) -> FakeExecuteResult:
@@ -171,6 +190,8 @@ class FakeSession:
             self.deleted_source = True
         if "categories" in str(statement):
             return FakeExecuteResult(self.categories)  # type: ignore[arg-type]
+        if "tags" in str(statement):
+            return FakeExecuteResult(self.tags)  # type: ignore[arg-type]
         return FakeExecuteResult(self.rows)
 
     def add(self, entity: object) -> None:
@@ -373,21 +394,26 @@ def test_chunk_text_with_locations_tracks_offsets_and_sections() -> None:
 
 
 def test_knowledge_schemas_trim_and_reject_blank_values() -> None:
-    search = KnowledgeSearchRequest(query="  find me  ", category_ids=[3])
-    answer = KnowledgeAnswerRequest(query="  answer me  ")
-    upload = KnowledgeUploadRequest(category_ids=[4])
+    search = KnowledgeSearchRequest(query="  find me  ", category_ids=[3], tag_ids=[6])
+    answer = KnowledgeAnswerRequest(query="  answer me  ", tag_ids=[7])
+    upload = KnowledgeUploadRequest(category_ids=[4], tag_ids=[8])
     text = KnowledgeTextIngestRequest(
         title="  Sprint notes  ",
         category_ids=[5],
+        tag_ids=[9],
         content="  decision log  ",
     )
 
     assert search.query == "find me"
     assert search.category_ids == [3]
+    assert search.tag_ids == [6]
     assert answer.query == "answer me"
+    assert answer.tag_ids == [7]
     assert upload.category_ids == [4]
+    assert upload.tag_ids == [8]
     assert text.title == "Sprint notes"
     assert text.category_ids == [5]
+    assert text.tag_ids == [9]
     assert text.content == "decision log"
 
     with pytest.raises(ValidationError):
@@ -404,6 +430,15 @@ def test_knowledge_schemas_trim_and_reject_blank_values() -> None:
 
     with pytest.raises(ValidationError):
         KnowledgeSearchRequest(query="find", category_ids=[1, 1])
+
+    with pytest.raises(ValidationError):
+        KnowledgeSearchRequest(query="find", tag_ids=[1, 1])
+
+    with pytest.raises(ValidationError):
+        KnowledgeSearchRequest(query="find", tag_ids=[])
+
+    with pytest.raises(ValidationError):
+        KnowledgeUploadRequest(category_ids=[1], tag_ids=[0])
 
     with pytest.raises(ValidationError):
         KnowledgeTextIngestRequest(title="   ", category_ids=[3], content="text")
@@ -489,7 +524,7 @@ async def test_ingest_uploaded_file_creates_same_title_source_when_content_diffe
 
 @pytest.mark.asyncio
 async def test_ingest_plain_text_creates_text_source() -> None:
-    session = FakeSession()
+    session = FakeSession(tags=[Tag(id=7, name="postgres", normalized_name="postgres")])
     embedding_client = FakeEmbeddingClient()
 
     source, chunks_created = await ingest_plain_text(
@@ -497,12 +532,14 @@ async def test_ingest_plain_text_creates_text_source() -> None:
         title="  Meeting notes  ",
         content=" Linha um. \n\n Linha dois. ",
         category_ids=[3],
+        tag_ids=[7],
         embedding_client=embedding_client,
     )
 
     assert source.id == 99
     assert source.title == "Meeting notes"
     assert [category.id for category in source.categories] == [3]
+    assert [tag.id for tag in source.tags] == [7]
     assert source.source_type == "text"
     assert source.uri == "text:Meeting notes"
     assert source.content_text == "Linha um.\nLinha dois."
@@ -612,6 +649,7 @@ async def test_get_source_detail_returns_public_contract() -> None:
         content_hash=sha256(b"source content").hexdigest(),
     )
     source.categories = [Category(id=3, name="docs")]
+    source.tags = [Tag(id=4, name="rag", normalized_name="rag")]
 
     detail = await get_source_detail(  # type: ignore[arg-type]
         FakeSession(source_by_public_id=source), source.public_id
@@ -620,6 +658,7 @@ async def test_get_source_detail_returns_public_contract() -> None:
     assert detail["source_id"] == "44444444-4444-4444-8444-444444444444"
     assert detail["content"] == "source content"
     assert detail["categories"] == [{"id": 3, "name": "docs"}]
+    assert detail["tags"] == [{"id": 4, "name": "rag"}]
 
 
 @pytest.mark.asyncio
@@ -634,17 +673,23 @@ async def test_update_source_metadata_does_not_call_embeddings() -> None:
         content_hash=sha256(b"same content").hexdigest(),
     )
     source.categories = [Category(id=3, name="docs")]
+    source.tags = [Tag(id=4, name="old", normalized_name="old")]
     embedding_client = FakeEmbeddingClient()
 
     detail, chunks_created = await update_source(
-        session=FakeSession(source_by_public_id=source),
+        session=FakeSession(
+            source_by_public_id=source,
+            tags=[Tag(id=6, name="postgres", normalized_name="postgres")],
+        ),
         source_id=source.public_id,
         title="new",
         category_ids=[3],
+        tag_ids=[6],
         embedding_client=embedding_client,
     )
 
     assert detail["title"] == "new"
+    assert detail["tags"] == [{"id": 6, "name": "postgres"}]
     assert chunks_created is None
     assert embedding_client.inputs == []
 
@@ -759,6 +804,148 @@ async def test_create_category_normalizes_and_rejects_duplicates() -> None:
             FakeCategorySession(existing=Category(id=1, name="finance")),  # type: ignore[arg-type]
             "FINANCE",
         )
+
+
+@pytest.mark.asyncio
+async def test_create_tag_normalizes_accents_and_rejects_duplicates() -> None:
+    class FakeTagSession:
+        def __init__(self, existing: Tag | None = None) -> None:
+            self.existing = existing
+            self.added: list[Tag] = []
+            self.committed = False
+
+        async def scalar(self, statement: object) -> Tag | None:
+            _ = statement
+            return self.existing
+
+        def add(self, entity: object) -> None:
+            assert isinstance(entity, Tag)
+            entity.id = 10
+            self.added.append(entity)
+
+        async def commit(self) -> None:
+            self.committed = True
+
+        async def refresh(self, entity: object) -> None:
+            _ = entity
+
+    assert normalize_tag_name("  PósTgres  ") == "postgres"
+
+    session = FakeTagSession()
+    tag = await create_tag(session, "  RÁG  ")  # type: ignore[arg-type]
+
+    assert tag.name == "rag"
+    assert tag.normalized_name == "rag"
+    assert session.committed is True
+
+    with pytest.raises(TagConflictError):
+        await create_tag(
+            FakeTagSession(existing=Tag(id=1, name="imposto", normalized_name="imposto")),  # type: ignore[arg-type]
+            " Impôsto ",
+        )
+
+
+@pytest.mark.asyncio
+async def test_update_and_delete_tag_enforce_conflicts_and_in_use() -> None:
+    class FakeTagManagementSession:
+        def __init__(
+            self,
+            tag: Tag,
+            existing: Tag | None = None,
+            in_use: bool = False,
+        ) -> None:
+            self.tag = tag
+            self.existing = existing
+            self.in_use = in_use
+            self.deleted = False
+            self.committed = False
+
+        async def get(self, entity: object, entity_id: int) -> Tag | None:
+            assert entity is Tag
+            return self.tag if self.tag.id == entity_id else None
+
+        async def scalar(self, statement: object) -> object:
+            statement_text = str(statement)
+            if "document_source_tags" in statement_text:
+                return self.in_use
+            return self.existing
+
+        async def execute(self, statement: object) -> object:
+            assert "DELETE FROM tags" in str(statement)
+            self.deleted = True
+            return None
+
+        async def commit(self) -> None:
+            self.committed = True
+
+        async def refresh(self, entity: object) -> None:
+            _ = entity
+
+    session = FakeTagManagementSession(Tag(id=5, name="old", normalized_name="old"))
+    updated = await update_tag(session, 5, " PósTgres ")  # type: ignore[arg-type]
+
+    assert updated.name == "postgres"
+    assert updated.normalized_name == "postgres"
+    assert session.committed is True
+
+    with pytest.raises(TagConflictError):
+        await update_tag(
+            FakeTagManagementSession(
+                Tag(id=5, name="old", normalized_name="old"),
+                existing=Tag(id=6, name="postgres", normalized_name="postgres"),
+            ),  # type: ignore[arg-type]
+            5,
+            "postgres",
+        )
+
+    with pytest.raises(TagInUseError):
+        await delete_tag(
+            FakeTagManagementSession(
+                Tag(id=5, name="postgres", normalized_name="postgres"),
+                in_use=True,
+            ),  # type: ignore[arg-type]
+            5,
+        )
+
+    delete_session = FakeTagManagementSession(Tag(id=5, name="postgres", normalized_name="postgres"))
+    await delete_tag(delete_session, 5)  # type: ignore[arg-type]
+
+    assert delete_session.deleted is True
+    assert delete_session.committed is True
+
+
+@pytest.mark.asyncio
+async def test_repository_search_applies_tag_filters_to_vector_and_text_paths() -> None:
+    class CapturingSearchSession:
+        def __init__(self) -> None:
+            self.statements: list[str] = []
+
+        async def execute(self, statement: object) -> FakeExecuteResult:
+            self.statements.append(str(statement))
+            return FakeExecuteResult([])
+
+    vector_session = CapturingSearchSession()
+    await repository_search_similar_chunks(
+        vector_session,  # type: ignore[arg-type]
+        query_embedding=[0.1, 0.2, 0.3],
+        limit=5,
+        category_ids=[1],
+        tag_ids=[2],
+    )
+
+    text_session = CapturingSearchSession()
+    await repository_search_text_chunks(
+        text_session,  # type: ignore[arg-type]
+        query="postgres",
+        limit=5,
+        category_ids=[1],
+        tag_ids=[2],
+    )
+
+    assert "document_source_categories" in vector_session.statements[0]
+    assert "document_source_tags" in vector_session.statements[0]
+    assert "document_source_categories" in text_session.statements[0]
+    assert "document_source_tags" in text_session.statements[0]
 
 
 @pytest.mark.asyncio
