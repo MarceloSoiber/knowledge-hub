@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from hashlib import sha256
+import logging
+import math
 from types import SimpleNamespace
 
 import pytest
@@ -36,7 +38,11 @@ from backend.app.services.documents.extractors import (
 )
 from backend.app.services.ingestion import ingest_plain_text, ingest_uploaded_file
 from backend.app.services.rag import LLMConfigurationError, OpenAICompatibleAnswerClient
-from backend.app.services.search import answer_knowledge, search_knowledge
+from backend.app.services.search import (
+    filter_results_by_score,
+    answer_knowledge,
+    search_knowledge,
+)
 from backend.app.services.sources import delete_source, get_source_detail, update_source
 
 
@@ -59,7 +65,11 @@ class FailingEmbeddingClient:
 
 
 class FakeAnswerClient:
+    def __init__(self) -> None:
+        self.sources_seen: list[KnowledgeChunkRead] | None = None
+
     async def answer(self, query: str, sources: list[KnowledgeChunkRead]) -> str:
+        self.sources_seen = sources
         return f"answer for {query} with {len(sources)} sources"
 
 
@@ -398,6 +408,27 @@ def test_knowledge_schemas_trim_and_reject_blank_values() -> None:
 
     with pytest.raises(ValidationError):
         KnowledgeTextIngestRequest(title="notes", category_ids=[3], content="   ")
+
+
+def test_knowledge_schemas_reject_invalid_min_score_values() -> None:
+    KnowledgeSearchRequest(query="find", min_score=0.0)
+    KnowledgeSearchRequest(query="find", min_score=1.0)
+    KnowledgeAnswerRequest(query="answer", min_score=0.5)
+
+    for invalid_min_score in (-0.01, 1.01, math.nan, math.inf):
+        with pytest.raises(ValidationError):
+            KnowledgeSearchRequest(query="find", min_score=invalid_min_score)
+
+        with pytest.raises(ValidationError):
+            KnowledgeAnswerRequest(query="answer", min_score=invalid_min_score)
+
+
+def test_settings_reject_invalid_search_min_score_values() -> None:
+    Settings(search_min_score=0.35)
+
+    for invalid_min_score in (-0.01, 1.01, math.nan, math.inf):
+        with pytest.raises(ValidationError):
+            Settings(search_min_score=invalid_min_score)
 
 
 def test_token_auth_accepts_matching_bearer_token() -> None:
@@ -760,6 +791,120 @@ async def test_search_knowledge_returns_similarity_scores() -> None:
 
 
 @pytest.mark.asyncio
+async def test_search_knowledge_filters_results_below_min_score() -> None:
+    session = FakeSession()
+    low_score_row = session.rows[0]
+
+    high_score_source = DocumentSource(
+        id=4,
+        public_id="88888888-8888-4888-8888-888888888888",
+        title="High Score Source",
+        source_type="text",
+        uri="text:High Score Source",
+        content_text="approved content",
+        content_hash=sha256(b"approved content").hexdigest(),
+    )
+    high_score_source.categories = [Category(id=3, name="docs")]
+    high_score_chunk = KnowledgeChunk(
+        id=2,
+        source_id=4,
+        content="approved content",
+        metadata_json={
+            "location": {"chunk_index": 1, "start_char": 0, "end_char": 16},
+        },
+    )
+    session.rows = [
+        low_score_row,
+        FakeRow(
+            KnowledgeChunk=high_score_chunk,
+            DocumentSource=high_score_source,
+            distance=0.1,
+        ),
+    ]
+
+    results = await search_knowledge(
+        session=session,
+        query="find this",
+        limit=5,
+        embedding_client=FakeEmbeddingClient(),
+        min_score=0.85,
+    )
+
+    assert [result.id for result in results] == [2]
+    assert results[0].score == 0.9
+
+
+@pytest.mark.asyncio
+async def test_search_knowledge_keeps_score_equal_to_min_score() -> None:
+    results = await search_knowledge(
+        session=FakeSession(),
+        query="find this",
+        limit=5,
+        embedding_client=FakeEmbeddingClient(),
+        min_score=0.8,
+    )
+
+    assert [result.id for result in results] == [1]
+
+
+@pytest.mark.asyncio
+async def test_search_knowledge_logs_filtering_without_query_text(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level(logging.INFO, logger="backend.app.services.search"):
+        await search_knowledge(
+            session=FakeSession(),
+            query="sensitive customer question",
+            limit=5,
+            embedding_client=FakeEmbeddingClient(),
+            min_score=0.9,
+        )
+
+    record = next(
+        record
+        for record in caplog.records
+        if record.message == "knowledge_search_relevance_filter"
+    )
+    assert record.threshold == 0.9
+    assert record.threshold_source == "request"
+    assert record.raw_count == 1
+    assert record.filtered_count == 0
+    assert record.min_score == 0.8
+    assert record.max_score == 0.8
+    assert "sensitive customer question" not in record.__dict__.values()
+
+
+def test_filter_results_by_score_rejects_missing_and_non_finite_scores() -> None:
+    template = KnowledgeChunkRead(
+        id=1,
+        source_id="99999999-9999-4999-8999-999999999999",
+        source_title="Stored Source",
+        source_type="text",
+        uri="text:Stored Source",
+        categories=[{"id": 3, "name": "docs"}],
+        location={
+            "chunk_index": 0,
+            "page": None,
+            "section": "Intro",
+            "start_char": 0,
+            "end_char": 14,
+        },
+        content="stored content",
+        score=0.8,
+        metadata={},
+    )
+    results = [
+        template.model_copy(update={"id": 1, "score": None}),
+        template.model_copy(update={"id": 2, "score": math.nan}),
+        template.model_copy(update={"id": 3, "score": math.inf}),
+        template.model_copy(update={"id": 4, "score": "0.9"}),
+        template.model_copy(update={"id": 5, "score": 0.9}),
+    ]
+
+    assert [result.id for result in filter_results_by_score(results, 0.5)] == [5]
+
+
+@pytest.mark.asyncio
 async def test_answer_knowledge_uses_search_sources() -> None:
     answer, sources = await answer_knowledge(
         session=FakeSession(),
@@ -771,6 +916,24 @@ async def test_answer_knowledge_uses_search_sources() -> None:
 
     assert answer == "answer for question with 1 sources"
     assert sources[0].content == "stored content"
+
+
+@pytest.mark.asyncio
+async def test_answer_knowledge_uses_empty_sources_when_scores_are_filtered() -> None:
+    answer_client = FakeAnswerClient()
+
+    answer, sources = await answer_knowledge(
+        session=FakeSession(),
+        query="question",
+        limit=5,
+        embedding_client=FakeEmbeddingClient(),
+        answer_client=answer_client,
+        min_score=0.9,
+    )
+
+    assert answer == "answer for question with 0 sources"
+    assert sources == []
+    assert answer_client.sources_seen == []
 
 
 @pytest.mark.asyncio

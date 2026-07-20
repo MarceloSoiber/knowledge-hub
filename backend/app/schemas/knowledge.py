@@ -87,6 +87,7 @@ class KnowledgeSearchRequest(BaseModel):
     query: NonEmptyStr
     limit: int = Field(default=5, ge=1, le=50)
     category_ids: list[int] | None = Field(default=None)
+    min_score: float | None = Field(default=None, ge=0.0, le=1.0, allow_inf_nan=False)
 
     @field_validator("category_ids")
     @classmethod
@@ -137,6 +138,7 @@ class KnowledgeAnswerRequest(BaseModel):
     query: NonEmptyStr
     limit: int = Field(default=5, ge=1, le=20)
     category_ids: list[int] | None = Field(default=None)
+    min_score: float | None = Field(default=None, ge=0.0, le=1.0, allow_inf_nan=False)
 
     @field_validator("category_ids")
     @classmethod

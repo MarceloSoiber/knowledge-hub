@@ -87,9 +87,10 @@ automaticamente. `metadata` aceita apenas `client_id` e `note_type`.
 A tool `source(source_id)` consulta uma fonte detalhada por UUID público. O MCP
 não expõe ferramentas de atualização ou exclusão de fontes nesta versão.
 
-A tool `search` retorna o mesmo contrato citável de `/api/v1/knowledge/search`:
-UUID público da fonte, título, URI sanitizada, categorias, localização do chunk,
-conteúdo, score e metadados públicos permitidos.
+A tool `search` aceita `query`, `limit`, `category_ids` e `min_score`, retornando
+o mesmo contrato citável de `/api/v1/knowledge/search`: UUID público da fonte,
+título, URI sanitizada, categorias, localização do chunk, conteúdo, score e
+metadados públicos permitidos.
 
 ## Resumo dos endpoints
 
@@ -307,6 +308,7 @@ Corpo da requisição:
 | `query` | string | sim | Não pode ser vazia. |
 | `limit` | inteiro | não | Padrão `5`; mínimo `1`; máximo `50`. |
 | `category_ids` | lista de inteiros | não | Filtra documentos que pertençam a qualquer uma das categorias informadas. |
+| `min_score` | número | não | Override por requisição; mínimo `0.0`; máximo `1.0`. Quando omitido, usa `SEARCH_MIN_SCORE` (`0.35`). |
 
 Exemplo:
 
@@ -317,7 +319,8 @@ curl -X POST http://localhost:8000/api/v1/knowledge/search \
   -d '{
     "query": "Quais documentos mencionam contratos?",
     "limit": 5,
-    "category_ids": [2, 3]
+    "category_ids": [2, 3],
+    "min_score": 0.35
   }'
 ```
 
@@ -361,7 +364,11 @@ Resposta `200 OK`:
 
 Cada resultado usa o UUID publico da fonte em `source_id` e inclui metadados
 suficientes para citacao. URIs baseadas em caminhos locais sao sanitizadas antes
-de sair da API.
+de sair da API. Resultados com `score` menor que o limiar efetivo sao removidos;
+quando nenhum chunk passa, `results` e retornado como lista vazia. O score e um
+sinal de similaridade para ordenacao e calibracao, nao uma probabilidade. O valor
+padrao `SEARCH_MIN_SCORE=0.35` e conservador e deve ser recalibrado ao trocar o
+modelo de embeddings ou o dominio do conhecimento.
 
 ### Gerar resposta com LLM
 
@@ -377,6 +384,7 @@ Corpo da requisição:
 | `query` | string | sim | Não pode ser vazia. |
 | `limit` | inteiro | não | Padrão `5`; mínimo `1`; máximo `20`. |
 | `category_ids` | lista de inteiros | não | Filtra documentos usados na resposta por semântica qualquer categoria. |
+| `min_score` | número | não | Override por requisição; mínimo `0.0`; máximo `1.0`. Quando omitido, usa `SEARCH_MIN_SCORE` (`0.35`). |
 
 Exemplo:
 
@@ -387,7 +395,8 @@ curl -X POST http://localhost:8000/api/v1/knowledge/answer \
   -d '{
     "query": "Resuma os pontos principais dos contratos.",
     "limit": 5,
-    "category_ids": [2, 3]
+    "category_ids": [2, 3],
+    "min_score": 0.35
   }'
 ```
 
@@ -426,7 +435,9 @@ Resposta `200 OK`:
 ```
 
 O prompt de resposta recebe titulo e localizacao de cada fonte recuperada, e a
-lista `sources` contem somente os chunks usados como contexto para o LLM.
+lista `sources` contem somente os chunks usados como contexto para o LLM. Quando
+nenhuma fonte passa pelo limiar de relevancia, `sources` fica vazia e o modelo
+deve declarar que nao encontrou a informacao no contexto fornecido.
 
 ### Listar documentos
 
