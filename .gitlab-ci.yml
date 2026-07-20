@@ -8,7 +8,7 @@ deploy:
   resource_group: production
   variables:
     COMPOSE_PROJECT_NAME: mcp-knowledge-hub
-    POSTGRES_DSN: "postgresql+asyncpg://postgres:postgres@192.168.15.125:15432/knowledge_hub"
+    POSTGRES_DSN: "postgresql+asyncpg://postgres:postgres@postgres:5432/knowledge_hub"
     DOCKER_LOCAL_LLM_BASE_URL: "http://192.168.15.114:1234"
     MCP_PUBLIC_URL: "http://192.168.15.125:8001"
   script:
@@ -51,19 +51,43 @@ deploy:
         return 1
       }
 
+      diagnose_postgres() {
+        echo "Postgres container diagnostics:"
+        docker compose ps postgres || true
+        docker inspect mcp-knowledge-hub-postgres \
+          --format '{{json .State.Health}}' || true
+        docker logs --tail=160 mcp-knowledge-hub-postgres || true
+      }
+
+      wait_for_postgres_health() {
+        docker compose up -d postgres
+        healthy_checks=0
+        for _ in $(seq 1 30); do
+          status="$(docker inspect mcp-knowledge-hub-postgres --format '{{.State.Health.Status}}' 2>/dev/null || true)"
+          if [ "${status}" = "healthy" ]; then
+            healthy_checks=$((healthy_checks + 1))
+            if [ "${healthy_checks}" -ge 3 ]; then
+              return 0
+            fi
+          else
+            healthy_checks=0
+          fi
+          if [ "${status}" = "unhealthy" ]; then
+            diagnose_postgres
+            return 1
+          fi
+          sleep 2
+        done
+
+        diagnose_postgres
+        return 1
+      }
+
       deploy_containers() {
+        wait_for_postgres_health
         docker compose up -d --build --no-deps --force-recreate backend
         wait_for_backend_health
         docker compose up -d --build --no-deps --force-recreate mcp
-      }
-
-      verify_database_port() {
-        if ! timeout 5 bash -c '</dev/tcp/192.168.15.125/15432'; then
-          echo "Postgres is not reachable at 192.168.15.125:15432."
-          docker ps -a --filter name=mcp-knowledge-hub-postgres || true
-          ss -H -ltn "sport = :15432" || true
-          exit 1
-        fi
       }
 
       remove_recreate_containers() {
@@ -95,7 +119,6 @@ deploy:
         done
       }
 
-      verify_database_port
       remove_recreate_containers
       cleanup_containers
       release_service_ports
