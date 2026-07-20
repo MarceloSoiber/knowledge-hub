@@ -15,7 +15,31 @@ deploy:
     - docker compose config --quiet
     - |
       cleanup_containers() {
-        docker rm -f mcp-knowledge-hub-backend mcp-knowledge-hub-mcp 2>/dev/null || true
+        echo "Stopping/removing old backend/MCP containers."
+        docker compose stop backend mcp || true
+        docker compose rm -sf backend mcp || true
+
+        for name in mcp-knowledge-hub-backend mcp-knowledge-hub-mcp; do
+          if docker container inspect "${name}" >/dev/null 2>&1; then
+            docker rm -f "${name}" || return 1
+          fi
+        done
+        sleep 2
+      }
+
+      has_service_containers() {
+        for name in mcp-knowledge-hub-backend mcp-knowledge-hub-mcp; do
+          if docker container inspect "${name}" >/dev/null 2>&1; then
+            return 0
+          fi
+        done
+        return 1
+      }
+
+      show_service_containers() {
+        docker ps -a \
+          --filter name=mcp-knowledge-hub-backend \
+          --filter name=mcp-knowledge-hub-mcp || true
       }
 
       diagnose_backend() {
@@ -106,6 +130,7 @@ deploy:
           if ss -H -ltn "sport = :${port}" | grep -q .; then
             echo "Port ${port} is busy before deploy; releasing stale listener."
             ss -H -ltnp "sport = :${port}" || true
+            cleanup_containers || true
             sudo -n fuser -k "${port}/tcp"
             sleep 2
           fi
@@ -113,6 +138,7 @@ deploy:
           if ss -H -ltn "sport = :${port}" | grep -q .; then
             echo "Port ${port} is still busy after release attempt."
             ss -H -ltnp "sport = :${port}" || true
+            show_service_containers
             docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' || true
             exit 1
           fi
@@ -123,13 +149,9 @@ deploy:
       cleanup_containers
       release_service_ports
 
-      if docker ps -aq \
-        --filter name=mcp-knowledge-hub-backend \
-        --filter name=mcp-knowledge-hub-mcp | grep -q .; then
+      if has_service_containers; then
         echo "Old backend/MCP containers are still stuck after cleanup."
-        docker ps -a \
-          --filter name=mcp-knowledge-hub-backend \
-          --filter name=mcp-knowledge-hub-mcp
+        show_service_containers
         exit 1
       fi
 
@@ -139,13 +161,9 @@ deploy:
         cleanup_containers
         release_service_ports
 
-        if docker ps -aq \
-          --filter name=mcp-knowledge-hub-backend \
-          --filter name=mcp-knowledge-hub-mcp | grep -q .; then
+        if has_service_containers; then
           echo "Old containers are still stuck after retry cleanup."
-          docker ps -a \
-            --filter name=mcp-knowledge-hub-backend \
-            --filter name=mcp-knowledge-hub-mcp
+          show_service_containers
           exit 1
         fi
 
