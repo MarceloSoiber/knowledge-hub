@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 from mcp.server.auth.provider import AccessToken
+from pydantic import ValidationError
 
 from backend.app.services.categories import CategoryNotFoundError
 from backend.app.services.documents.extractors import EmptyDocumentError
@@ -75,7 +76,10 @@ def test_mcp_text_ingest_schema_validates_fields() -> None:
 async def test_search_knowledge_returns_citation_context(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    captured_kwargs: dict[str, object] = {}
+
     async def fake_search_backend_knowledge(**_: object) -> list[KnowledgeChunkRead]:
+        captured_kwargs.update(_)
         return [
             KnowledgeChunkRead(
                 id=10,
@@ -111,12 +115,60 @@ async def test_search_knowledge_returns_citation_context(
     )
     monkeypatch.setattr("mcp_server.tools.knowledge.build_embedding_client", lambda: object())
 
-    results = await search_knowledge("find", limit=1, category_ids=[2])
+    results = await search_knowledge("find", limit=1, category_ids=[2], min_score=0.55)
 
+    assert captured_kwargs["min_score"] == 0.55
     assert results[0].source_id == "33333333-3333-4333-8333-333333333333"
     assert results[0].source_title == "runbook.md"
     assert results[0].location.section == "Setup"
     assert results[0].metadata == {"note_type": "decision"}
+
+
+@pytest.mark.asyncio
+async def test_search_knowledge_rejects_invalid_min_score(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeSessionLocal:
+        async def __aenter__(self) -> object:
+            raise AssertionError("session should not open for invalid min_score")
+
+        async def __aexit__(self, *_: object) -> None:
+            return None
+
+    monkeypatch.setattr("mcp_server.tools.knowledge.SessionLocal", FakeSessionLocal)
+
+    with pytest.raises(ValidationError):
+        await search_knowledge("find", min_score=1.01)
+
+
+@pytest.mark.asyncio
+async def test_registered_search_tool_forwards_min_score(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from mcp_server import server
+
+    captured_kwargs: dict[str, object] = {}
+
+    async def fake_search_knowledge(**kwargs: object) -> list[KnowledgeChunkRead]:
+        captured_kwargs.update(kwargs)
+        return []
+
+    monkeypatch.setattr(server, "search_knowledge", fake_search_knowledge)
+
+    results = await server.search(
+        query="find",
+        limit=3,
+        category_ids=[2],
+        min_score=0.6,
+    )
+
+    assert results == []
+    assert captured_kwargs == {
+        "query": "find",
+        "limit": 3,
+        "category_ids": [2],
+        "min_score": 0.6,
+    }
 
 
 @pytest.mark.asyncio

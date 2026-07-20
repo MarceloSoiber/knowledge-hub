@@ -147,7 +147,10 @@ async def test_search_response_contract(
     transport: httpx.ASGITransport,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    captured_kwargs: dict[str, object] = {}
+
     async def fake_search(**_: object) -> list[dict[str, object]]:
+        captured_kwargs.update(_)
         return [
             {
                 "id": 10,
@@ -176,10 +179,16 @@ async def test_search_response_contract(
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.post(
             "/api/v1/knowledge/search",
-            json={"query": "find this", "limit": 5, "category_ids": [2, 3]},
+            json={
+                "query": "find this",
+                "limit": 5,
+                "category_ids": [2, 3],
+                "min_score": 0.42,
+            },
         )
 
     assert response.status_code == 200
+    assert captured_kwargs["min_score"] == 0.42
     assert response.json() == {
         "query": "find this",
         "limit": 5,
@@ -207,11 +216,57 @@ async def test_search_response_contract(
 
 
 @pytest.mark.asyncio
+async def test_search_response_allows_empty_results(
+    app: Any,
+    transport: httpx.ASGITransport,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_search(**_: object) -> list[dict[str, object]]:
+        return []
+
+    app.dependency_overrides[require_auth_token] = no_auth
+    app.dependency_overrides[get_embedding_client] = fake_embedding_client
+    monkeypatch.setattr("backend.app.api.routes.knowledge.search_knowledge", fake_search)
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/api/v1/knowledge/search",
+            json={"query": "unknown", "limit": 5, "min_score": 0.8},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"query": "unknown", "limit": 5, "results": []}
+
+
+@pytest.mark.asyncio
+async def test_search_rejects_invalid_min_score(
+    app: Any,
+    transport: httpx.ASGITransport,
+) -> None:
+    app.dependency_overrides[require_auth_token] = no_auth
+    app.dependency_overrides[get_embedding_client] = fake_embedding_client
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        too_low = await client.post(
+            "/api/v1/knowledge/search",
+            json={"query": "find", "min_score": -0.01},
+        )
+        too_high = await client.post(
+            "/api/v1/knowledge/search",
+            json={"query": "find", "min_score": 1.01},
+        )
+
+    assert too_low.status_code == 422
+    assert too_high.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_answer_response_contract_includes_citation_sources(
     app: Any,
     transport: httpx.ASGITransport,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    captured_kwargs: dict[str, object] = {}
     source = {
         "id": 10,
         "source_id": "33333333-3333-4333-8333-333333333333",
@@ -232,6 +287,7 @@ async def test_answer_response_contract_includes_citation_sources(
     }
 
     async def fake_answer(**_: object) -> tuple[str, list[dict[str, object]]]:
+        captured_kwargs.update(_)
         return "answer with citation", [source]
 
     app.dependency_overrides[require_auth_token] = no_auth
@@ -242,15 +298,34 @@ async def test_answer_response_contract_includes_citation_sources(
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.post(
             "/api/v1/knowledge/answer",
-            json={"query": "summarize", "limit": 5},
+            json={"query": "summarize", "limit": 5, "min_score": 0.45},
         )
 
     assert response.status_code == 200
+    assert captured_kwargs["min_score"] == 0.45
     assert response.json() == {
         "query": "summarize",
         "answer": "answer with citation",
         "sources": [source],
     }
+
+
+@pytest.mark.asyncio
+async def test_answer_rejects_invalid_min_score(
+    app: Any,
+    transport: httpx.ASGITransport,
+) -> None:
+    app.dependency_overrides[require_auth_token] = no_auth
+    app.dependency_overrides[get_embedding_client] = fake_embedding_client
+    app.dependency_overrides[get_answer_client] = fake_answer_client
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/api/v1/knowledge/answer",
+            json={"query": "summarize", "min_score": 1.01},
+        )
+
+    assert response.status_code == 422
 
 
 @pytest.mark.asyncio

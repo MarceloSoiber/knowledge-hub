@@ -10,6 +10,7 @@ from pydantic import (
     ConfigDict,
     Field,
     StringConstraints,
+    TypeAdapter,
     ValidationError,
     field_validator,
 )
@@ -36,6 +37,8 @@ TitleStr = Annotated[
     StringConstraints(strip_whitespace=True, min_length=1, max_length=255),
 ]
 ContentStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+MinScore = Annotated[float, Field(ge=0.0, le=1.0, allow_inf_nan=False)]
+min_score_adapter = TypeAdapter(MinScore | None)
 
 
 class KnowledgeHit(BaseModel):
@@ -135,13 +138,16 @@ async def search_knowledge(
     query: str,
     limit: int = 5,
     category_ids: list[int] | None = None,
+    min_score: MinScore | None = None,
 ) -> list[KnowledgeHit]:
+    validated_min_score = min_score_adapter.validate_python(min_score)
     async with SessionLocal() as session:
         results = await search_backend_knowledge(
             session=session,
             query=query,
             limit=limit,
             category_ids=category_ids,
+            min_score=validated_min_score,
             embedding_client=build_embedding_client(),
         )
     return [KnowledgeHit(**result.model_dump()) for result in results]

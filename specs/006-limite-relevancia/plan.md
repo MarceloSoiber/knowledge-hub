@@ -62,7 +62,9 @@ backend/app/
     |-- rag.py
     `-- search.py
 
-mcp_server/tools/knowledge.py
+mcp_server/
+|-- server.py
+`-- tools/knowledge.py
 
 tests/
 |-- test_knowledge_api_integration.py
@@ -80,6 +82,7 @@ doc/API.md
 
 - Add `search_min_score: float = Field(default=0.35, ge=0.0, le=1.0)` to `backend/app/core/settings.py`.
 - Environment variable maps to `SEARCH_MIN_SCORE` through Pydantic settings.
+- Reject non-finite values during request validation and service filtering; `NaN` or infinite scores must never pass the threshold.
 - Document the default as conservative, not universal; recalibrate when domains or embedding models change.
 
 ### Search Flow
@@ -88,6 +91,7 @@ doc/API.md
 - Extend `search_knowledge()` to accept `min_score`.
 - Resolve effective threshold as request `min_score` when present, otherwise `get_settings().search_min_score`.
 - Compute scores as today in `backend/app/repositories/chunks.py`, then remove results whose score is missing, invalid or lower than the effective threshold.
+- Keep filtering in `backend/app/services/search.py` so API search, API answer and MCP use the same policy.
 - Consider fetching up to the requested limit only for v1; if calibration shows too many false negatives due to top-N truncation, add a later candidate expansion parameter.
 
 ### Answer Flow
@@ -99,7 +103,8 @@ doc/API.md
 ### MCP Flow
 
 - Extend `mcp_server/tools/knowledge.py::search_knowledge()` with optional `min_score`.
-- Validate `min_score` with the MCP tool schema/model before calling the backend search service.
+- Extend the registered FastMCP wrapper in `mcp_server/server.py::search()` so external MCP clients can pass `min_score`.
+- Validate `min_score` with typed annotations/Pydantic bounds before calling the backend search service.
 - Return the same result contract as API search.
 
 ### Observability
@@ -123,8 +128,8 @@ doc/API.md
 - Unit test score filtering in `tests/test_knowledge_service.py`.
 - Unit test that score equal to threshold is retained and score below threshold is removed.
 - Unit test empty filtered results in `answer_knowledge()`.
-- API integration test valid `min_score` is forwarded and invalid `min_score` returns validation error.
-- MCP test valid/invalid `min_score` behavior and forwarding.
+- API integration tests verify valid `min_score` forwarding for search and answer, plus invalid `min_score` validation errors.
+- MCP tests verify `min_score` forwarding from tool helper and registered server wrapper, plus invalid values where local validation applies.
 - Documentation check by updating `doc/API.md` examples and parameter tables.
 
 ## Risk Notes

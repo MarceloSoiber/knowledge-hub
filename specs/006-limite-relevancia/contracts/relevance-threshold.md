@@ -59,6 +59,7 @@ Response shape is unchanged. When no sources pass the threshold, `sources` is em
 
 - `min_score` is optional and validated in the same range as the API.
 - Results use the existing `KnowledgeHit` contract.
+- The registered FastMCP `search` tool exposes the same `min_score` argument and forwards it to the backend search service.
 
 ## Configuration
 

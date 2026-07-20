@@ -11,6 +11,7 @@ from .tools.knowledge import (
     KnowledgeHit,
     KnowledgeCategory,
     KnowledgeSource,
+    MinScore,
     MCPTextIngestResult,
     KnowledgeSourceDetail,
     get_knowledge_categories,
@@ -92,8 +93,14 @@ async def search(
     query: str,
     limit: int = 5,
     category_ids: list[int] | None = None,
+    min_score: MinScore | None = None,
 ) -> list[KnowledgeHit]:
-    return await search_knowledge(query=query, limit=limit, category_ids=category_ids)
+    return await search_knowledge(
+        query=query,
+        limit=limit,
+        category_ids=category_ids,
+        min_score=min_score,
+    )
 
 
 @mcp.tool()

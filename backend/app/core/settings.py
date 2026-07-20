@@ -23,6 +23,7 @@ class Settings(BaseSettings):
 
     embedding_model: str = Field(default="text-embedding-nomic-embed-text-v1.5")
     vector_dim: int = Field(default=768)
+    search_min_score: float = Field(default=0.35, ge=0.0, le=1.0, allow_inf_nan=False)
 
     mcp_host: str = Field(default="0.0.0.0")
     mcp_port: int = Field(default=8001)
