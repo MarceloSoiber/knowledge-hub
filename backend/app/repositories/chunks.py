@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 import json
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import delete, exists, select
+from sqlalchemy import delete, exists, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -12,6 +13,13 @@ from ..db.models import DocumentSource, KnowledgeChunk, document_source_categori
 from ..schemas.knowledge import KnowledgeChunkRead
 
 PUBLIC_METADATA_KEYS = {"client_id", "note_type"}
+TEXT_SEARCH_CONFIG = "simple"
+
+
+@dataclass(frozen=True)
+class TextSearchChunk:
+    chunk: KnowledgeChunkRead
+    text_rank: float
 
 
 async def delete_chunks_for_source(session: AsyncSession, source_id: int) -> None:
@@ -69,6 +77,43 @@ async def search_similar_chunks(
     ]
 
 
+async def search_text_chunks(
+    session: AsyncSession,
+    query: str,
+    limit: int,
+    category_ids: list[int] | None = None,
+) -> list[TextSearchChunk]:
+    ts_query = func.plainto_tsquery(TEXT_SEARCH_CONFIG, query)
+    text_rank = func.ts_rank_cd(KnowledgeChunk.search_vector, ts_query)
+
+    statement = (
+        select(
+            KnowledgeChunk,
+            DocumentSource,
+            text_rank.label("text_rank"),
+        )
+        .join(DocumentSource, KnowledgeChunk.source_id == DocumentSource.id)
+        .options(selectinload(DocumentSource.categories))
+        .where(KnowledgeChunk.search_vector.op("@@")(ts_query))
+    )
+    if category_ids is not None:
+        statement = statement.where(
+            exists()
+            .where(document_source_categories.c.document_source_id == DocumentSource.id)
+            .where(document_source_categories.c.category_id.in_(category_ids))
+        )
+    statement = statement.order_by(text_rank.desc(), KnowledgeChunk.id).limit(limit)
+
+    rows = (await session.execute(statement)).all()
+    return [
+        TextSearchChunk(
+            chunk=build_text_chunk_read(row),
+            text_rank=float(get_row_value(row, "text_rank", 2) or 0.0),
+        )
+        for row in rows
+    ]
+
+
 def build_chunk_read(row: object) -> KnowledgeChunkRead:
     chunk = get_row_value(row, "KnowledgeChunk", 0)
     source = get_row_value(row, "DocumentSource", 1)
@@ -91,6 +136,31 @@ def build_chunk_read(row: object) -> KnowledgeChunkRead:
         location=build_location(metadata, getattr(chunk, "content")),
         content=getattr(chunk, "content"),
         score=1 - float(distance),
+        metadata=public_metadata(metadata),
+    )
+
+
+def build_text_chunk_read(row: object) -> KnowledgeChunkRead:
+    chunk = get_row_value(row, "KnowledgeChunk", 0)
+    source = get_row_value(row, "DocumentSource", 1)
+    metadata = normalize_metadata(getattr(chunk, "metadata_json", None))
+    return KnowledgeChunkRead(
+        id=getattr(chunk, "id"),
+        source_id=getattr(source, "public_id"),
+        source_title=getattr(source, "title"),
+        source_type=getattr(source, "source_type"),
+        uri=sanitize_uri(
+            getattr(source, "uri"),
+            getattr(source, "source_type"),
+            getattr(source, "title"),
+        ),
+        categories=[
+            {"id": category.id, "name": category.name}
+            for category in sorted(getattr(source, "categories", []), key=lambda category: category.name)
+        ],
+        location=build_location(metadata, getattr(chunk, "content")),
+        content=getattr(chunk, "content"),
+        score=None,
         metadata=public_metadata(metadata),
     )
 

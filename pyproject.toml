@@ -7,7 +7,7 @@ name = "mcp-knowledge-hub"
 version = "0.1.0"
 description = "Base inicial para um hub de conhecimento com FastAPI, pgvector e MCP"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.13,<3.14"
 dependencies = [
   "fastapi>=0.115,<0.116",
   "starlette>=0.40,<0.47",

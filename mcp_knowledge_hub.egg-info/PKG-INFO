@@ -2,7 +2,7 @@ Metadata-Version: 2.4
 Name: mcp-knowledge-hub
 Version: 0.1.0
 Summary: Base inicial para um hub de conhecimento com FastAPI, pgvector e MCP
-Requires-Python: >=3.11
+Requires-Python: <3.14,>=3.13
 Description-Content-Type: text/markdown
 Requires-Dist: fastapi<0.116,>=0.115
 Requires-Dist: starlette<0.47,>=0.40
@@ -40,7 +40,7 @@ Hub de conhecimento com API FastAPI, PostgreSQL + `pgvector`, embeddings, RAG e 
 
 - Docker e `docker-compose`
 - Node.js, para os scripts `npm`
-- Python 3.11+
+- Python 3.13
 - `uv`, para rodar o backend localmente
 - Um servidor OpenAI-compatible para chat e embeddings, como LM Studio, ou uma API externa configurada por `API_KEY`
 

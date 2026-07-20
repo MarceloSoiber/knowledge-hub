@@ -13,6 +13,7 @@ from backend.app.cli.config import generate_auth_token, validate_auth_token
 from backend.app.core.auth import is_valid_token
 from backend.app.core.settings import Settings
 from backend.app.db.models import Category, DocumentSource, KnowledgeChunk
+from backend.app.repositories.chunks import TextSearchChunk
 from backend.app.schemas.knowledge import (
     KnowledgeAnswerRequest,
     KnowledgeChunkRead,
@@ -39,6 +40,7 @@ from backend.app.services.documents.extractors import (
 from backend.app.services.ingestion import ingest_plain_text, ingest_uploaded_file
 from backend.app.services.rag import LLMConfigurationError, OpenAICompatibleAnswerClient
 from backend.app.services.search import (
+    fuse_hybrid_results,
     filter_results_by_score,
     answer_knowledge,
     search_knowledge,
@@ -904,6 +906,44 @@ def test_filter_results_by_score_rejects_missing_and_non_finite_scores() -> None
     assert [result.id for result in filter_results_by_score(results, 0.5)] == [5]
 
 
+def test_fuse_hybrid_results_promotes_exact_text_matches_without_duplicates() -> None:
+    vector_chunk = build_test_chunk(chunk_id=1, content="semantic result", score=0.91)
+    shared_chunk = build_test_chunk(chunk_id=2, content="ERR_CONN_RESET details", score=0.7)
+    text_only_chunk = build_test_chunk(chunk_id=3, content="ABC-1234 incident", score=None)
+
+    results = fuse_hybrid_results(
+        vector_results=[vector_chunk, shared_chunk],
+        text_results=[
+            TextSearchChunk(chunk=shared_chunk.model_copy(update={"score": None}), text_rank=1.0),
+            TextSearchChunk(chunk=text_only_chunk, text_rank=0.9),
+        ],
+        limit=5,
+        min_score=0.35,
+        include_match_reasons=True,
+    )
+
+    assert [result.id for result in results] == [2, 1, 3]
+    assert results[0].score == 0.7
+    assert results[0].match_reasons == ["vector", "text"]
+    assert results[2].score is None
+    assert results[2].match_reasons == ["text"]
+
+
+def test_fuse_hybrid_results_keeps_text_only_when_vector_score_is_filtered() -> None:
+    low_vector_chunk = build_test_chunk(chunk_id=1, content="weak semantic", score=0.2)
+    text_only_chunk = build_test_chunk(chunk_id=2, content="ERR_CONN_RESET", score=None)
+
+    results = fuse_hybrid_results(
+        vector_results=[low_vector_chunk],
+        text_results=[TextSearchChunk(chunk=text_only_chunk, text_rank=1.0)],
+        limit=5,
+        min_score=0.8,
+    )
+
+    assert [result.id for result in results] == [2]
+    assert not hasattr(results[0], "match_reasons")
+
+
 @pytest.mark.asyncio
 async def test_answer_knowledge_uses_search_sources() -> None:
     answer, sources = await answer_knowledge(
@@ -934,6 +974,31 @@ async def test_answer_knowledge_uses_empty_sources_when_scores_are_filtered() ->
     assert answer == "answer for question with 0 sources"
     assert sources == []
     assert answer_client.sources_seen == []
+
+
+def build_test_chunk(
+    chunk_id: int,
+    content: str,
+    score: float | None,
+) -> KnowledgeChunkRead:
+    return KnowledgeChunkRead(
+        id=chunk_id,
+        source_id="99999999-9999-4999-8999-999999999999",
+        source_title="Stored Source",
+        source_type="text",
+        uri="text:Stored Source",
+        categories=[{"id": 3, "name": "docs"}],
+        location={
+            "chunk_index": chunk_id,
+            "page": None,
+            "section": None,
+            "start_char": 0,
+            "end_char": len(content),
+        },
+        content=content,
+        score=score,
+        metadata={},
+    )
 
 
 @pytest.mark.asyncio

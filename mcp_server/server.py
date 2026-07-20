@@ -94,12 +94,14 @@ async def search(
     limit: int = 5,
     category_ids: list[int] | None = None,
     min_score: MinScore | None = None,
+    include_match_reasons: bool = False,
 ) -> list[KnowledgeHit]:
     return await search_knowledge(
         query=query,
         limit=limit,
         category_ids=category_ids,
         min_score=min_score,
+        include_match_reasons=include_match_reasons,
     )
 
 

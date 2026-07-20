@@ -102,6 +102,19 @@ async def init_db() -> None:
         )
         await connection.execute(
             text(
+                "ALTER TABLE knowledge_chunks "
+                "ADD COLUMN IF NOT EXISTS search_vector tsvector "
+                "GENERATED ALWAYS AS (to_tsvector('simple'::regconfig, content)) STORED"
+            )
+        )
+        await connection.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_knowledge_chunks_search_vector "
+                "ON knowledge_chunks USING GIN (search_vector)"
+            )
+        )
+        await connection.execute(
+            text(
                 "DO $$ "
                 "BEGIN "
                 "IF EXISTS ("

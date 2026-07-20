@@ -87,10 +87,12 @@ automaticamente. `metadata` aceita apenas `client_id` e `note_type`.
 A tool `source(source_id)` consulta uma fonte detalhada por UUID público. O MCP
 não expõe ferramentas de atualização ou exclusão de fontes nesta versão.
 
-A tool `search` aceita `query`, `limit`, `category_ids` e `min_score`, retornando
-o mesmo contrato citável de `/api/v1/knowledge/search`: UUID público da fonte,
-título, URI sanitizada, categorias, localização do chunk, conteúdo, score e
-metadados públicos permitidos.
+A tool `search` aceita `query`, `limit`, `category_ids`, `min_score` e
+`include_match_reasons`, retornando o mesmo contrato citável de
+`/api/v1/knowledge/search`: UUID público da fonte, título, URI sanitizada,
+categorias, localização do chunk, conteúdo, score e metadados públicos
+permitidos. Quando `include_match_reasons=true`, cada resultado pode indicar se
+veio de match `vector`, `text` ou ambos.
 
 ## Resumo dos endpoints
 
@@ -294,7 +296,7 @@ o conteúdo canônico normalizado já existir em outra fonte, a API retorna
 
 ## Consulta de conhecimento
 
-### Busca semântica
+### Busca híbrida
 
 ```http
 POST /api/v1/knowledge/search
@@ -309,6 +311,7 @@ Corpo da requisição:
 | `limit` | inteiro | não | Padrão `5`; mínimo `1`; máximo `50`. |
 | `category_ids` | lista de inteiros | não | Filtra documentos que pertençam a qualquer uma das categorias informadas. |
 | `min_score` | número | não | Override por requisição; mínimo `0.0`; máximo `1.0`. Quando omitido, usa `SEARCH_MIN_SCORE` (`0.35`). |
+| `include_match_reasons` | booleano | não | Padrão `false`. Quando `true`, inclui motivos diagnósticos do match por resultado. |
 
 Exemplo:
 
@@ -320,7 +323,8 @@ curl -X POST http://localhost:8000/api/v1/knowledge/search \
     "query": "Quais documentos mencionam contratos?",
     "limit": 5,
     "category_ids": [2, 3],
-    "min_score": 0.35
+    "min_score": 0.35,
+    "include_match_reasons": true
   }'
 ```
 
@@ -356,7 +360,8 @@ Resposta `200 OK`:
       },
       "content": "Trecho do documento encontrado...",
       "score": 0.87,
-      "metadata": {}
+      "metadata": {},
+      "match_reasons": ["vector", "text"]
     }
   ]
 }
@@ -364,11 +369,15 @@ Resposta `200 OK`:
 
 Cada resultado usa o UUID publico da fonte em `source_id` e inclui metadados
 suficientes para citacao. URIs baseadas em caminhos locais sao sanitizadas antes
-de sair da API. Resultados com `score` menor que o limiar efetivo sao removidos;
-quando nenhum chunk passa, `results` e retornado como lista vazia. O score e um
-sinal de similaridade para ordenacao e calibracao, nao uma probabilidade. O valor
-padrao `SEARCH_MIN_SCORE=0.35` e conservador e deve ser recalibrado ao trocar o
-modelo de embeddings ou o dominio do conhecimento.
+de sair da API. A busca combina candidatos por similaridade vetorial e busca
+textual PostgreSQL, usando fusao por ranking. Resultados com score vetorial menor
+que o limiar efetivo sao removidos; resultados encontrados apenas por texto podem
+ter `score: null` e ainda aparecer quando forem relevantes pelo match textual.
+Quando nenhum chunk passa, `results` e retornado como lista vazia. O score e um
+sinal de similaridade vetorial para ordenacao e calibracao, nao uma probabilidade
+nem o score hibrido interno. O valor padrao `SEARCH_MIN_SCORE=0.35` e conservador
+e deve ser recalibrado ao trocar o modelo de embeddings ou o dominio do
+conhecimento. O campo `match_reasons` so aparece quando solicitado.
 
 ### Gerar resposta com LLM
 
@@ -385,6 +394,7 @@ Corpo da requisição:
 | `limit` | inteiro | não | Padrão `5`; mínimo `1`; máximo `20`. |
 | `category_ids` | lista de inteiros | não | Filtra documentos usados na resposta por semântica qualquer categoria. |
 | `min_score` | número | não | Override por requisição; mínimo `0.0`; máximo `1.0`. Quando omitido, usa `SEARCH_MIN_SCORE` (`0.35`). |
+| `include_match_reasons` | booleano | não | Padrão `false`. Quando `true`, inclui motivos diagnósticos nas fontes recuperadas. |
 
 Exemplo:
 

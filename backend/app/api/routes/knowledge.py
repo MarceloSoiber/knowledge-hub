@@ -90,6 +90,7 @@ async def knowledge_search(
             limit=payload.limit,
             category_ids=payload.category_ids,
             min_score=payload.min_score,
+            include_match_reasons=payload.include_match_reasons,
             embedding_client=embedding_client,
         )
     except CategoryNotFoundError as exc:
@@ -202,6 +203,7 @@ async def knowledge_answer(
             limit=payload.limit,
             category_ids=payload.category_ids,
             min_score=payload.min_score,
+            include_match_reasons=payload.include_match_reasons,
             embedding_client=embedding_client,
             answer_client=answer_client,
         )

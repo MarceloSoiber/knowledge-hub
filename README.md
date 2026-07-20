@@ -14,7 +14,7 @@ Hub de conhecimento com API FastAPI, PostgreSQL + `pgvector`, embeddings, RAG e 
 
 - Docker e `docker-compose`
 - Node.js, para os scripts `npm`
-- Python 3.11+
+- Python 3.13
 - `uv`, para rodar o backend localmente
 - Um servidor OpenAI-compatible para chat e embeddings, como LM Studio, ou uma API externa configurada por `API_KEY`
 
