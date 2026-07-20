@@ -34,15 +34,22 @@ deploy:
           return 0
         fi
 
-        echo "Regular docker removal failed for ${name}; retrying with sudo."
-        sudo -n docker stop "${name}" || true
-        if sudo -n docker rm -f "${name}"; then
+        echo "Docker daemon could not kill ${name}; asking PID 1 inside the container to exit."
+        docker exec "${name}" sh -c 'kill -TERM 1' || true
+        for _ in $(seq 1 15); do
+          running="$(docker inspect "${name}" --format '{{.State.Running}}' 2>/dev/null || true)"
+          if [ "${running}" != "true" ]; then
+            break
+          fi
+          sleep 1
+        done
+
+        if docker rm -f "${name}"; then
           return 0
         fi
 
         echo "Could not remove ${name}; container state follows."
         docker inspect "${name}" --format '{{json .State}}' || true
-        sudo -n docker inspect "${name}" --format '{{json .State}}' || true
         return 1
       }
 
@@ -150,7 +157,7 @@ deploy:
             echo "Port ${port} is busy before deploy; releasing stale listener."
             ss -H -ltnp "sport = :${port}" || true
             cleanup_containers || true
-            sudo -n fuser -k "${port}/tcp"
+            fuser -k "${port}/tcp" || true
             sleep 2
           fi
 
