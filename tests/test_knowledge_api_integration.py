@@ -16,6 +16,7 @@ from backend.app.services.categories import (
     CategoryInUseError,
     CategoryNotFoundError,
 )
+from backend.app.services.tags import TagConflictError, TagInUseError, TagNotFoundError
 from backend.app.services.ingestion import DuplicateSourceContentError
 from backend.app.services.rag import LLMConfigurationError
 from backend.app.services.sources import SourceDeleteConfirmationError, SourceNotFoundError
@@ -159,6 +160,7 @@ async def test_search_response_contract(
                 "source_type": "upload",
                 "uri": "upload:runbook.md",
                 "categories": [{"id": 2, "name": "docs"}],
+                "tags": [{"id": 7, "name": "postgres"}],
                 "location": {
                     "chunk_index": 1,
                     "page": None,
@@ -183,12 +185,14 @@ async def test_search_response_contract(
                 "query": "find this",
                 "limit": 5,
                 "category_ids": [2, 3],
+                "tag_ids": [7],
                 "min_score": 0.42,
             },
         )
 
     assert response.status_code == 200
     assert captured_kwargs["min_score"] == 0.42
+    assert captured_kwargs["tag_ids"] == [7]
     assert captured_kwargs["include_match_reasons"] is False
     assert response.json() == {
         "query": "find this",
@@ -198,9 +202,10 @@ async def test_search_response_contract(
                 "id": 10,
                 "source_id": "33333333-3333-4333-8333-333333333333",
                 "source_title": "runbook.md",
-                "source_type": "upload",
-                "uri": "upload:runbook.md",
-                "categories": [{"id": 2, "name": "docs"}],
+                    "source_type": "upload",
+                    "uri": "upload:runbook.md",
+                    "categories": [{"id": 2, "name": "docs"}],
+                    "tags": [{"id": 7, "name": "postgres"}],
                 "location": {
                     "chunk_index": 1,
                     "page": None,
@@ -232,8 +237,9 @@ async def test_search_response_includes_match_reasons_when_requested(
                 "source_id": "33333333-3333-4333-8333-333333333333",
                 "source_title": "runbook.md",
                 "source_type": "upload",
-                "uri": "upload:runbook.md",
-                "categories": [{"id": 2, "name": "docs"}],
+            "uri": "upload:runbook.md",
+            "categories": [{"id": 2, "name": "docs"}],
+            "tags": [{"id": 7, "name": "postgres"}],
                 "location": {
                     "chunk_index": 1,
                     "page": None,
@@ -326,6 +332,7 @@ async def test_answer_response_contract_includes_citation_sources(
         "source_type": "upload",
         "uri": "upload:runbook.md",
         "categories": [{"id": 2, "name": "docs"}],
+        "tags": [{"id": 7, "name": "postgres"}],
         "location": {
             "chunk_index": 1,
             "page": None,
@@ -350,11 +357,12 @@ async def test_answer_response_contract_includes_citation_sources(
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.post(
             "/api/v1/knowledge/answer",
-            json={"query": "summarize", "limit": 5, "min_score": 0.45},
+            json={"query": "summarize", "limit": 5, "tag_ids": [7], "min_score": 0.45},
         )
 
     assert response.status_code == 200
     assert captured_kwargs["min_score"] == 0.45
+    assert captured_kwargs["tag_ids"] == [7]
     assert response.json() == {
         "query": "summarize",
         "answer": "answer with citation",
@@ -463,6 +471,7 @@ async def test_text_ingestion_response_contract(
                 public_id="11111111-1111-4111-8111-111111111111",
                 title="meeting-notes",
                 categories=[SimpleNamespace(id=2, name="docs"), SimpleNamespace(id=3, name="ops")],
+                tags=[SimpleNamespace(id=7, name="postgres")],
             ),
             3,
         )
@@ -477,6 +486,7 @@ async def test_text_ingestion_response_contract(
             json={
                 "title": "meeting-notes",
                 "category_ids": [2, 3],
+                "tag_ids": [7],
                 "content": "first line\nsecond line",
             },
         )
@@ -486,6 +496,7 @@ async def test_text_ingestion_response_contract(
         "source_id": "11111111-1111-4111-8111-111111111111",
         "title": "meeting-notes",
         "categories": [{"id": 2, "name": "docs"}, {"id": 3, "name": "ops"}],
+        "tags": [{"id": 7, "name": "postgres"}],
         "chunks_created": 3,
     }
 
@@ -500,11 +511,13 @@ async def test_text_ingestion_accepts_form_data(
         assert kwargs["title"] == "market-notes"
         assert kwargs["content"] == "ações e dividendos"
         assert kwargs["category_ids"] == [1]
+        assert kwargs["tag_ids"] == [8]
         return (
             SimpleNamespace(
                 public_id="22222222-2222-4222-8222-222222222222",
                 title="market-notes",
                 categories=[SimpleNamespace(id=1, name="financeiro")],
+                tags=[SimpleNamespace(id=8, name="imposto")],
             ),
             1,
         )
@@ -520,6 +533,7 @@ async def test_text_ingestion_accepts_form_data(
                 "title": "market-notes",
                 "content": "ações e dividendos",
                 "category_ids": "1",
+                "tag_ids": "8",
             },
         )
 
@@ -528,6 +542,7 @@ async def test_text_ingestion_accepts_form_data(
         "source_id": "22222222-2222-4222-8222-222222222222",
         "title": "market-notes",
         "categories": [{"id": 1, "name": "financeiro"}],
+        "tags": [{"id": 8, "name": "imposto"}],
         "chunks_created": 1,
     }
 
@@ -544,6 +559,7 @@ async def test_sources_response_contract(
                 "source_id": "33333333-3333-4333-8333-333333333333",
                 "title": "onboarding-guide",
                 "categories": [{"id": 4, "name": "docs"}],
+                "tags": [{"id": 5, "name": "python"}],
                 "source_type": "upload",
                 "uri": "upload:onboarding-guide.pdf",
                 "content_hash": "abc123",
@@ -562,9 +578,10 @@ async def test_sources_response_contract(
     assert response.json() == [
         {
             "source_id": "33333333-3333-4333-8333-333333333333",
-            "title": "onboarding-guide",
-            "categories": [{"id": 4, "name": "docs"}],
-            "source_type": "upload",
+                "title": "onboarding-guide",
+                "categories": [{"id": 4, "name": "docs"}],
+                "tags": [{"id": 5, "name": "python"}],
+                "source_type": "upload",
             "uri": "upload:onboarding-guide.pdf",
             "content_hash": "abc123",
             "created_at": None,
@@ -584,6 +601,7 @@ async def test_source_lifecycle_response_contracts(
         "source_id": source_id,
         "title": "runbook",
         "categories": [{"id": 4, "name": "docs"}],
+        "tags": [{"id": 5, "name": "python"}],
         "source_type": "text",
         "uri": "text:runbook",
         "content_hash": "abc123",
@@ -600,6 +618,7 @@ async def test_source_lifecycle_response_contracts(
         assert kwargs["source_id"] == source_id
         assert kwargs["title"] == "new title"
         assert kwargs["category_ids"] == [4]
+        assert kwargs["tag_ids"] == [5]
         updated = dict(payload)
         updated["title"] = "new title"
         return updated, None
@@ -618,7 +637,7 @@ async def test_source_lifecycle_response_contracts(
         detail = await client.get(f"/api/v1/knowledge/sources/{source_id}")
         patched = await client.patch(
             f"/api/v1/knowledge/sources/{source_id}",
-            json={"title": "new title", "category_ids": [4]},
+            json={"title": "new title", "category_ids": [4], "tag_ids": [5]},
         )
         deleted = await client.delete(f"/api/v1/knowledge/sources/{source_id}?confirm=true")
 
@@ -721,4 +740,82 @@ async def test_category_conflicts_map_to_409(
         delete_response = await client.delete("/api/v1/knowledge/categories/1")
 
     assert create_response.status_code == 409
+    assert delete_response.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_tag_crud_and_autocomplete_contracts(
+    app: Any,
+    transport: httpx.ASGITransport,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_list_tags(_: object) -> list[dict[str, object]]:
+        return [{"id": 9, "name": "postgres"}]
+
+    async def fake_autocomplete_tags(_: object, query: str, limit: int) -> list[dict[str, object]]:
+        assert query == "po"
+        assert limit == 5
+        return [{"id": 9, "name": "postgres"}]
+
+    async def fake_create_tag(_: object, name: str) -> object:
+        return SimpleNamespace(id=9, name=name.strip().lower())
+
+    async def fake_update_tag(_: object, tag_id: int, name: str) -> object:
+        return SimpleNamespace(id=tag_id, name=name.strip().lower())
+
+    async def fake_delete_tag(_: object, tag_id: int) -> None:
+        assert tag_id == 9
+
+    app.dependency_overrides[require_auth_token] = no_auth
+    monkeypatch.setattr("backend.app.api.routes.knowledge.list_tags", fake_list_tags)
+    monkeypatch.setattr("backend.app.api.routes.knowledge.autocomplete_tags", fake_autocomplete_tags)
+    monkeypatch.setattr("backend.app.api.routes.knowledge.create_tag", fake_create_tag)
+    monkeypatch.setattr("backend.app.api.routes.knowledge.update_tag", fake_update_tag)
+    monkeypatch.setattr("backend.app.api.routes.knowledge.delete_tag", fake_delete_tag)
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        listed = await client.get("/api/v1/knowledge/tags")
+        completed = await client.get("/api/v1/knowledge/tags/autocomplete?q=po&limit=5")
+        created = await client.post("/api/v1/knowledge/tags", json={"name": " Postgres "})
+        updated = await client.patch("/api/v1/knowledge/tags/9", json={"name": "RAG"})
+        deleted = await client.delete("/api/v1/knowledge/tags/9")
+
+    assert listed.status_code == 200
+    assert listed.json() == [{"id": 9, "name": "postgres"}]
+    assert completed.status_code == 200
+    assert completed.json() == [{"id": 9, "name": "postgres"}]
+    assert created.status_code == 201
+    assert created.json() == {"id": 9, "name": "postgres"}
+    assert updated.status_code == 200
+    assert updated.json() == {"id": 9, "name": "rag"}
+    assert deleted.status_code == 204
+
+
+@pytest.mark.asyncio
+async def test_tag_status_mapping(
+    app: Any,
+    transport: httpx.ASGITransport,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def duplicate_tag(_: object, __: str) -> object:
+        raise TagConflictError("Tag 'postgres' already exists.")
+
+    async def missing_tag(_: object, __: int, ___: str) -> object:
+        raise TagNotFoundError("Tag 9 does not exist.")
+
+    async def in_use_tag(_: object, __: int) -> None:
+        raise TagInUseError("Tag 9 is in use.")
+
+    app.dependency_overrides[require_auth_token] = no_auth
+    monkeypatch.setattr("backend.app.api.routes.knowledge.create_tag", duplicate_tag)
+    monkeypatch.setattr("backend.app.api.routes.knowledge.update_tag", missing_tag)
+    monkeypatch.setattr("backend.app.api.routes.knowledge.delete_tag", in_use_tag)
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        create_response = await client.post("/api/v1/knowledge/tags", json={"name": "postgres"})
+        update_response = await client.patch("/api/v1/knowledge/tags/9", json={"name": "rag"})
+        delete_response = await client.delete("/api/v1/knowledge/tags/9")
+
+    assert create_response.status_code == 409
+    assert update_response.status_code == 404
     assert delete_response.status_code == 409

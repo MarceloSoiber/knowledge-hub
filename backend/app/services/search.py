@@ -13,6 +13,7 @@ from ..schemas.knowledge import KnowledgeChunkRead
 from .categories import get_categories
 from .embeddings import EmbeddingClient
 from .rag import AnswerClient
+from .tags import get_tags
 
 logger = logging.getLogger(__name__)
 RRF_K = 60
@@ -58,11 +59,14 @@ async def search_knowledge(
     limit: int,
     embedding_client: EmbeddingClient,
     category_ids: list[int] | None = None,
+    tag_ids: list[int] | None = None,
     min_score: float | None = None,
     include_match_reasons: bool = False,
 ) -> list[KnowledgeChunkRead]:
     if category_ids is not None:
         await get_categories(session, category_ids)
+    if tag_ids is not None:
+        await get_tags(session, tag_ids)
     query_embedding = (await embedding_client.embed_texts([query]))[0]
     candidate_limit = resolve_candidate_limit(limit)
     vector_results = await search_similar_chunks(
@@ -70,12 +74,14 @@ async def search_knowledge(
         query_embedding=query_embedding,
         limit=candidate_limit,
         category_ids=category_ids,
+        tag_ids=tag_ids,
     )
     text_results = await search_text_chunks(
         session=session,
         query=query,
         limit=candidate_limit,
         category_ids=category_ids,
+        tag_ids=tag_ids,
     )
     threshold = resolve_search_threshold(min_score)
     results = fuse_hybrid_results(
@@ -103,6 +109,7 @@ async def answer_knowledge(
     embedding_client: EmbeddingClient,
     answer_client: AnswerClient,
     category_ids: list[int] | None = None,
+    tag_ids: list[int] | None = None,
     min_score: float | None = None,
     include_match_reasons: bool = False,
 ) -> tuple[str, list[KnowledgeChunkRead]]:
@@ -112,6 +119,7 @@ async def answer_knowledge(
         limit,
         embedding_client,
         category_ids=category_ids,
+        tag_ids=tag_ids,
         min_score=min_score,
         include_match_reasons=include_match_reasons,
     )

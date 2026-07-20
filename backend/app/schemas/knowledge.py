@@ -30,10 +30,22 @@ class CategoryWrite(BaseModel):
     name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
 
 
+class TagRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+
+
+class TagWrite(BaseModel):
+    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
+
+
 class KnowledgeSourceRead(BaseModel):
     source_id: str
     title: str
     categories: list[CategoryRead]
+    tags: list[TagRead] = Field(default_factory=list)
     source_type: str
     uri: str
     content_hash: str
@@ -48,6 +60,7 @@ class KnowledgeSourceDetail(KnowledgeSourceRead):
 class KnowledgeSourcePatchRequest(BaseModel):
     title: TitleStr | None = None
     category_ids: list[int] | None = None
+    tag_ids: list[int] | None = None
     content: NonEmptyStr | None = None
 
     @field_validator("category_ids")
@@ -55,9 +68,19 @@ class KnowledgeSourcePatchRequest(BaseModel):
     def validate_category_ids(cls, value: list[int] | None) -> list[int] | None:
         return validate_optional_category_ids(value)
 
+    @field_validator("tag_ids")
+    @classmethod
+    def validate_tag_ids(cls, value: list[int] | None) -> list[int] | None:
+        return validate_source_patch_tag_ids(value)
+
     @model_validator(mode="after")
     def require_any_field(self) -> "KnowledgeSourcePatchRequest":
-        if self.title is None and self.category_ids is None and self.content is None:
+        if (
+            self.title is None
+            and self.category_ids is None
+            and self.tag_ids is None
+            and self.content is None
+        ):
             raise ValueError("At least one source field must be provided.")
         return self
 
@@ -79,6 +102,7 @@ class KnowledgeChunkRead(BaseModel):
     source_type: str
     uri: str
     categories: list[CategoryRead]
+    tags: list[TagRead] = Field(default_factory=list)
     location: KnowledgeChunkLocation
     content: str
     score: float | None = None
@@ -89,6 +113,7 @@ class KnowledgeSearchRequest(BaseModel):
     query: NonEmptyStr
     limit: int = Field(default=5, ge=1, le=50)
     category_ids: list[int] | None = Field(default=None)
+    tag_ids: list[int] | None = Field(default=None)
     min_score: float | None = Field(default=None, ge=0.0, le=1.0, allow_inf_nan=False)
     include_match_reasons: bool = Field(default=False)
 
@@ -96,6 +121,11 @@ class KnowledgeSearchRequest(BaseModel):
     @classmethod
     def validate_category_ids(cls, value: list[int] | None) -> list[int] | None:
         return validate_optional_category_ids(value)
+
+    @field_validator("tag_ids")
+    @classmethod
+    def validate_tag_ids(cls, value: list[int] | None) -> list[int] | None:
+        return validate_optional_tag_ids(value)
 
 
 class KnowledgeSearchResponse(BaseModel):
@@ -108,27 +138,37 @@ class KnowledgeUploadResponse(BaseModel):
     source_id: str
     title: str
     categories: list[CategoryRead]
+    tags: list[TagRead] = Field(default_factory=list)
     chunks_created: int
 
 
 class KnowledgeUploadRequest(BaseModel):
     category_ids: list[int]
+    tag_ids: list[int] | None = None
 
     @field_validator("category_ids")
     @classmethod
     def validate_category_ids(cls, value: list[int]) -> list[int]:
         return validate_required_category_ids(value)
 
+    @field_validator("tag_ids")
+    @classmethod
+    def validate_tag_ids(cls, value: list[int] | None) -> list[int] | None:
+        return validate_optional_tag_ids(value)
+
     @classmethod
     async def as_form(
-        cls, category_ids: Annotated[list[int], Form(...)]
+        cls,
+        category_ids: Annotated[list[int], Form(...)],
+        tag_ids: Annotated[list[int] | None, Form()] = None,
     ) -> "KnowledgeUploadRequest":
-        return cls(category_ids=category_ids)
+        return cls(category_ids=category_ids, tag_ids=tag_ids)
 
 
 class KnowledgeTextIngestRequest(BaseModel):
     title: TitleStr
     category_ids: list[int]
+    tag_ids: list[int] | None = None
     content: NonEmptyStr
 
     @field_validator("category_ids")
@@ -136,11 +176,17 @@ class KnowledgeTextIngestRequest(BaseModel):
     def validate_category_ids(cls, value: list[int]) -> list[int]:
         return validate_required_category_ids(value)
 
+    @field_validator("tag_ids")
+    @classmethod
+    def validate_tag_ids(cls, value: list[int] | None) -> list[int] | None:
+        return validate_optional_tag_ids(value)
+
 
 class KnowledgeAnswerRequest(BaseModel):
     query: NonEmptyStr
     limit: int = Field(default=5, ge=1, le=20)
     category_ids: list[int] | None = Field(default=None)
+    tag_ids: list[int] | None = Field(default=None)
     min_score: float | None = Field(default=None, ge=0.0, le=1.0, allow_inf_nan=False)
     include_match_reasons: bool = Field(default=False)
 
@@ -148,6 +194,11 @@ class KnowledgeAnswerRequest(BaseModel):
     @classmethod
     def validate_category_ids(cls, value: list[int] | None) -> list[int] | None:
         return validate_optional_category_ids(value)
+
+    @field_validator("tag_ids")
+    @classmethod
+    def validate_tag_ids(cls, value: list[int] | None) -> list[int] | None:
+        return validate_optional_tag_ids(value)
 
 
 class KnowledgeAnswerResponse(BaseModel):
@@ -170,9 +221,31 @@ def validate_optional_category_ids(value: list[int] | None) -> list[int] | None:
     return validate_category_id_list(value)
 
 
+def validate_optional_tag_ids(value: list[int] | None) -> list[int] | None:
+    if value is None:
+        return None
+    if not value:
+        raise ValueError("Tag id filter must not be empty.")
+    return validate_tag_id_list(value)
+
+
+def validate_source_patch_tag_ids(value: list[int] | None) -> list[int] | None:
+    if value is None:
+        return None
+    return validate_tag_id_list(value)
+
+
 def validate_category_id_list(value: list[int]) -> list[int]:
     if any(category_id < 1 for category_id in value):
         raise ValueError("Category ids must be greater than zero.")
     if len(set(value)) != len(value):
         raise ValueError("Category ids must not contain duplicates.")
+    return value
+
+
+def validate_tag_id_list(value: list[int]) -> list[int]:
+    if any(tag_id < 1 for tag_id in value):
+        raise ValueError("Tag ids must be greater than zero.")
+    if len(set(value)) != len(value):
+        raise ValueError("Tag ids must not contain duplicates.")
     return value

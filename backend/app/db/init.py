@@ -1,7 +1,7 @@
 from sqlalchemy import text
 
 from .base import Base
-from .models import AppConfig, Category, DocumentSource, KnowledgeChunk  # noqa: F401
+from .models import AppConfig, Category, DocumentSource, KnowledgeChunk, Tag  # noqa: F401
 from .session import engine
 
 
@@ -84,6 +84,32 @@ async def init_db() -> None:
             text(
                 "CREATE UNIQUE INDEX IF NOT EXISTS uq_categories_lower_name "
                 "ON categories (lower(name))"
+            )
+        )
+        await connection.execute(
+            text(
+                "ALTER TABLE tags ADD COLUMN IF NOT EXISTS normalized_name VARCHAR(100)"
+            )
+        )
+        await connection.execute(
+            text(
+                "UPDATE tags SET normalized_name = lower(btrim(name)) "
+                "WHERE normalized_name IS NULL"
+            )
+        )
+        await connection.execute(
+            text("ALTER TABLE tags ALTER COLUMN normalized_name SET NOT NULL")
+        )
+        await connection.execute(
+            text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_tags_normalized_name "
+                "ON tags (normalized_name)"
+            )
+        )
+        await connection.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_document_source_tags_tag_id "
+                "ON document_source_tags (tag_id)"
             )
         )
         await connection.execute(

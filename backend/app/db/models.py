@@ -25,6 +25,18 @@ document_source_categories = Table(
 )
 
 
+document_source_tags = Table(
+    "document_source_tags",
+    Base.metadata,
+    Column(
+        "document_source_id",
+        ForeignKey("document_sources.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column("tag_id", ForeignKey("tags.id"), primary_key=True),
+)
+
+
 class Category(Base):
     __tablename__ = "categories"
 
@@ -35,6 +47,20 @@ class Category(Base):
     sources: Mapped[list["DocumentSource"]] = relationship(
         secondary=document_source_categories,
         back_populates="categories",
+    )
+
+
+class Tag(Base):
+    __tablename__ = "tags"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    normalized_name: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    sources: Mapped[list["DocumentSource"]] = relationship(
+        secondary=document_source_tags,
+        back_populates="tags",
     )
 
 
@@ -60,6 +86,10 @@ class DocumentSource(Base):
     )
     categories: Mapped[list[Category]] = relationship(
         secondary=document_source_categories,
+        back_populates="sources",
+    )
+    tags: Mapped[list[Tag]] = relationship(
+        secondary=document_source_tags,
         back_populates="sources",
     )
 

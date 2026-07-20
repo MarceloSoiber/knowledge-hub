@@ -20,6 +20,8 @@ from ...schemas.knowledge import (
     KnowledgeTextIngestRequest,
     KnowledgeUploadRequest,
     KnowledgeUploadResponse,
+    TagRead,
+    TagWrite,
 )
 from ...services.embeddings import (
     EmbeddingClient,
@@ -55,6 +57,16 @@ from ...services.sources import (
     get_source_detail,
     update_source,
 )
+from ...services.tags import (
+    TagConflictError,
+    TagInUseError,
+    TagNotFoundError,
+    autocomplete_tags,
+    create_tag,
+    delete_tag,
+    list_tags,
+    update_tag,
+)
 
 router = APIRouter(prefix="/knowledge", tags=["knowledge"])
 
@@ -68,6 +80,9 @@ async def parse_text_ingest_payload(request: Request) -> KnowledgeTextIngestRequ
             "content": form.get("content"),
             "category_ids": form.getlist("category_ids"),
         }
+        tag_ids = form.getlist("tag_ids")
+        if tag_ids:
+            payload["tag_ids"] = tag_ids
     else:
         payload = await request.json()
 
@@ -89,11 +104,14 @@ async def knowledge_search(
             query=payload.query,
             limit=payload.limit,
             category_ids=payload.category_ids,
+            tag_ids=payload.tag_ids,
             min_score=payload.min_score,
             include_match_reasons=payload.include_match_reasons,
             embedding_client=embedding_client,
         )
     except CategoryNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except TagNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except EmbeddingConfigurationError as exc:
         raise HTTPException(
@@ -123,6 +141,7 @@ async def upload_knowledge_file(
             filename=file.filename or "upload",
             content=content,
             category_ids=payload.category_ids,
+            tag_ids=payload.tag_ids,
             embedding_client=embedding_client,
         )
     except FileTooLargeError as exc:
@@ -130,6 +149,8 @@ async def upload_knowledge_file(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail=str(exc)
         ) from exc
     except CategoryNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except TagNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except DuplicateSourceContentError as exc:
         raise _duplicate_source_http_error(exc) from exc
@@ -146,6 +167,7 @@ async def upload_knowledge_file(
         source_id=source.public_id,
         title=source.title,
         categories=source.categories,
+        tags=getattr(source, "tags", []),
         chunks_created=chunks_created,
     )
 
@@ -166,9 +188,12 @@ async def ingest_knowledge_text(
             title=payload.title,
             content=payload.content,
             category_ids=payload.category_ids,
+            tag_ids=payload.tag_ids,
             embedding_client=embedding_client,
         )
     except CategoryNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except TagNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except DuplicateSourceContentError as exc:
         raise _duplicate_source_http_error(exc) from exc
@@ -185,6 +210,7 @@ async def ingest_knowledge_text(
         source_id=source.public_id,
         title=source.title,
         categories=source.categories,
+        tags=getattr(source, "tags", []),
         chunks_created=chunks_created,
     )
 
@@ -202,12 +228,15 @@ async def knowledge_answer(
             query=payload.query,
             limit=payload.limit,
             category_ids=payload.category_ids,
+            tag_ids=payload.tag_ids,
             min_score=payload.min_score,
             include_match_reasons=payload.include_match_reasons,
             embedding_client=embedding_client,
             answer_client=answer_client,
         )
     except CategoryNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except TagNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except (EmbeddingConfigurationError, LLMConfigurationError) as exc:
         raise HTTPException(
@@ -251,12 +280,15 @@ async def patch_knowledge_source(
             embedding_client=embedding_client,
             title=payload.title,
             category_ids=payload.category_ids,
+            tag_ids=payload.tag_ids,
             content=payload.content,
         )
         return source
     except SourceNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except CategoryNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except TagNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except DuplicateSourceContentError as exc:
         raise _duplicate_source_http_error(exc) from exc
@@ -289,6 +321,69 @@ async def knowledge_categories(
     session: AsyncSession = Depends(get_session),
 ) -> list[dict[str, str | int]]:
     return await list_categories(session)
+
+
+@router.get("/tags", response_model=list[TagRead])
+async def knowledge_tags(
+    session: AsyncSession = Depends(get_session),
+) -> list[dict[str, str | int]]:
+    return await list_tags(session)
+
+
+@router.get("/tags/autocomplete", response_model=list[TagRead])
+async def autocomplete_knowledge_tags(
+    q: str,
+    limit: int = 10,
+    session: AsyncSession = Depends(get_session),
+) -> list[dict[str, str | int]]:
+    if limit < 1 or limit > 50:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="limit must be between 1 and 50.",
+        )
+    return await autocomplete_tags(session, q, limit)
+
+
+@router.post(
+    "/tags",
+    response_model=TagRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_knowledge_tag(
+    payload: TagWrite,
+    session: AsyncSession = Depends(get_session),
+) -> TagRead:
+    try:
+        return await create_tag(session, payload.name)
+    except TagConflictError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+
+@router.patch("/tags/{tag_id}", response_model=TagRead)
+async def update_knowledge_tag(
+    tag_id: int,
+    payload: TagWrite,
+    session: AsyncSession = Depends(get_session),
+) -> TagRead:
+    try:
+        return await update_tag(session, tag_id, payload.name)
+    except TagNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except TagConflictError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+
+@router.delete("/tags/{tag_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_knowledge_tag(
+    tag_id: int,
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    try:
+        await delete_tag(session, tag_id)
+    except TagNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except TagInUseError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
 
 @router.post(
