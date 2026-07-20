@@ -4,6 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: mcp-knowledge-hub-backend
+    init: true
     restart: unless-stopped
     depends_on:
       postgres:
@@ -42,6 +43,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: mcp-knowledge-hub-mcp
+    init: true
     restart: unless-stopped
     depends_on:
       backend:
