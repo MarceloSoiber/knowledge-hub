@@ -117,9 +117,9 @@ entram nos candidatos vetoriais; eles ainda podem aparecer por busca textual
 quando o fluxo híbrido encontrar correspondência, sem `vector` em
 `match_reasons`.
 
-Operacoes administrativas de reindexacao e backup sao expostas por CLI/runbook,
+Operacoes administrativas de reindexacao, backup e indice HNSW sao expostas por CLI/runbook,
 nao por endpoint HTTP nesta versao. Consulte `doc/OPERATIONS.md` para
-`reindex-embeddings`, `knowledge-backup`, backup com `pg_dump`, restauracao e
+`reindex-embeddings`, `knowledge-backup`, `knowledge-hnsw`, backup com `pg_dump`, restauracao e
 gate de agendamento apos teste real de restore.
 
 As tools `tags()` e `tag_autocomplete(query, limit)` listam tags existentes para
