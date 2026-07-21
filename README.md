@@ -1,4 +1,4 @@
-# MCP Knowledge Hub
+# Knowledge Hub
 
 Hub de conhecimento com API FastAPI, PostgreSQL + `pgvector`, embeddings, RAG e um servidor MCP remoto para que agentes consultem os documentos ingeridos.
 
@@ -87,13 +87,13 @@ docker-compose run --rm backend set-auth-token --generate
 Se o servidor tiver Docker, mas não tiver `docker-compose`, execute o comando dentro do container do backend já iniciado:
 
 ```bash
-docker exec -it mcp-knowledge-hub-backend set-auth-token
+docker exec -it knowledge-hub-backend set-auth-token
 ```
 
 Para evitar problemas de colagem no terminal, prefira gerar e salvar direto no container:
 
 ```bash
-docker exec -it mcp-knowledge-hub-backend set-auth-token --generate
+docker exec -it knowledge-hub-backend set-auth-token --generate
 ```
 
 O comando pede o token de forma interativa:
@@ -109,7 +109,7 @@ Depois de salvar, use esse valor apenas no cliente/API que vai acessar o sistema
 Para conferir se o token foi salvo sem exibir o valor:
 
 ```bash
-docker exec -it mcp-knowledge-hub-postgres psql -U postgres -d knowledge_hub \
+docker exec -it knowledge-hub-postgres psql -U postgres -d knowledge_hub \
   -c "select key, length(value) as token_length, updated_at from app_config;"
 ```
 
@@ -396,15 +396,15 @@ docker-compose run --rm backend set-auth-token
 Sem `docker-compose` no servidor:
 
 ```bash
-docker exec -it mcp-knowledge-hub-backend set-auth-token
-docker restart mcp-knowledge-hub-mcp
+docker exec -it knowledge-hub-backend set-auth-token
+docker restart knowledge-hub-mcp
 ```
 
 Para gerar e salvar direto no container:
 
 ```bash
-docker exec -it mcp-knowledge-hub-backend set-auth-token --generate
-docker restart mcp-knowledge-hub-mcp
+docker exec -it knowledge-hub-backend set-auth-token --generate
+docker restart knowledge-hub-mcp
 ```
 
 O backend e o MCP consultam o banco para validar o Bearer token, então o novo valor passa a valer sem precisar gravar segredo no repositório.

@@ -43,7 +43,7 @@ def create_app() -> FastAPI:
 
     @app.get("/")
     async def root() -> dict[str, str]:
-        return {"message": "MCP Knowledge Hub API"}
+        return {"message": "Knowledge Hub API"}
 
     return app
 

@@ -275,7 +275,7 @@ wheels = [
 ]
 
 [[package]]
-name = "mcp-knowledge-hub"
+name = "knowledge-hub"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

@@ -1,4 +1,4 @@
-# API do MCP Knowledge Hub
+# API do Knowledge Hub
 
 Documentação da API HTTP usada para cadastrar documentos, consultar categorias,
 realizar buscas semânticas e gerar respostas com apoio de um LLM.

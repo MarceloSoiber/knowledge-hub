@@ -3,14 +3,14 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: mcp-knowledge-hub-backend
+    container_name: knowledge-hub-backend
     init: true
     restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      APP_NAME: "MCP Knowledge Hub"
+      APP_NAME: "Knowledge Hub"
       ENVIRONMENT: development
       FRONTEND_ORIGIN: "${FRONTEND_ORIGIN:-http://localhost:5173}"
       POSTGRES_DSN: "${POSTGRES_DSN:-postgresql+asyncpg://postgres:postgres@host.docker.internal:15432/knowledge_hub}"
@@ -42,7 +42,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: mcp-knowledge-hub-mcp
+    container_name: knowledge-hub-mcp
     init: true
     restart: unless-stopped
     depends_on:
@@ -52,7 +52,7 @@ services:
         condition: service_healthy
     command: ["mcp-server"]
     environment:
-      APP_NAME: "MCP Knowledge Hub"
+      APP_NAME: "Knowledge Hub"
       ENVIRONMENT: development
       POSTGRES_DSN: "${POSTGRES_DSN:-postgresql+asyncpg://postgres:postgres@host.docker.internal:15432/knowledge_hub}"
       LLM_PROVIDER: "${LLM_PROVIDER:-local}"
@@ -75,7 +75,7 @@ services:
 
   postgres:
     image: pgvector/pgvector:pg16
-    container_name: mcp-knowledge-hub-postgres
+    container_name: knowledge-hub-postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: knowledge_hub
