@@ -8,6 +8,8 @@ from .models import (  # noqa: F401
     EmbeddingBatch,
     KnowledgeChunk,
     Project,
+    ReindexItem,
+    ReindexRun,
     Tag,
 )
 from .session import engine
@@ -272,6 +274,36 @@ async def init_db() -> None:
             text(
                 "CREATE INDEX IF NOT EXISTS ix_knowledge_chunks_embedding_hash_batch "
                 "ON knowledge_chunks (embedding_content_hash, embedding_batch_id)"
+            )
+        )
+        await connection.execute(
+            text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_reindex_runs_public_id "
+                "ON reindex_runs (public_id)"
+            )
+        )
+        await connection.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_reindex_runs_config_status "
+                "ON reindex_runs (target_config_hash, status)"
+            )
+        )
+        await connection.execute(
+            text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_reindex_items_run_chunk "
+                "ON reindex_items (run_id, chunk_id) WHERE chunk_id IS NOT NULL"
+            )
+        )
+        await connection.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_reindex_items_run_status "
+                "ON reindex_items (run_id, status)"
+            )
+        )
+        await connection.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_reindex_items_source_status "
+                "ON reindex_items (source_id, status)"
             )
         )
         await connection.execute(
