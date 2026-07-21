@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import math
+import time
 from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -65,6 +66,7 @@ async def search_knowledge(
     project_ids: list[int] | None = None,
     min_score: float | None = None,
     include_match_reasons: bool = False,
+    latency_ms: dict[str, float] | None = None,
 ) -> list[KnowledgeChunkRead]:
     # pylint: disable=too-many-locals
     if category_ids is not None:
@@ -73,7 +75,11 @@ async def search_knowledge(
         await get_tags(session, tag_ids)
     if project_ids is not None:
         await get_projects(session, project_ids)
+    embedding_started_at = time.perf_counter()
     query_embedding = (await embedding_client.embed_texts([query]))[0]
+    if latency_ms is not None:
+        latency_ms["embedding"] = round((time.perf_counter() - embedding_started_at) * 1000, 3)
+    search_started_at = time.perf_counter()
     embedding_identity = active_embedding_identity()
     candidate_limit = resolve_candidate_limit(limit)
     vector_results = await search_similar_chunks(
@@ -109,6 +115,8 @@ async def search_knowledge(
         threshold=threshold,
         include_match_reasons=include_match_reasons,
     )
+    if latency_ms is not None:
+        latency_ms["search"] = round((time.perf_counter() - search_started_at) * 1000, 3)
     return results
 
 

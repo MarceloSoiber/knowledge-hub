@@ -40,6 +40,7 @@ set-auth-token = "backend.app.cli.config:set_auth_token_main"
 reindex-embeddings = "backend.app.cli.reindex:reindex_main"
 knowledge-backup = "backend.app.cli.backup:backup_main"
 knowledge-hnsw = "backend.app.cli.hnsw:main"
+rag-eval = "backend.app.cli.evaluate_rag:main"
 
 [tool.setuptools]
 package-dir = {"" = "."}
