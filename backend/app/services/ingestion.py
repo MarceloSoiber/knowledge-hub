@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db.models import Category, DocumentSource, Project, Tag
 from ..repositories.chunks import add_source_chunks
+from ..repositories.embeddings import complete_embedding_batch, create_embedding_batch
 from ..repositories.sources import get_source_by_content_hash
 from .categories import get_categories
 from .documents.chunker import (
@@ -25,6 +26,7 @@ from .documents.extractors import (
 )
 from .documents.normalizer import normalize_text
 from .embeddings import EmbeddingClient
+from .embedding_versions import active_embedding_identity, compute_embedding_content_hash
 from .projects import get_projects
 from .tags import get_tags
 
@@ -135,6 +137,7 @@ async def ingest_text_source(
     page_spans: list[PageSpan] | None = None,
     section_spans: list[SectionSpan] | None = None,
 ) -> tuple[DocumentSource, int]:
+    # pylint: disable=too-many-locals
     content_hash = compute_content_hash(text)
     existing_source = await get_source_by_content_hash(session, content_hash)
     if existing_source is not None:
@@ -146,6 +149,12 @@ async def ingest_text_source(
         section_spans=section_spans,
     )
     chunk_contents = [chunk.content for chunk in chunks]
+    embedding_identity = active_embedding_identity()
+    embedding_batch = await create_embedding_batch(
+        session,
+        embedding_identity,
+        len(chunk_contents),
+    )
     embeddings = await embedding_client.embed_texts(chunk_contents)
 
     source = DocumentSource(
@@ -175,7 +184,13 @@ async def ingest_text_source(
             chunks=chunks,
             extra_metadata=extra_metadata,
         ),
+        embedding_batch.id,
+        [
+            compute_embedding_content_hash(chunk_content)
+            for chunk_content in chunk_contents
+        ],
     )
+    await complete_embedding_batch(session, embedding_batch.id, len(chunks))
 
     await session.commit()
     return source, len(chunks)
@@ -199,7 +214,11 @@ def build_chunk_metadata(
         for tag in (tags or [])
     ]
     project_payload = [
-        {"id": project.id, "name": project.name, "status": project.status}  # type: ignore[attr-defined]
+        {  # type: ignore[attr-defined]
+            "id": project.id,
+            "name": project.name,
+            "status": project.status,
+        }
         for project in (projects or [])
     ]
     metadata = []

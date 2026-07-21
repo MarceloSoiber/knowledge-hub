@@ -53,13 +53,25 @@ class ProjectRead(BaseModel):
 
 
 class ProjectWrite(BaseModel):
-    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=150)]
-    description: Annotated[str, StringConstraints(strip_whitespace=True, max_length=2000)] | None = None
+    name: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=150),
+    ]
+    description: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, max_length=2000),
+    ] | None = None
 
 
 class ProjectPatch(BaseModel):
-    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=150)] | None = None
-    description: Annotated[str, StringConstraints(strip_whitespace=True, max_length=2000)] | None = None
+    name: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=150),
+    ] | None = None
+    description: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, max_length=2000),
+    ] | None = None
 
     @model_validator(mode="after")
     def require_any_field(self) -> "ProjectPatch":
@@ -126,6 +138,15 @@ class KnowledgeChunkLocation(BaseModel):
     section: str | None = None
     start_char: int
     end_char: int
+
+
+class KnowledgeEmbeddingRead(BaseModel):
+    status: str
+    provider: str | None = None
+    model: str | None = None
+    dimension: int | None = None
+    version: str | None = None
+    embedded_at: datetime | None = None
 
 
 class KnowledgeChunkRead(BaseModel):

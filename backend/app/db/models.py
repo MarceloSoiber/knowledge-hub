@@ -3,7 +3,18 @@ from typing import Any
 from uuid import uuid4
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import Column, Computed, DateTime, ForeignKey, Integer, String, Table, Text, func
+from sqlalchemy import (
+    CheckConstraint,
+    Column,
+    Computed,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Table,
+    Text,
+    func,
+)
 from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -144,9 +155,39 @@ class KnowledgeChunk(Base):
     embedding: Mapped[list[float] | None] = mapped_column(
         Vector(EMBEDDING_DIMENSION), nullable=True
     )
+    embedding_batch_id: Mapped[int | None] = mapped_column(
+        ForeignKey("embedding_batches.id"), nullable=True
+    )
+    embedding_content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    embedding_status: Mapped[str] = mapped_column(String(32), nullable=False, default="pending")
+    embedded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    embedding_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     source: Mapped[DocumentSource] = relationship(back_populates="chunks")
+    embedding_batch: Mapped["EmbeddingBatch | None"] = relationship(back_populates="chunks")
+
+
+class EmbeddingBatch(Base):
+    __tablename__ = "embedding_batches"
+    __table_args__ = (
+        CheckConstraint("dimension > 0", name="ck_embedding_batches_dimension_positive"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    provider: Mapped[str] = mapped_column(String(50), nullable=False)
+    model: Mapped[str] = mapped_column(String(255), nullable=False)
+    dimension: Mapped[int] = mapped_column(Integer, nullable=False)
+    version: Mapped[str] = mapped_column(String(255), nullable=False)
+    config_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="running")
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    chunks_total: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    chunks_embedded: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    chunks: Mapped[list[KnowledgeChunk]] = relationship(back_populates="embedding_batch")
 
 
 class AppConfig(Base):

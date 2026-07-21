@@ -36,7 +36,9 @@ async def get_category(session: AsyncSession, category_id: int) -> Category:
 async def get_categories(session: AsyncSession, category_ids: list[int]) -> list[Category]:
     categories = await list_categories_by_ids(session, category_ids)
     categories_by_id = {category.id: category for category in categories}
-    missing_ids = [category_id for category_id in category_ids if category_id not in categories_by_id]
+    missing_ids = [
+        category_id for category_id in category_ids if category_id not in categories_by_id
+    ]
     if missing_ids:
         raise CategoryNotFoundError(f"Category {missing_ids[0]} does not exist.")
     return [categories_by_id[category_id] for category_id in category_ids]

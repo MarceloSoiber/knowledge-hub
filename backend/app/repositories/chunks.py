@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
 import json
 from pathlib import Path
 from typing import Any
@@ -11,12 +12,14 @@ from sqlalchemy.orm import selectinload
 
 from ..db.models import (
     DocumentSource,
+    EmbeddingBatch,
     KnowledgeChunk,
     document_source_categories,
     document_source_projects,
     document_source_tags,
 )
 from ..schemas.knowledge import KnowledgeChunkRead
+from ..services.embedding_versions import EmbeddingConfigIdentity
 
 PUBLIC_METADATA_KEYS = {"client_id", "note_type"}
 TEXT_SEARCH_CONFIG = "simple"
@@ -38,14 +41,26 @@ def add_source_chunks(
     chunks: list[str],
     embeddings: list[list[float]],
     metadata: list[dict[str, Any]],
+    embedding_batch_id: int,
+    embedding_content_hashes: list[str],
 ) -> None:
-    for chunk, embedding, metadata_json in zip(chunks, embeddings, metadata, strict=True):
+    for chunk, embedding, metadata_json, content_hash in zip(
+        chunks,
+        embeddings,
+        metadata,
+        embedding_content_hashes,
+        strict=True,
+    ):
         session.add(
             KnowledgeChunk(
                 source_id=source_id,
                 content=chunk,
                 metadata_json=metadata_json,
                 embedding=embedding,
+                embedding_batch_id=embedding_batch_id,
+                embedding_content_hash=content_hash,
+                embedding_status="embedded",
+                embedded_at=datetime.now(UTC),
             )
         )
 
@@ -54,6 +69,7 @@ async def search_similar_chunks(
     session: AsyncSession,
     query_embedding: list[float],
     limit: int,
+    embedding_identity: EmbeddingConfigIdentity,
     category_ids: list[int] | None = None,
     tag_ids: list[int] | None = None,
     project_ids: list[int] | None = None,
@@ -67,12 +83,17 @@ async def search_similar_chunks(
             distance.label("distance"),
         )
         .join(DocumentSource, KnowledgeChunk.source_id == DocumentSource.id)
+        .join(EmbeddingBatch, KnowledgeChunk.embedding_batch_id == EmbeddingBatch.id)
         .options(
+            selectinload(KnowledgeChunk.embedding_batch),
             selectinload(DocumentSource.categories),
             selectinload(DocumentSource.tags),
             selectinload(DocumentSource.projects),
         )
         .where(KnowledgeChunk.embedding.is_not(None))
+        .where(KnowledgeChunk.embedding_status == "embedded")
+        .where(EmbeddingBatch.config_hash == embedding_identity.config_hash)
+        .where(EmbeddingBatch.status == "completed")
     )
     if category_ids is not None:
         statement = statement.where(
@@ -120,6 +141,7 @@ async def search_text_chunks(
         )
         .join(DocumentSource, KnowledgeChunk.source_id == DocumentSource.id)
         .options(
+            selectinload(KnowledgeChunk.embedding_batch),
             selectinload(DocumentSource.categories),
             selectinload(DocumentSource.tags),
             selectinload(DocumentSource.projects),
@@ -173,7 +195,10 @@ def build_chunk_read(row: object) -> KnowledgeChunkRead:
         ),
         categories=[
             {"id": category.id, "name": category.name}
-            for category in sorted(getattr(source, "categories", []), key=lambda category: category.name)
+            for category in sorted(
+                getattr(source, "categories", []),
+                key=lambda category: category.name,
+            )
         ],
         tags=[
             {"id": tag.id, "name": tag.name}
@@ -194,6 +219,7 @@ def build_chunk_read(row: object) -> KnowledgeChunkRead:
         content=getattr(chunk, "content"),
         score=1 - float(distance),
         metadata=public_metadata(metadata),
+        embedding=build_embedding_payload(chunk),
     )
 
 
@@ -213,7 +239,10 @@ def build_text_chunk_read(row: object) -> KnowledgeChunkRead:
         ),
         categories=[
             {"id": category.id, "name": category.name}
-            for category in sorted(getattr(source, "categories", []), key=lambda category: category.name)
+            for category in sorted(
+                getattr(source, "categories", []),
+                key=lambda category: category.name,
+            )
         ],
         tags=[
             {"id": tag.id, "name": tag.name}
@@ -234,7 +263,30 @@ def build_text_chunk_read(row: object) -> KnowledgeChunkRead:
         content=getattr(chunk, "content"),
         score=None,
         metadata=public_metadata(metadata),
+        embedding=build_embedding_payload(chunk),
     )
+
+
+def build_embedding_payload(chunk: object) -> dict[str, Any]:
+    batch = getattr(chunk, "embedding_batch", None)
+    status = getattr(chunk, "embedding_status", None) or "unversioned"
+    if batch is None:
+        return {
+            "status": status,
+            "provider": None,
+            "model": None,
+            "dimension": None,
+            "version": None,
+            "embedded_at": getattr(chunk, "embedded_at", None),
+        }
+    return {
+        "status": status,
+        "provider": getattr(batch, "provider", None),
+        "model": getattr(batch, "model", None),
+        "dimension": getattr(batch, "dimension", None),
+        "version": getattr(batch, "version", None),
+        "embedded_at": getattr(chunk, "embedded_at", None),
+    }
 
 
 def get_row_value(row: object, name: str, index: int) -> object:

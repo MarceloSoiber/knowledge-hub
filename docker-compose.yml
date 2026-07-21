@@ -21,6 +21,7 @@ services:
       API_LLM_MODEL: "${API_LLM_MODEL:-gpt-4.1-mini}"
       API_KEY: "${API_KEY:-}"
       EMBEDDING_MODEL: "${EMBEDDING_MODEL:-text-embedding-nomic-embed-text-v1.5}"
+      EMBEDDING_VERSION: "${EMBEDDING_VERSION:-default}"
       VECTOR_DIM: "${VECTOR_DIM:-768}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -62,6 +63,7 @@ services:
       API_LLM_MODEL: "${API_LLM_MODEL:-gpt-4.1-mini}"
       API_KEY: "${API_KEY:-}"
       EMBEDDING_MODEL: "${EMBEDDING_MODEL:-text-embedding-nomic-embed-text-v1.5}"
+      EMBEDDING_VERSION: "${EMBEDDING_VERSION:-default}"
       VECTOR_DIM: "${VECTOR_DIM:-768}"
       MCP_HOST: "0.0.0.0"
       MCP_PORT: "8001"

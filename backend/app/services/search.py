@@ -11,6 +11,7 @@ from ..repositories.chunks import TextSearchChunk, search_similar_chunks, search
 from ..repositories.sources import list_sources as list_source_records
 from ..schemas.knowledge import KnowledgeChunkRead
 from .categories import get_categories
+from .embedding_versions import active_embedding_identity
 from .embeddings import EmbeddingClient
 from .rag import AnswerClient
 from .projects import get_projects
@@ -65,6 +66,7 @@ async def search_knowledge(
     min_score: float | None = None,
     include_match_reasons: bool = False,
 ) -> list[KnowledgeChunkRead]:
+    # pylint: disable=too-many-locals
     if category_ids is not None:
         await get_categories(session, category_ids)
     if tag_ids is not None:
@@ -72,11 +74,13 @@ async def search_knowledge(
     if project_ids is not None:
         await get_projects(session, project_ids)
     query_embedding = (await embedding_client.embed_texts([query]))[0]
+    embedding_identity = active_embedding_identity()
     candidate_limit = resolve_candidate_limit(limit)
     vector_results = await search_similar_chunks(
         session=session,
         query_embedding=query_embedding,
         limit=candidate_limit,
+        embedding_identity=embedding_identity,
         category_ids=category_ids,
         tag_ids=tag_ids,
         project_ids=project_ids,

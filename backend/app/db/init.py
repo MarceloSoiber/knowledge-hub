@@ -1,10 +1,21 @@
 from sqlalchemy import text
 
 from .base import Base
-from .models import AppConfig, Category, DocumentSource, KnowledgeChunk, Project, Tag  # noqa: F401
+from .models import (  # noqa: F401
+    AppConfig,
+    Category,
+    DocumentSource,
+    EmbeddingBatch,
+    KnowledgeChunk,
+    Project,
+    Tag,
+)
 from .session import engine
+from ..core.settings import get_settings
+from ..services.embedding_versions import assert_pgvector_dimension
 
 
+# pylint: disable=too-many-statements
 async def init_db() -> None:
     async with engine.begin() as connection:
         await connection.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
@@ -17,7 +28,11 @@ async def init_db() -> None:
             text("ALTER TABLE document_sources ADD COLUMN IF NOT EXISTS public_id VARCHAR(36)")
         )
         await connection.execute(
-            text("UPDATE document_sources SET public_id = gen_random_uuid()::text WHERE public_id IS NULL")
+            text(
+                "UPDATE document_sources "
+                "SET public_id = gen_random_uuid()::text "
+                "WHERE public_id IS NULL"
+            )
         )
         await connection.execute(
             text("ALTER TABLE document_sources ALTER COLUMN public_id SET NOT NULL")
@@ -171,6 +186,96 @@ async def init_db() -> None:
         )
         await connection.execute(
             text(
+                "CREATE INDEX IF NOT EXISTS ix_embedding_batches_config_hash "
+                "ON embedding_batches (config_hash)"
+            )
+        )
+        await connection.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_embedding_batches_identity "
+                "ON embedding_batches (provider, model, dimension, version)"
+            )
+        )
+        await connection.execute(
+            text(
+                "ALTER TABLE knowledge_chunks "
+                "ADD COLUMN IF NOT EXISTS embedding_batch_id INTEGER"
+            )
+        )
+        await connection.execute(
+            text(
+                "DO $$ "
+                "BEGIN "
+                "IF NOT EXISTS ("
+                "SELECT 1 "
+                "FROM pg_constraint constraint_row "
+                "JOIN pg_class source_table ON source_table.oid = constraint_row.conrelid "
+                "JOIN pg_class target_table ON target_table.oid = constraint_row.confrelid "
+                "WHERE constraint_row.contype = 'f' "
+                "AND source_table.relname = 'knowledge_chunks' "
+                "AND target_table.relname = 'embedding_batches' "
+                ") THEN "
+                "ALTER TABLE knowledge_chunks "
+                "ADD CONSTRAINT fk_knowledge_chunks_embedding_batch_id "
+                "FOREIGN KEY (embedding_batch_id) REFERENCES embedding_batches(id); "
+                "END IF; "
+                "END $$"
+            )
+        )
+        await connection.execute(
+            text(
+                "ALTER TABLE knowledge_chunks "
+                "ADD COLUMN IF NOT EXISTS embedding_content_hash VARCHAR(64)"
+            )
+        )
+        await connection.execute(
+            text(
+                "ALTER TABLE knowledge_chunks "
+                "ADD COLUMN IF NOT EXISTS embedding_status VARCHAR(32)"
+            )
+        )
+        await connection.execute(
+            text(
+                "UPDATE knowledge_chunks "
+                "SET embedding_status = CASE "
+                "WHEN embedding IS NULL THEN 'pending' "
+                "ELSE 'unversioned' "
+                "END "
+                "WHERE embedding_status IS NULL"
+            )
+        )
+        await connection.execute(
+            text("ALTER TABLE knowledge_chunks ALTER COLUMN embedding_status SET NOT NULL")
+        )
+        await connection.execute(
+            text(
+                "ALTER TABLE knowledge_chunks "
+                "ADD COLUMN IF NOT EXISTS embedded_at TIMESTAMP WITH TIME ZONE"
+            )
+        )
+        await connection.execute(
+            text("ALTER TABLE knowledge_chunks ADD COLUMN IF NOT EXISTS embedding_error TEXT")
+        )
+        await connection.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_knowledge_chunks_embedding_batch_id "
+                "ON knowledge_chunks (embedding_batch_id)"
+            )
+        )
+        await connection.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_knowledge_chunks_embedding_status_batch "
+                "ON knowledge_chunks (embedding_status, embedding_batch_id)"
+            )
+        )
+        await connection.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_knowledge_chunks_embedding_hash_batch "
+                "ON knowledge_chunks (embedding_content_hash, embedding_batch_id)"
+            )
+        )
+        await connection.execute(
+            text(
                 "DO $$ "
                 "BEGIN "
                 "IF EXISTS ("
@@ -284,18 +389,4 @@ async def init_db() -> None:
             )
         )
         await connection.execute(text("DROP FUNCTION IF EXISTS try_parse_jsonb(text)"))
-        await connection.execute(
-            text(
-                "DO $$ "
-                "BEGIN "
-                "IF EXISTS ("
-                "SELECT 1 FROM pg_attribute "
-                "WHERE attrelid = 'knowledge_chunks'::regclass "
-                "AND attname = 'embedding' "
-                "AND atttypmod <> 768"
-                ") THEN "
-                "ALTER TABLE knowledge_chunks ALTER COLUMN embedding TYPE vector(768); "
-                "END IF; "
-                "END $$"
-            )
-        )
+        await assert_pgvector_dimension(connection, get_settings().vector_dim)

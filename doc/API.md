@@ -110,6 +110,13 @@ categorias, tags, projetos, localização do chunk, conteúdo, score e metadados
 permitidos. Quando `include_match_reasons=true`, cada resultado pode indicar se
 veio de match `vector`, `text` ou ambos.
 
+A busca vetorial usa somente chunks com embeddings gerados pela configuração
+ativa (`LLM_PROVIDER`, `EMBEDDING_MODEL`, `EMBEDDING_VERSION` e `VECTOR_DIM`).
+Chunks legados sem metadados de embedding ou gerados por outra configuração não
+entram nos candidatos vetoriais; eles ainda podem aparecer por busca textual
+quando o fluxo híbrido encontrar correspondência, sem `vector` em
+`match_reasons`.
+
 As tools `tags()` e `tag_autocomplete(query, limit)` listam tags existentes para
 que clientes MCP escolham `tag_ids` validos antes de ingerir ou buscar.
 As tools `projects(status)` e `project_sources(project_id)` listam projetos e
@@ -594,6 +601,10 @@ e deve ser recalibrado ao trocar o modelo de embeddings ou o dominio do
 conhecimento. O campo `match_reasons` so aparece quando solicitado.
 Filtros de categorias, tags e projetos são aplicados antes dos limites de candidatos.
 Dentro de cada dimensão, a semântica é ANY; entre dimensões, a combinação é AND.
+Na etapa vetorial, apenas chunks com `embedding_status=embedded` e lote de
+embedding compatível com a configuração ativa participam da similaridade.
+Ao trocar `EMBEDDING_MODEL`, `EMBEDDING_VERSION`, `VECTOR_DIM` ou provider,
+reindexe os documentos para recuperar cobertura vetorial completa.
 
 ### Gerar resposta com LLM
 

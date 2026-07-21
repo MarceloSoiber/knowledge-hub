@@ -40,7 +40,7 @@ def build_token_verifier():
             try:
                 async with SessionLocal() as session:
                     expected_token = await get_auth_token(session)
-            except Exception:
+            except Exception:  # pylint: disable=broad-exception-caught
                 logger.exception("Failed to validate MCP bearer token.")
                 return None
             if not expected_token or not is_valid_token(token, expected_token):
