@@ -6,6 +6,7 @@ from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     CheckConstraint,
     Column,
+    Boolean,
     Computed,
     DateTime,
     ForeignKey,
@@ -188,6 +189,57 @@ class EmbeddingBatch(Base):
     chunks_embedded: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     chunks: Mapped[list[KnowledgeChunk]] = relationship(back_populates="embedding_batch")
+
+
+class ReindexRun(Base):
+    __tablename__ = "reindex_runs"
+    __table_args__ = (
+        CheckConstraint("target_dimension > 0", name="ck_reindex_runs_dimension_positive"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    public_id: Mapped[str] = mapped_column(
+        String(36), nullable=False, unique=True, default=lambda: str(uuid4())
+    )
+    target_provider: Mapped[str] = mapped_column(String(50), nullable=False)
+    target_model: Mapped[str] = mapped_column(String(255), nullable=False)
+    target_dimension: Mapped[int] = mapped_column(Integer, nullable=False)
+    target_version: Mapped[str] = mapped_column(String(255), nullable=False)
+    target_config_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    filters_json: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    dry_run: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="running")
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    sources_total: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    chunks_total: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    chunks_reindexed: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    chunks_reused: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    chunks_failed: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    items: Mapped[list["ReindexItem"]] = relationship(
+        back_populates="run", cascade="all, delete-orphan"
+    )
+
+
+class ReindexItem(Base):
+    __tablename__ = "reindex_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    run_id: Mapped[int] = mapped_column(ForeignKey("reindex_runs.id"), nullable=False)
+    source_id: Mapped[int] = mapped_column(ForeignKey("document_sources.id"), nullable=False)
+    chunk_id: Mapped[int | None] = mapped_column(ForeignKey("knowledge_chunks.id"), nullable=True)
+    reason: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="pending")
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    run: Mapped[ReindexRun] = relationship(back_populates="items")
+    source: Mapped[DocumentSource] = relationship()
+    chunk: Mapped[KnowledgeChunk | None] = relationship()
 
 
 class AppConfig(Base):

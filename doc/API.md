@@ -117,6 +117,11 @@ entram nos candidatos vetoriais; eles ainda podem aparecer por busca textual
 quando o fluxo híbrido encontrar correspondência, sem `vector` em
 `match_reasons`.
 
+Operacoes administrativas de reindexacao e backup sao expostas por CLI/runbook,
+nao por endpoint HTTP nesta versao. Consulte `doc/OPERATIONS.md` para
+`reindex-embeddings`, `knowledge-backup`, backup com `pg_dump`, restauracao e
+gate de agendamento apos teste real de restore.
+
 As tools `tags()` e `tag_autocomplete(query, limit)` listam tags existentes para
 que clientes MCP escolham `tag_ids` validos antes de ingerir ou buscar.
 As tools `projects(status)` e `project_sources(project_id)` listam projetos e
