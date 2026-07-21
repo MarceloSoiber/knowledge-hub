@@ -1,0 +1,10 @@
+{
+  "min_recall_at_k": 0.8,
+  "min_mrr": 0.7,
+  "min_answer_correct_rate": 0.8,
+  "min_refusal_correct_rate": 1.0,
+  "min_citation_correct_rate": 0.8,
+  "max_embedding_latency_p95_ms": 5000,
+  "max_search_latency_p95_ms": 1000,
+  "max_answer_latency_p95_ms": 30000
+}

@@ -192,3 +192,32 @@ fora de uma transacao.
 knowledge-hnsw drop
 knowledge-hnsw drop --execute
 ```
+
+## Avaliacao do RAG
+
+Use a avaliacao antes de promover mudancas em chunking, embeddings, thresholds,
+busca hibrida ou indice. O dataset e os relatórios sao artefatos JSON: mantenha
+perguntas, referencias e respostas esperadas sem dados pessoais ou segredos.
+
+Copie `evaluation/rag-dataset.example.json` para um dataset local e substitua as
+referencias por `source_public_id` e `chunk_index` do ambiente. Inclua perguntas
+com resposta conhecida, termo exato, busca semantica e pelo menos uma pergunta
+que deve ser recusada. Os limites em `evaluation/thresholds.example.json` devem
+ser ajustados somente com evidencia de relatórios comparáveis.
+
+Capture uma linha de base aprovada e, depois da mudanca, execute o candidato:
+
+```bash
+rag-eval baseline --dataset evaluation/rag-dataset.json \
+  --thresholds evaluation/thresholds.json --output reports/rag-baseline.json
+rag-eval candidate --dataset evaluation/rag-dataset.json \
+  --thresholds evaluation/thresholds.json --output reports/rag-candidate.json
+rag-eval compare --baseline reports/rag-baseline.json \
+  --candidate reports/rag-candidate.json --thresholds evaluation/thresholds.json \
+  --output reports/rag-comparison.json
+```
+
+`compare` retorna `0` quando o candidato atende aos limites, `1` quando falha o
+gate e `2` para arquivo ou contrato invalido. Revise `regressed_cases`, deltas,
+erros de provider e os campos por caso antes de aceitar a mudanca. Para avaliar
+somente recuperacao, use `--search-only` em `baseline` ou `candidate`.

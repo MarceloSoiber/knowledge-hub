@@ -1,0 +1,35 @@
+{
+  "dataset_version": "rag-eval-v1",
+  "description": "Small non-sensitive RAG evaluation dataset. Replace identifiers for each environment.",
+  "defaults": {"limit": 5, "min_score": 0.35},
+  "cases": [
+    {
+      "id": "known-answer-hnsw-create",
+      "kind": "known_answer",
+      "question": "Which command creates the HNSW index?",
+      "expected_chunks": [{"source_title": "HNSW runbook", "chunk_index": 0, "snippet": "knowledge-hnsw create"}],
+      "expected_answer_points": ["knowledge-hnsw create"],
+      "expected_refusal": false
+    },
+    {
+      "id": "exact-term-hnsw",
+      "kind": "exact_term",
+      "question": "What is ix_knowledge_chunks_embedding_hnsw_cosine?",
+      "expected_chunks": [{"source_title": "HNSW runbook", "chunk_index": 0}],
+      "expected_answer_points": ["ix_knowledge_chunks_embedding_hnsw_cosine"]
+    },
+    {
+      "id": "semantic-backup",
+      "kind": "semantic",
+      "question": "How should a database backup be protected before external storage?",
+      "expected_chunks": [{"source_title": "Backup runbook", "chunk_index": 0}],
+      "expected_answer_points": ["encrypt"]
+    },
+    {
+      "id": "unanswered-private-data",
+      "kind": "unanswered",
+      "question": "What is the private payroll number of the project owner?",
+      "expected_refusal": true
+    }
+  ]
+}
