@@ -5,7 +5,7 @@
 ```json
 {
   "id": 1,
-  "name": "mcp-knowledge-hub",
+  "name": "knowledge-hub",
   "description": "Contexto de desenvolvimento do hub",
   "status": "active",
   "created_at": "2026-07-20T12:00:00Z",
@@ -31,7 +31,7 @@ Response `200`:
 [
   {
     "id": 1,
-    "name": "mcp-knowledge-hub",
+    "name": "knowledge-hub",
     "description": "Contexto de desenvolvimento do hub",
     "status": "active",
     "created_at": "2026-07-20T12:00:00Z",

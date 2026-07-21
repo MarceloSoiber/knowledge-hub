@@ -7,7 +7,7 @@ deploy:
     - docker-deploy
   resource_group: production
   variables:
-    COMPOSE_PROJECT_NAME: mcp-knowledge-hub
+    COMPOSE_PROJECT_NAME: knowledge-hub
     POSTGRES_HOST_PORT: "5432"
     POSTGRES_DSN: "postgresql+asyncpg://postgres:postgres@host.docker.internal:5432/knowledge_hub"
     DOCKER_LOCAL_LLM_BASE_URL: "http://192.168.15.114:1234"
@@ -20,7 +20,7 @@ deploy:
         docker compose stop backend mcp || true
         docker compose rm -sf backend mcp || true
 
-        for name in mcp-knowledge-hub-backend mcp-knowledge-hub-mcp; do
+        for name in knowledge-hub-backend knowledge-hub-mcp; do
           if docker container inspect "${name}" >/dev/null 2>&1; then
             remove_container_by_name "${name}" || return 1
           fi
@@ -69,7 +69,7 @@ deploy:
       }
 
       has_service_containers() {
-        for name in mcp-knowledge-hub-backend mcp-knowledge-hub-mcp; do
+        for name in knowledge-hub-backend knowledge-hub-mcp; do
           if docker container inspect "${name}" >/dev/null 2>&1; then
             return 0
           fi
@@ -79,24 +79,24 @@ deploy:
 
       show_service_containers() {
         docker ps -a \
-          --filter name=mcp-knowledge-hub-backend \
-          --filter name=mcp-knowledge-hub-mcp || true
+          --filter name=knowledge-hub-backend \
+          --filter name=knowledge-hub-mcp || true
       }
 
       diagnose_backend() {
         echo "Backend container diagnostics:"
-        docker ps -a --filter name=mcp-knowledge-hub-backend || true
-        docker inspect mcp-knowledge-hub-backend \
+        docker ps -a --filter name=knowledge-hub-backend || true
+        docker inspect knowledge-hub-backend \
           --format '{{json .State.Health}}' || true
-        docker inspect mcp-knowledge-hub-backend \
+        docker inspect knowledge-hub-backend \
           --format '{{range .Config.Env}}{{println .}}{{end}}' | grep POSTGRES_DSN || true
-        docker logs --tail=160 mcp-knowledge-hub-backend || true
+        docker logs --tail=160 knowledge-hub-backend || true
       }
 
       wait_for_backend_health() {
         healthy_checks=0
         for _ in $(seq 1 30); do
-          status="$(docker inspect mcp-knowledge-hub-backend --format '{{.State.Health.Status}}' 2>/dev/null || true)"
+          status="$(docker inspect knowledge-hub-backend --format '{{.State.Health.Status}}' 2>/dev/null || true)"
           if [ "${status}" = "healthy" ]; then
             healthy_checks=$((healthy_checks + 1))
             if [ "${healthy_checks}" -ge 3 ]; then
@@ -119,16 +119,16 @@ deploy:
       diagnose_postgres() {
         echo "Postgres container diagnostics:"
         docker compose ps postgres || true
-        docker inspect mcp-knowledge-hub-postgres \
+        docker inspect knowledge-hub-postgres \
           --format '{{json .State.Health}}' || true
-        docker logs --tail=160 mcp-knowledge-hub-postgres || true
+        docker logs --tail=160 knowledge-hub-postgres || true
       }
 
       wait_for_postgres_health() {
         docker compose up -d --force-recreate postgres
         healthy_checks=0
         for _ in $(seq 1 30); do
-          status="$(docker inspect mcp-knowledge-hub-postgres --format '{{.State.Health.Status}}' 2>/dev/null || true)"
+          status="$(docker inspect knowledge-hub-postgres --format '{{.State.Health.Status}}' 2>/dev/null || true)"
           if [ "${status}" = "healthy" ]; then
             healthy_checks=$((healthy_checks + 1))
             if [ "${healthy_checks}" -ge 3 ]; then
@@ -157,12 +157,12 @@ deploy:
 
       remove_recreate_containers() {
         if docker ps -aq \
-          --filter name='^[0-9a-f]+_mcp-knowledge-hub-backend$' \
-          --filter name='^[0-9a-f]+_mcp-knowledge-hub-mcp$' | grep -q .; then
+          --filter name='^[0-9a-f]+_knowledge-hub-backend$' \
+          --filter name='^[0-9a-f]+_knowledge-hub-mcp$' | grep -q .; then
           echo "Removing stale Compose recreate containers."
           docker ps -aq \
-            --filter name='^[0-9a-f]+_mcp-knowledge-hub-backend$' \
-            --filter name='^[0-9a-f]+_mcp-knowledge-hub-mcp$' | xargs -r docker rm -f
+            --filter name='^[0-9a-f]+_knowledge-hub-backend$' \
+            --filter name='^[0-9a-f]+_knowledge-hub-mcp$' | xargs -r docker rm -f
         fi
       }
 
@@ -215,11 +215,11 @@ deploy:
       if ! docker compose exec -T backend python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5).read()"; then
         echo "Final backend healthcheck failed."
         docker compose ps || true
-        docker inspect mcp-knowledge-hub-backend \
+        docker inspect knowledge-hub-backend \
           --format '{{json .State}}' || true
-        docker inspect mcp-knowledge-hub-backend \
+        docker inspect knowledge-hub-backend \
           --format '{{range .Config.Env}}{{println .}}{{end}}' | grep POSTGRES_DSN || true
-        docker logs --tail=200 mcp-knowledge-hub-backend || true
+        docker logs --tail=200 knowledge-hub-backend || true
         exit 1
       fi
   environment:

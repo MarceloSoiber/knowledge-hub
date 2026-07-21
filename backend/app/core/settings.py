@@ -7,7 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    app_name: str = Field(default="MCP Knowledge Hub")
+    app_name: str = Field(default="Knowledge Hub")
     environment: str = Field(default="development")
     frontend_origin: str = Field(default="http://localhost:5173")
     postgres_dsn: str = Field(

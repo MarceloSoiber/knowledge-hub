@@ -17,7 +17,7 @@
 ```bash
 curl -sS -X POST http://localhost:8000/api/v1/knowledge/projects \
   -H 'Content-Type: application/json' \
-  -d '{"name":"MCP Knowledge Hub","description":"Contexto do projeto"}'
+  -d '{"name":"Knowledge Hub","description":"Contexto do projeto"}'
 ```
 
 Expected: response includes `"status": "active"`.
@@ -31,7 +31,7 @@ curl -sS -X POST http://localhost:8000/api/v1/knowledge/texts \
     "title": "Notas do projeto",
     "category_ids": [1],
     "project_ids": [1],
-    "content": "Decisoes especificas do projeto MCP Knowledge Hub."
+    "content": "Decisoes especificas do projeto Knowledge Hub."
   }'
 ```
 

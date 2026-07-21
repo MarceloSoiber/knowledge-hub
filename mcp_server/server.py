@@ -79,7 +79,7 @@ def build_auth_settings():
 settings = get_settings()
 
 mcp = FastMCP(
-    "knowledge-hub-mcp",
+    "knowledge-hub",
     instructions="Ferramentas MCP para consultar e ampliar o Knowledge Hub.",
     host=settings.mcp_host,
     port=settings.mcp_port,
@@ -91,7 +91,7 @@ mcp = FastMCP(
 
 @mcp.tool()
 def health() -> dict[str, str]:
-    return {"status": "ok", "service": "knowledge-hub-mcp"}
+    return {"status": "ok", "service": "knowledge-hub"}
 
 
 @mcp.tool()

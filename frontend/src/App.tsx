@@ -25,7 +25,7 @@ function App() {
   return (
     <main className="shell">
       <section className="hero">
-        <div className="hero__badge">MCP Knowledge Hub</div>
+        <div className="hero__badge">Knowledge Hub</div>
         <h1>Uma base inicial para um hub de conhecimento com busca vetorial e MCP.</h1>
         <p>
           Estrutura pronta para evoluir ingestão de conteúdo, consulta semântica, ferramentas MCP e
