@@ -12,7 +12,7 @@ from pydantic import ValidationError
 from backend.app.cli.config import generate_auth_token, validate_auth_token
 from backend.app.core.auth import is_valid_token
 from backend.app.core.settings import Settings
-from backend.app.db.models import Category, DocumentSource, KnowledgeChunk, Project, Tag
+from backend.app.db.models import Category, DocumentSource, EmbeddingBatch, KnowledgeChunk, Project, Tag
 from backend.app.repositories.chunks import (
     TextSearchChunk,
     search_similar_chunks as repository_search_similar_chunks,
@@ -29,6 +29,7 @@ from backend.app.services.embeddings import (
     EmbeddingConfigurationError,
     OpenAIEmbeddingClient,
 )
+from backend.app.services.embedding_versions import active_embedding_identity
 from backend.app.services.categories import (
     CategoryConflictError,
     CategoryNotFoundError,
@@ -218,6 +219,8 @@ class FakeSession:
             entity.id = 99
         if isinstance(entity, DocumentSource) and entity.public_id is None:
             entity.public_id = "11111111-1111-4111-8111-111111111111"
+        if isinstance(entity, EmbeddingBatch) and entity.id is None:
+            entity.id = 101
         self.added.append(entity)
 
     async def flush(self) -> None:
@@ -586,6 +589,16 @@ async def test_ingest_plain_text_creates_text_source() -> None:
     assert source.content_hash == sha256("Linha um.\nLinha dois.".encode()).hexdigest()
     assert chunks_created == 1
     assert embedding_client.inputs == [["Linha um.\nLinha dois."]]
+    batch = next(entity for entity in session.added if isinstance(entity, EmbeddingBatch))
+    chunk = next(entity for entity in session.added if isinstance(entity, KnowledgeChunk))
+    assert batch.provider == "local"
+    assert batch.model == Settings().embedding_model
+    assert batch.dimension == Settings().vector_dim
+    assert batch.version == "default"
+    assert chunk.embedding_batch_id == batch.id
+    assert chunk.embedding_status == "embedded"
+    assert chunk.embedding_content_hash == sha256("Linha um.\nLinha dois.".encode()).hexdigest()
+    assert chunk.embedded_at is not None
     assert session.committed is True
 
 
@@ -1114,6 +1127,7 @@ async def test_repository_search_applies_tag_and_project_filters_to_vector_and_t
         vector_session,  # type: ignore[arg-type]
         query_embedding=[0.1, 0.2, 0.3],
         limit=5,
+        embedding_identity=active_embedding_identity(Settings()),
         category_ids=[1],
         tag_ids=[2],
         project_ids=[3],
@@ -1132,6 +1146,8 @@ async def test_repository_search_applies_tag_and_project_filters_to_vector_and_t
     assert "document_source_categories" in vector_session.statements[0]
     assert "document_source_tags" in vector_session.statements[0]
     assert "document_source_projects" in vector_session.statements[0]
+    assert "embedding_batches" in vector_session.statements[0]
+    assert "embedding_status" in vector_session.statements[0]
     assert "document_source_categories" in text_session.statements[0]
     assert "document_source_tags" in text_session.statements[0]
     assert "document_source_projects" in text_session.statements[0]
@@ -1161,11 +1177,19 @@ async def test_search_knowledge_returns_similarity_scores() -> None:
                 "start_char": 0,
                 "end_char": 14,
             },
-            content="stored content",
-            score=0.8,
-            metadata={"note_type": "decision"},
-        )
-    ]
+                content="stored content",
+                score=0.8,
+                metadata={"note_type": "decision"},
+                embedding={
+                    "status": "unversioned",
+                    "provider": None,
+                    "model": None,
+                    "dimension": None,
+                    "version": None,
+                    "embedded_at": None,
+                },
+            )
+        ]
 
 
 @pytest.mark.asyncio

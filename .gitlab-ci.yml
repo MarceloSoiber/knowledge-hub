@@ -11,6 +11,7 @@ deploy:
     POSTGRES_HOST_PORT: "5432"
     POSTGRES_DSN: "postgresql+asyncpg://postgres:postgres@host.docker.internal:5432/knowledge_hub"
     DOCKER_LOCAL_LLM_BASE_URL: "http://192.168.15.114:1234"
+    EMBEDDING_VERSION: "default"
     MCP_PUBLIC_URL: "http://192.168.15.125:8001"
   script:
     - docker compose config --quiet

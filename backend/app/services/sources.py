@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db.models import DocumentSource
 from ..repositories.chunks import add_source_chunks, delete_chunks_for_source
+from ..repositories.embeddings import complete_embedding_batch, create_embedding_batch
 from ..repositories.sources import (
     delete_source_by_id,
     get_source_by_content_hash,
@@ -15,6 +16,7 @@ from .documents.chunker import chunk_text_with_locations, detect_markdown_sectio
 from .documents.extractors import EmptyDocumentError
 from .documents.normalizer import normalize_text
 from .embeddings import EmbeddingClient
+from .embedding_versions import active_embedding_identity, compute_embedding_content_hash
 from .ingestion import (
     DuplicateSourceContentError,
     KnowledgeIngestionError,
@@ -48,6 +50,7 @@ async def update_source(
     project_ids: list[int] | None = None,
     content: str | None = None,
 ) -> tuple[dict[str, object], int | None]:
+    # pylint: disable=too-many-locals
     source = await _get_source_or_raise(session, source_id)
     categories = (
         await get_categories(session, category_ids)
@@ -90,6 +93,12 @@ async def update_source(
 
     chunks = chunk_text_with_locations(text, section_spans=detect_markdown_sections(text))
     chunk_contents = [chunk.content for chunk in chunks]
+    embedding_identity = active_embedding_identity()
+    embedding_batch = await create_embedding_batch(
+        session,
+        embedding_identity,
+        len(chunk_contents),
+    )
     embeddings = await embedding_client.embed_texts(chunk_contents)
 
     source.title = normalized_title
@@ -112,7 +121,13 @@ async def update_source(
             source_type=source.source_type,
             chunks=chunks,
         ),
+        embedding_batch.id,
+        [
+            compute_embedding_content_hash(chunk_content)
+            for chunk_content in chunk_contents
+        ],
     )
+    await complete_embedding_batch(session, embedding_batch.id, len(chunks))
     await session.commit()
     await session.refresh(source)
     return serialize_source(source, include_content=True), len(chunks)

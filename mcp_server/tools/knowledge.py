@@ -53,7 +53,10 @@ class KnowledgeHit(BaseModel):
     uri: str = Field(description="URI publica ou sanitizada da origem")
     categories: list["KnowledgeCategory"] = Field(description="Categorias da origem")
     tags: list["KnowledgeTag"] = Field(default_factory=list, description="Tags da origem")
-    projects: list["KnowledgeProject"] = Field(default_factory=list, description="Projetos da origem")
+    projects: list["KnowledgeProject"] = Field(
+        default_factory=list,
+        description="Projetos da origem",
+    )
     location: "KnowledgeChunkLocation" = Field(description="Localizacao citavel do chunk")
     content: str = Field(description="Conteúdo encontrado")
     score: float | None = Field(default=None, description="Score de relevância")
