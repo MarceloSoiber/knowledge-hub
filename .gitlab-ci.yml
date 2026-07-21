@@ -20,7 +20,7 @@ deploy:
         docker compose stop backend mcp || true
         docker compose rm -sf backend mcp || true
 
-        for name in knowledge-hub-backend knowledge-hub-mcp; do
+        for name in knowledge-hub-backend knowledge-hub-mcp mcp-knowledge-hub-backend mcp-knowledge-hub-mcp; do
           if docker container inspect "${name}" >/dev/null 2>&1; then
             remove_container_by_name "${name}" || return 1
           fi
@@ -69,7 +69,7 @@ deploy:
       }
 
       has_service_containers() {
-        for name in knowledge-hub-backend knowledge-hub-mcp; do
+        for name in knowledge-hub-backend knowledge-hub-mcp mcp-knowledge-hub-backend mcp-knowledge-hub-mcp; do
           if docker container inspect "${name}" >/dev/null 2>&1; then
             return 0
           fi
@@ -80,7 +80,9 @@ deploy:
       show_service_containers() {
         docker ps -a \
           --filter name=knowledge-hub-backend \
-          --filter name=knowledge-hub-mcp || true
+          --filter name=knowledge-hub-mcp \
+          --filter name=mcp-knowledge-hub-backend \
+          --filter name=mcp-knowledge-hub-mcp || true
       }
 
       diagnose_backend() {
