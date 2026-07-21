@@ -39,6 +39,7 @@ mcp-server = "mcp_server.server:main"
 set-auth-token = "backend.app.cli.config:set_auth_token_main"
 reindex-embeddings = "backend.app.cli.reindex:reindex_main"
 knowledge-backup = "backend.app.cli.backup:backup_main"
+knowledge-hnsw = "backend.app.cli.hnsw:main"
 
 [tool.setuptools]
 package-dir = {"" = "."}
