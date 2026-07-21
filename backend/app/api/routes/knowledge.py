@@ -62,6 +62,7 @@ from ...services.projects import (
     reactivate_project,
     update_project,
 )
+from ...services.privacy import SensitiveContentExternalProviderError
 from ...services.rag import AnswerClient, LLMConfigurationError, LLMError
 from ...services.search import answer_knowledge, list_sources, search_knowledge
 from ...services.sources import (
@@ -273,6 +274,8 @@ async def knowledge_answer(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
         ) from exc
+    except SensitiveContentExternalProviderError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
     except (EmbeddingError, LLMError) as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
 

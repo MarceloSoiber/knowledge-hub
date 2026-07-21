@@ -23,6 +23,7 @@ from backend.app.services.projects import (
 )
 from backend.app.services.tags import TagConflictError, TagInUseError, TagNotFoundError
 from backend.app.services.ingestion import DuplicateSourceContentError
+from backend.app.services.privacy import SensitiveContentExternalProviderError
 from backend.app.services.rag import LLMConfigurationError
 from backend.app.services.sources import SourceDeleteConfirmationError, SourceNotFoundError
 
@@ -501,6 +502,33 @@ async def test_answer_maps_llm_config_error_to_503(
 
     assert response.status_code == 503
     assert response.json() == {"detail": "Missing API key"}
+
+
+@pytest.mark.asyncio
+async def test_answer_maps_sensitive_external_content_to_403(
+    app: Any,
+    transport: httpx.ASGITransport,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_answer(**_: object) -> tuple[str, list[dict[str, object]]]:
+        raise SensitiveContentExternalProviderError(
+            "Sensitive retrieved content cannot be sent to an external provider. "
+            "Use a local provider or narrow the query to non-sensitive content."
+        )
+
+    app.dependency_overrides[require_auth_token] = no_auth
+    app.dependency_overrides[get_embedding_client] = fake_embedding_client
+    app.dependency_overrides[get_answer_client] = fake_answer_client
+    monkeypatch.setattr("backend.app.api.routes.knowledge.answer_knowledge", fake_answer)
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/api/v1/knowledge/answer",
+            json={"query": "summarize", "limit": 5},
+        )
+
+    assert response.status_code == 403
+    assert "Sensitive retrieved content" in response.json()["detail"]
 
 
 @pytest.mark.asyncio

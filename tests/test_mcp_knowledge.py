@@ -7,6 +7,7 @@ from mcp.server.auth.provider import AccessToken
 from pydantic import ValidationError
 
 from backend.app.services.categories import CategoryNotFoundError
+from backend.app.core.settings import Settings
 from backend.app.services.documents.extractors import EmptyDocumentError
 from backend.app.services.embeddings import EmbeddingError
 from backend.app.schemas.knowledge import KnowledgeChunkRead
@@ -35,6 +36,39 @@ def authorize(monkeypatch: pytest.MonkeyPatch, scopes: list[str]) -> None:
         "mcp_server.tools.knowledge.get_access_token",
         lambda: access_token_with_scopes(scopes),
     )
+
+
+def test_mcp_instructions_explain_dynamic_category_inventory() -> None:
+    from mcp_server import server
+
+    assert "categories() como o inventario dinamico" in server.mcp.instructions
+    assert "tarefas com todo o contexto na conversa" in server.mcp.instructions
+    assert "reformule a consulta uma unica vez" in server.mcp.instructions
+
+
+def test_mcp_tool_descriptions_guide_discovery_search_and_writes() -> None:
+    from mcp_server import server
+
+    tools = server.mcp._tool_manager
+    assert "Comece globalmente" in tools.get_tool("search").description
+    assert "reformule a consulta uma unica vez" in tools.get_tool("search").description
+    assert "inventario dinamico" in tools.get_tool("categories").description
+    assert "filtros opcionais" in tools.get_tool("tags").description
+    assert "contexto de um projeto" in tools.get_tool("projects").description
+    assert "fontes de um projeto" in tools.get_tool("project_sources").description
+    assert "prefixo" in tools.get_tool("tag_autocomplete").description
+    assert "confirmacao explicita" in tools.get_tool("ingest_text").description
+    assert "arquivar conversas automaticamente" in tools.get_tool("ingest_text").description
+
+
+def test_mcp_scopes_follow_write_enabled_setting(monkeypatch: pytest.MonkeyPatch) -> None:
+    from mcp_server import server
+
+    monkeypatch.setattr(server, "get_settings", lambda: Settings(mcp_write_enabled=False))
+    assert server.build_mcp_scopes() == ["knowledge:read"]
+
+    monkeypatch.setattr(server, "get_settings", lambda: Settings(mcp_write_enabled=True))
+    assert server.build_mcp_scopes() == ["knowledge:read", "knowledge:write"]
 
 
 def test_mcp_text_ingest_schema_validates_fields() -> None:
