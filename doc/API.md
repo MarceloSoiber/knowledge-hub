@@ -41,6 +41,11 @@ export KNOWLEDGE_HUB_TOKEN="seu-token"
 Quando nenhum token estiver configurado, a autenticação fica desabilitada. Os endpoints
 `GET /` e `GET /health` são públicos em ambos os casos.
 
+O frontend Angular local fica em `http://localhost:8080`. Ele valida o token antes de
+liberar a interface e o envia como Bearer nas chamadas protegidas. Quando o usuário
+marca “Manter conectado neste navegador”, o token é guardado no armazenamento local
+do navegador até que ele escolha desconectar ou limpe os dados do site.
+
 ## MCP
 
 O servidor MCP usa o mesmo token Bearer salvo em `app_config.auth_token`.
