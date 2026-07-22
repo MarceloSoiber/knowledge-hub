@@ -6,8 +6,8 @@ Hub de conhecimento com API FastAPI, PostgreSQL + `pgvector`, embeddings, RAG e 
 
 - `backend/`: API FastAPI, rotas de conhecimento e serviços de ingestão, busca semântica e resposta com LLM.
 - `mcp_server/`: servidor MCP via Streamable HTTP.
-- `frontend/`: interface React + Vite.
-- `docker-compose.yml`: serviços de PostgreSQL, backend e MCP.
+- `frontend/`: interface Angular para acesso ao Knowledge Hub.
+- `docker-compose.yml`: serviços de PostgreSQL, backend, frontend e MCP.
 - `app_config.auth_token`: token Bearer salvo no PostgreSQL para proteger a API de conhecimento e o MCP.
 
 ## Requisitos
@@ -29,7 +29,8 @@ cp .env.example .env
 Principais variáveis:
 
 ```env
-FRONTEND_ORIGIN="http://localhost:5173"
+FRONTEND_ORIGIN="http://localhost:8080"
+FRONTEND_PORT="8080"
 
 POSTGRES_DSN="postgresql+asyncpg://postgres:postgres@localhost:5432/knowledge_hub"
 
@@ -116,7 +117,7 @@ docker exec -it knowledge-hub-postgres psql -U postgres -d knowledge_hub \
 
 ## Rodando Com Docker
 
-Suba banco, backend e MCP:
+Suba banco, backend, frontend e MCP:
 
 ```bash
 npm run dev:up
@@ -153,11 +154,19 @@ URLs padrão:
 
 - API: `http://localhost:8000`
 - Health check: `http://localhost:8000/health`
+- Frontend: `http://localhost:8080`
 - MCP local: `http://localhost:8001/mcp`
 - MCP na rede: `http://192.0.2.10:8001/mcp`
 - PostgreSQL: `localhost:5432`
 
 Se o LM Studio ou outro servidor local estiver rodando no host, o container deve usar `DOCKER_LOCAL_LLM_BASE_URL`. Em Linux moderno, o Compose já configura `host.docker.internal`.
+
+### Acessar Pelo Frontend
+
+Abra `http://localhost:8080` e informe o token configurado por `set-auth-token`.
+O frontend valida o token na API e o envia como Bearer nas chamadas protegidas. A opção
+“Manter conectado neste navegador” persiste o token no armazenamento local do navegador;
+use-a apenas em um navegador/dispositivo confiável e clique em “Desconectar” para removê-lo.
 
 ## Rodando Localmente
 

@@ -5,6 +5,18 @@ from mcp.server.fastmcp import FastMCP
 from backend.app.core.auth import is_valid_token
 from backend.app.core.settings import get_settings
 from backend.app.db.session import SessionLocal
+from backend.app.services.agent_policy import (
+    CATEGORIES_DESCRIPTION,
+    INGEST_TEXT_DESCRIPTION,
+    PROJECTS_DESCRIPTION,
+    PROJECT_SOURCES_DESCRIPTION,
+    SEARCH_DESCRIPTION,
+    SOURCE_DESCRIPTION,
+    SOURCES_DESCRIPTION,
+    TAGS_DESCRIPTION,
+    TAG_AUTOCOMPLETE_DESCRIPTION,
+    build_mcp_instructions,
+)
 from backend.app.services.config import get_auth_token
 
 from .tools.knowledge import (
@@ -80,7 +92,7 @@ settings = get_settings()
 
 mcp = FastMCP(
     "knowledge-hub",
-    instructions="Ferramentas MCP para consultar e ampliar o Knowledge Hub.",
+    instructions=build_mcp_instructions(),
     host=settings.mcp_host,
     port=settings.mcp_port,
     streamable_http_path=settings.mcp_path,
@@ -94,7 +106,7 @@ def health() -> dict[str, str]:
     return {"status": "ok", "service": "knowledge-hub"}
 
 
-@mcp.tool()
+@mcp.tool(description=SEARCH_DESCRIPTION)
 async def search(
     query: str,
     limit: int = 5,
@@ -115,49 +127,42 @@ async def search(
     )
 
 
-@mcp.tool()
+@mcp.tool(description=SOURCES_DESCRIPTION)
 async def sources() -> list[KnowledgeSource]:
     return await get_knowledge_sources()
 
 
-@mcp.tool(description="Consulta uma fonte detalhada por UUID publico.")
+@mcp.tool(description=SOURCE_DESCRIPTION)
 async def source(source_id: str) -> KnowledgeSourceDetail:
     return await get_knowledge_source(source_id)
 
 
-@mcp.tool()
+@mcp.tool(description=CATEGORIES_DESCRIPTION)
 async def categories() -> list[KnowledgeCategory]:
     return await get_knowledge_categories()
 
 
-@mcp.tool()
+@mcp.tool(description=TAGS_DESCRIPTION)
 async def tags() -> list[KnowledgeTag]:
     return await get_knowledge_tags()
 
 
-@mcp.tool()
+@mcp.tool(description=PROJECTS_DESCRIPTION)
 async def projects(status: str | None = None) -> list[KnowledgeProject]:
     return await get_knowledge_projects(status)
 
 
-@mcp.tool()
+@mcp.tool(description=PROJECT_SOURCES_DESCRIPTION)
 async def project_sources(project_id: int) -> list[KnowledgeSource]:
     return await get_knowledge_project_sources(project_id)
 
 
-@mcp.tool()
+@mcp.tool(description=TAG_AUTOCOMPLETE_DESCRIPTION)
 async def tag_autocomplete(query: str, limit: int = 10) -> list[KnowledgeTag]:
     return await autocomplete_knowledge_tags(query, limit)
 
 
-@mcp.tool(
-    description=(
-        "Persiste uma nota textual no Knowledge Hub somente depois de confirmacao "
-        "explicita do usuario. Nao use para arquivar conversas automaticamente. "
-        "Use categories() antes para escolher category_ids validos. Requer "
-        "escopo knowledge:write."
-    )
-)
+@mcp.tool(description=INGEST_TEXT_DESCRIPTION)
 async def ingest_text(
     title: str,
     content: str,

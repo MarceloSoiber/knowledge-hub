@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     mcp_public_url: str = Field(default="http://192.0.2.10:8001")
     mcp_path: str = Field(default="/mcp")
     mcp_write_enabled: bool = Field(default=False)
+    sensitive_category_names: list[str] = Field(default_factory=list)
+    allow_external_sensitive_content: bool = Field(default=False)
 
 
 @lru_cache(maxsize=1)

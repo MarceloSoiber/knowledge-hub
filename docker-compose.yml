@@ -12,7 +12,7 @@ services:
     environment:
       APP_NAME: "Knowledge Hub"
       ENVIRONMENT: development
-      FRONTEND_ORIGIN: "${FRONTEND_ORIGIN:-http://localhost:5173}"
+      FRONTEND_ORIGIN: "${FRONTEND_ORIGIN:-http://localhost:8080}"
       POSTGRES_DSN: "${POSTGRES_DSN:-postgresql+asyncpg://postgres:postgres@host.docker.internal:15432/knowledge_hub}"
       LLM_PROVIDER: "${LLM_PROVIDER:-local}"
       LOCAL_LLM_BASE_URL: "${DOCKER_LOCAL_LLM_BASE_URL:-http://host.docker.internal:1234}"
@@ -38,6 +38,19 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: knowledge-hub-frontend
+    init: true
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
 
   mcp:
     build:

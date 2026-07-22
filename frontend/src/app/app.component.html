@@ -1,0 +1,55 @@
+<main class="page-shell">
+  <section class="auth-card" aria-labelledby="page-title">
+    <div class="brand">Knowledge Hub</div>
+
+    @if (auth.status === "authenticated") {
+      <div class="status-icon status-icon--success" aria-hidden="true">✓</div>
+      <h1 id="page-title">Conectado ao Knowledge Hub</h1>
+      <p>Seu token foi validado. Novas funcionalidades aparecerão aqui.</p>
+      <button type="button" class="button button--secondary" (click)="disconnect()">
+        Desconectar
+      </button>
+    } @else {
+      <h1 id="page-title">Acessar o Knowledge Hub</h1>
+      <p>Informe o Bearer token configurado para a API.</p>
+
+      <form (ngSubmit)="connect()" #tokenForm="ngForm">
+        <label for="access-token">Token de acesso</label>
+        <input
+          id="access-token"
+          name="access-token"
+          type="password"
+          autocomplete="off"
+          required
+          [(ngModel)]="accessToken"
+          [disabled]="auth.status === 'checking'"
+          aria-describedby="token-help"
+        />
+        <small id="token-help">O token é enviado somente para a API do Knowledge Hub.</small>
+
+        <label class="checkbox-row" for="remember-token">
+          <input
+            id="remember-token"
+            name="remember-token"
+            type="checkbox"
+            [(ngModel)]="rememberToken"
+            [disabled]="auth.status === 'checking'"
+          />
+          <span>Manter conectado neste navegador</span>
+        </label>
+
+        @if (auth.status === "error") {
+          <p class="message message--error" role="alert">{{ auth.errorMessage }}</p>
+        }
+
+        <button
+          type="submit"
+          class="button"
+          [disabled]="tokenForm.invalid || auth.status === 'checking'"
+        >
+          {{ auth.status === "checking" ? "Validando…" : "Conectar" }}
+        </button>
+      </form>
+    }
+  </section>
+</main>
