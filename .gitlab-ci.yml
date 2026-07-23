@@ -276,7 +276,7 @@ deploy:
         exit 1
       fi
     - |
-      if ! docker compose exec -T frontend wget -q -O /dev/null http://127.0.0.1/health; then
+      if ! docker compose exec -T frontend wget -q -O /dev/null http://127.0.0.1/; then
         echo "Final frontend healthcheck failed."
         docker compose ps || true
         docker inspect knowledge-hub-frontend --format '{{json .State}}' || true
