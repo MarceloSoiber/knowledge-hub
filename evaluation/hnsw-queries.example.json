@@ -1,0 +1,18 @@
+{
+  "queries": [
+    {
+      "query": "Como funciona a reindexacao de embeddings?",
+      "limit": 10
+    },
+    {
+      "query": "Documentacao do projeto atual",
+      "limit": 10,
+      "category_ids": [1]
+    },
+    {
+      "query": "Decisoes do projeto",
+      "limit": 10,
+      "project_ids": [1]
+    }
+  ]
+}

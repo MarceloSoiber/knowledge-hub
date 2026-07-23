@@ -1,0 +1,30 @@
+{
+  "name": "knowledge-hub-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "ng serve --host 0.0.0.0 --port 5173",
+    "build": "ng build",
+    "lint": "tsc --noEmit -p tsconfig.app.json",
+    "typecheck": "tsc --noEmit -p tsconfig.app.json",
+    "quality": "npm run typecheck && npm run build"
+  },
+  "dependencies": {
+    "@angular/common": "^22.0.8",
+    "@angular/compiler": "^22.0.8",
+    "@angular/core": "^22.0.8",
+    "@angular/forms": "^22.0.8",
+    "@angular/platform-browser": "^22.0.8",
+    "@angular/router": "^22.0.8",
+    "rxjs": "^7.8.2",
+    "zone.js": "^0.15.1"
+  },
+  "devDependencies": {
+    "@angular/build": "^22.0.7",
+    "@angular/cli": "^22.0.7",
+    "@angular/compiler-cli": "^22.0.8",
+    "ntl": "^5.1.0",
+    "typescript": "^6.0.3"
+  }
+}

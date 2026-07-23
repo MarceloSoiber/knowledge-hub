@@ -1,0 +1,4 @@
+interface:
+  display_name: "SpecKit"
+  short_description: "Spec-first workflow for this repo"
+  default_prompt: "Use $speckit to turn this feature idea into a spec, plan, tasks, and implementation path."
