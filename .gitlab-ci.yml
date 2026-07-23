@@ -18,6 +18,7 @@ deploy:
     - |
       cleanup_containers() {
         echo "Stopping/removing old backend/frontend/MCP containers."
+        disable_restart_policies
         docker compose stop backend frontend mcp || true
         docker compose rm -sf backend frontend mcp || true
 
@@ -29,6 +30,26 @@ deploy:
         sleep 2
       }
 
+      disable_restart_policies() {
+        for name in knowledge-hub-backend knowledge-hub-frontend knowledge-hub-mcp mcp-knowledge-hub-backend mcp-knowledge-hub-frontend mcp-knowledge-hub-mcp; do
+          if ! docker container inspect "${name}" >/dev/null 2>&1; then
+            continue
+          fi
+
+          echo "Disabling restart policy for ${name}."
+          if ! docker update --restart=no "${name}"; then
+            echo "Could not disable the restart policy for ${name}."
+            return 1
+          fi
+
+          restart_policy="$(docker inspect "${name}" --format '{{.HostConfig.RestartPolicy.Name}}')"
+          if [ "${restart_policy}" != "no" ]; then
+            echo "Restart policy for ${name} is still ${restart_policy}."
+            return 1
+          fi
+        done
+      }
+
       remove_container_by_name() {
         name="$1"
         echo "Removing container ${name}."
@@ -37,7 +58,6 @@ deploy:
         fi
 
         echo "Docker daemon could not kill ${name}; asking PID 1 inside the container to exit."
-        docker update --restart=no "${name}" || true
         docker exec -u 0 "${name}" sh -c 'kill -TERM 1' || true
         for _ in $(seq 1 10); do
           running="$(docker inspect "${name}" --format '{{.State.Running}}' 2>/dev/null || true)"
