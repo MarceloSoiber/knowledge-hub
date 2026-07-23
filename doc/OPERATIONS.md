@@ -158,6 +158,8 @@ aplicacao.
 
 Valide recall e latencia com o mesmo conjunto de consultas:
 
+
+
 ```bash
 knowledge-hnsw validate \
   --queries evaluation/hnsw-queries.json \
