@@ -7,7 +7,6 @@ deploy:
     - docker-deploy
   resource_group: production
   variables:
-    COMPOSE_PROJECT_NAME: knowledge-hub
     POSTGRES_HOST_PORT: "5432"
     DOCKER_LOCAL_LLM_BASE_URL: "http://192.168.15.114:1234"
     EMBEDDING_VERSION: "default"
@@ -21,7 +20,7 @@ deploy:
         docker compose stop backend frontend mcp || true
         docker compose rm -sf backend frontend mcp || true
 
-        for name in knowledge-hub-backend knowledge-hub-frontend knowledge-hub-mcp mcp-knowledge-hub-backend mcp-knowledge-hub-frontend mcp-knowledge-hub-mcp; do
+        for name in knowledge-hub-backend knowledge-hub-frontend knowledge-hub-mcp knowledge-hub-postgres mcp-knowledge-hub-backend mcp-knowledge-hub-frontend mcp-knowledge-hub-mcp; do
           if docker container inspect "${name}" >/dev/null 2>&1; then
             remove_container_by_name "${name}" || return 1
           fi
@@ -30,7 +29,7 @@ deploy:
       }
 
       disable_restart_policies() {
-        for name in knowledge-hub-backend knowledge-hub-frontend knowledge-hub-mcp mcp-knowledge-hub-backend mcp-knowledge-hub-frontend mcp-knowledge-hub-mcp; do
+        for name in knowledge-hub-backend knowledge-hub-frontend knowledge-hub-mcp knowledge-hub-postgres mcp-knowledge-hub-backend mcp-knowledge-hub-frontend mcp-knowledge-hub-mcp; do
           if ! docker container inspect "${name}" >/dev/null 2>&1; then
             continue
           fi
@@ -89,7 +88,7 @@ deploy:
       }
 
       has_service_containers() {
-        for name in knowledge-hub-backend knowledge-hub-frontend knowledge-hub-mcp mcp-knowledge-hub-backend mcp-knowledge-hub-frontend mcp-knowledge-hub-mcp; do
+        for name in knowledge-hub-backend knowledge-hub-frontend knowledge-hub-mcp knowledge-hub-postgres mcp-knowledge-hub-backend mcp-knowledge-hub-frontend mcp-knowledge-hub-mcp; do
           if docker container inspect "${name}" >/dev/null 2>&1; then
             return 0
           fi
