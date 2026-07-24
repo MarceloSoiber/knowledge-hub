@@ -199,12 +199,12 @@ deploy:
       }
 
       deploy_containers() {
-        wait_for_postgres_health
-        docker compose up -d --build --no-deps --force-recreate backend
-        wait_for_backend_health
-        docker compose up -d --build --no-deps --force-recreate frontend
-        wait_for_frontend_health
-        docker compose up -d --build --no-deps --force-recreate mcp
+        wait_for_postgres_health || return 1
+        docker compose up -d --build --no-deps --force-recreate backend || return 1
+        wait_for_backend_health || return 1
+        docker compose up -d --build --no-deps --force-recreate frontend || return 1
+        wait_for_frontend_health || return 1
+        docker compose up -d --build --no-deps --force-recreate mcp || return 1
       }
 
       remove_recreate_containers() {
