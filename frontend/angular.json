@@ -40,6 +40,13 @@
             }
           },
           "defaultConfiguration": "development"
+        },
+        "test": {
+          "builder": "@angular/build:unit-test",
+          "options": {
+            "buildTarget": "knowledge-hub-frontend:build:development",
+            "runner": "vitest"
+          }
         }
       }
     }
