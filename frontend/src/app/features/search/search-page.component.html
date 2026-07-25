@@ -1,0 +1,45 @@
+<section class="search-page" aria-labelledby="search-title">
+  <header><p class="eyebrow">Conhecimento</p><h1 id="search-title">Busca inteligente</h1><p>Encontre trechos relevantes e confira a fonte de cada resposta.</p></header>
+
+  <form class="search-form" (ngSubmit)="search()" #searchForm="ngForm">
+    <label for="query">O que você procura?</label>
+    <div class="query-row">
+      <input id="query" name="query" [(ngModel)]="query" required [disabled]="status === 'loading'" placeholder="Ex.: como configurar o MCP" />
+      <button type="submit" [disabled]="searchForm.invalid || status === 'loading'">{{ status === "loading" ? "Buscando…" : "Buscar" }}</button>
+    </div>
+
+    <div class="filters" aria-label="Filtros de busca">
+      <label>Limite <input name="limit" type="number" min="1" max="50" [(ngModel)]="limit" [disabled]="status === 'loading'" /></label>
+      <label>Score mínimo <input name="min-score" type="number" min="0" max="1" step="0.01" [(ngModel)]="minScore" [disabled]="status === 'loading'" /></label>
+      <label class="checkbox"><input name="match-reasons" type="checkbox" [(ngModel)]="includeMatchReasons" /> Mostrar motivos de correspondência</label>
+    </div>
+
+    <div class="metadata-filters">
+      <label for="category">Categoria</label><select id="category" (change)="addCategory($any($event.target).value)"><option value="">Adicionar categoria</option>@for (category of categoryOptions; track category.id) { <option [value]="category.id">{{ category.name }}</option> }</select>
+      <label for="project">Projeto</label><select id="project" (change)="addProject($any($event.target).value)"><option value="">Adicionar projeto</option>@for (project of projectOptions; track project.id) { <option [value]="project.id">{{ project.name }}{{ project.status === 'archived' ? ' (arquivado)' : '' }}</option> }</select>
+      <label for="tag">Tag</label><input id="tag" name="tag" [(ngModel)]="tagQuery" (ngModelChange)="onTagInput()" autocomplete="off" placeholder="Digite para sugerir" />
+      @if (tagOptions.length) { <ul class="suggestions" role="listbox" aria-label="Sugestões de tags">@for (tag of tagOptions; track tag.id) { <li><button type="button" (click)="addTag(tag)">{{ tag.name }}</button></li> }</ul> }
+    </div>
+
+    @if (metadataError) { <p class="notice notice--error" role="alert">{{ metadataError }} <button type="button" (click)="loadMetadata()">Recarregar filtros</button></p> }
+    <div class="chips" aria-label="Filtros aplicados">
+      @for (category of selectedCategories; track category.id) { <button type="button" class="chip" (click)="removeCategory(category.id)">Categoria: {{ category.name }} ×</button> }
+      @for (tag of selectedTags; track tag.id) { <button type="button" class="chip" (click)="removeTag(tag.id)">Tag: {{ tag.name }} ×</button> }
+      @for (project of selectedProjects; track project.id) { <button type="button" class="chip" (click)="removeProject(project.id)">Projeto: {{ project.name }} ×</button> }
+    </div>
+  </form>
+
+  <div class="results" aria-live="polite">
+    @if (status === "error") { <p class="notice notice--error" role="alert">{{ message }} @if (message.includes('não existe')) { <button type="button" (click)="loadMetadata()">Recarregar filtros</button> } @if (message.includes('indisponíveis')) { <button type="button" (click)="search()">Tentar novamente</button> }</p> }
+    @if (status === "loading") { <p class="notice">Buscando trechos relevantes…</p> }
+    @if (status === "success" && !results.length) { <p class="notice">Nenhum resultado foi encontrado. Ajuste a consulta ou remova filtros.</p> }
+    @for (result of results; track result.id) {
+      <article class="result-card">
+        <div class="result-heading"><div><h2><a [routerLink]="['/sources', result.source_id]">{{ result.source_title }}</a></h2><p class="location">{{ location(result) }}</p></div>@if (result.score !== null) { <span class="score">Score {{ result.score | number:'1.2-2' }}</span> } @else { <span class="score score--unavailable">Score vetorial indisponível</span> }</div>
+        <p class="excerpt">{{ result.content }}</p>
+        <div class="result-meta"><span class="meta-label">Categorias</span>@for (category of result.categories; track category.id) { <span class="meta-chip">{{ category.name }}</span> } @for (tag of result.tags; track tag.id) { <span class="meta-chip">#{{ tag.name }}</span> } @for (project of result.projects; track project.id) { <span class="meta-chip">{{ project.name }}</span> }</div>
+        @if (includeMatchReasons && result.match_reasons?.length) { <p class="reasons">Motivos: {{ result.match_reasons.join(', ') }}</p> }
+      </article>
+    }
+  </div>
+</section>
