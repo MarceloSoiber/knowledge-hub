@@ -8,6 +8,7 @@
     "build": "ng build",
     "lint": "tsc --noEmit -p tsconfig.app.json",
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
+    "test": "ng test --watch=false",
     "quality": "npm run typecheck && npm run build"
   },
   "dependencies": {

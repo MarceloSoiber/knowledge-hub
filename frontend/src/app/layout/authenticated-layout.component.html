@@ -1,0 +1,22 @@
+<div class="app-shell" [class.app-shell--menu-open]="menuOpen">
+  <header class="topbar">
+    <button #menuButton class="menu-button" type="button" (click)="menuOpen = !menuOpen"
+      [attr.aria-expanded]="menuOpen" aria-controls="primary-navigation" aria-label="Abrir navegação">
+      <span aria-hidden="true">☰</span>
+    </button>
+    <a class="brand" routerLink="/inicio">Knowledge Hub</a>
+    <button class="logout-button" type="button" (click)="logout()">Desconectar</button>
+  </header>
+
+  @if (menuOpen) {
+    <button class="backdrop" type="button" aria-label="Fechar navegação" (click)="closeMenu(true)"></button>
+  }
+
+  <nav id="primary-navigation" class="sidebar" aria-label="Navegação principal">
+    <a routerLink="/inicio" routerLinkActive="is-active" (click)="closeMenu()">Início</a>
+  </nav>
+
+  <main id="main-content" class="content" tabindex="-1">
+    <router-outlet />
+  </main>
+</div>

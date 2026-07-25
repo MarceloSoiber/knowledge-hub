@@ -1,15 +1,14 @@
-import { ApplicationConfig, inject, provideAppInitializer } from "@angular/core";
+import { ApplicationConfig } from "@angular/core";
 import { provideHttpClient, withInterceptors } from "@angular/common/http";
-import { provideRouter } from "@angular/router";
+import { provideRouter, withInMemoryScrolling } from "@angular/router";
 
 import { authInterceptor } from "./core/auth.interceptor";
-import { AuthService } from "./core/auth.service";
+import { unauthorizedInterceptor } from "./core/unauthorized.interceptor";
 import { routes } from "./app.routes";
 
 export const appConfig: ApplicationConfig = {
   providers: [
-    provideHttpClient(withInterceptors([authInterceptor])),
-    provideRouter(routes),
-    provideAppInitializer(() => inject(AuthService).initialize()),
+    provideHttpClient(withInterceptors([authInterceptor, unauthorizedInterceptor])),
+    provideRouter(routes, withInMemoryScrolling({ scrollPositionRestoration: "top" })),
   ],
 };
