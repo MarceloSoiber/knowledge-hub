@@ -43,4 +43,19 @@ describe("KnowledgeApiService ingestion", () => {
     expect(request.request.body).toEqual(payload);
     request.flush({ source_id: "33333333-3333-4333-8333-333333333333", title: "Ata", categories: [], tags: [], projects: [], chunks_created: 1 });
   });
+
+  it("patches only the supplied source fields", () => {
+    api.updateSource("33333333-3333-4333-8333-333333333333", { title: "Ata revisada", tag_ids: [2] }).subscribe();
+    const request = http.expectOne("/api/v1/knowledge/sources/33333333-3333-4333-8333-333333333333");
+    expect(request.request.method).toBe("PATCH");
+    expect(request.request.body).toEqual({ title: "Ata revisada", tag_ids: [2] });
+    request.flush({ source_id: "33333333-3333-4333-8333-333333333333", title: "Ata revisada", categories: [], tags: [], projects: [], source_type: "text", uri: "", content_hash: "hash", content: "texto", created_at: null, updated_at: null });
+  });
+
+  it("deletes a source only with the required confirmation query", () => {
+    api.deleteSource("33333333-3333-4333-8333-333333333333").subscribe();
+    const request = http.expectOne("/api/v1/knowledge/sources/33333333-3333-4333-8333-333333333333?confirm=true");
+    expect(request.request.method).toBe("DELETE");
+    request.flush(null);
+  });
 });

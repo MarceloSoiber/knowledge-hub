@@ -1,0 +1,24 @@
+<section class="library-page" aria-labelledby="library-title">
+  <header><p class="eyebrow">Acervo</p><h1 id="library-title">Biblioteca</h1><p>Consulte e mantenha as fontes já ingeridas.</p></header>
+  @if (loading) { <kh-loading-state message="Carregando fontes…" /> }
+  @if (error) { <kh-error-state title="Acervo indisponível" [message]="error" [showRetry]="true" (retry)="load()" /> }
+  @if (!loading && !error && !sources.length) { <kh-empty-state title="Nenhuma fonte no acervo" description="Use a Ingestão para adicionar a primeira fonte." /> }
+  @if (!loading && !error && sources.length) {
+    <div class="filters" aria-label="Filtros da biblioteca">
+      <label>Buscar por título <input name="query" [(ngModel)]="query" placeholder="Ex.: ata de reunião" /></label>
+      <label>Categorias <select multiple (change)="categoryIds = selectedIds($event)">@for (item of categories; track item.id) { <option [value]="item.id">{{ item.name }}</option> }</select></label>
+      <label>Tags <select multiple (change)="tagIds = selectedIds($event)">@for (item of tags; track item.id) { <option [value]="item.id">{{ item.name }}</option> }</select></label>
+      <label>Projetos <select multiple (change)="projectIds = selectedIds($event)">@for (item of projects; track item.id) { <option [value]="item.id">{{ item.name }}</option> }</select></label>
+      @if (hasFilters) { <button type="button" class="secondary" (click)="clearFilters()">Limpar filtros</button> }
+    </div>
+    <p class="count" aria-live="polite">{{ filteredSources.length }} fonte{{ filteredSources.length === 1 ? '' : 's' }} encontrada{{ filteredSources.length === 1 ? '' : 's' }}.</p>
+    @if (!filteredSources.length) { <kh-empty-state title="Nenhuma fonte encontrada" description="Ajuste ou limpe os filtros para ver o acervo." /> }
+    <ul class="source-list">
+      @for (source of filteredSources; track source.source_id) {
+        <li><article><h2><a [routerLink]="['/sources', source.source_id]">{{ source.title }}</a></h2><p>{{ source.source_type }} · {{ source.uri || 'Sem origem informada' }}</p>
+          <div class="chips">@for (category of source.categories; track category.id) { <span>{{ category.name }}</span> } @for (tag of source.tags; track tag.id) { <span>#{{ tag.name }}</span> } @for (project of source.projects; track project.id) { <span>{{ project.name }}</span> }</div>
+        </article></li>
+      }
+    </ul>
+  }
+</section>
