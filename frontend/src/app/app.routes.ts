@@ -3,6 +3,8 @@ import { Routes } from "@angular/router";
 import { authGuard } from "./core/auth.guard";
 import { HomeComponent } from "./features/home/home.component";
 import { LoginComponent } from "./features/login/login.component";
+import { SearchPageComponent } from "./features/search/search-page.component";
+import { SourceDetailComponent } from "./features/source-detail/source-detail.component";
 import { AuthenticatedLayoutComponent } from "./layout/authenticated-layout.component";
 
 export const routes: Routes = [
@@ -13,6 +15,8 @@ export const routes: Routes = [
     canActivate: [authGuard],
     children: [
       { path: "inicio", component: HomeComponent, title: "Início | Knowledge Hub" },
+      { path: "busca", component: SearchPageComponent, title: "Busca inteligente | Knowledge Hub" },
+      { path: "sources/:sourceId", component: SourceDetailComponent, title: "Fonte | Knowledge Hub" },
       { path: "", pathMatch: "full", redirectTo: "inicio" },
     ],
   },

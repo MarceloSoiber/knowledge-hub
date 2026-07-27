@@ -9,7 +9,7 @@ export interface Project {
   id: number;
   name: string;
   description: string | null;
-  status: "active" | "archived" | string;
+  status: "active" | "archived";
   created_at: string | null;
   updated_at: string | null;
 }
@@ -52,7 +52,7 @@ export interface KnowledgeChunk {
   content: string;
   score: number | null;
   metadata: Record<string, unknown>;
-  match_reasons?: string[];
+  match_reasons?: Array<"vector" | "text">;
 }
 
 export interface KnowledgeFilters {
