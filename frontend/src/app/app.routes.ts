@@ -5,6 +5,7 @@ import { HomeComponent } from "./features/home/home.component";
 import { LoginComponent } from "./features/login/login.component";
 import { SearchPageComponent } from "./features/search/search-page.component";
 import { AskPageComponent } from "./features/ask/ask-page.component";
+import { IngestionPageComponent } from "./features/ingestion/ingestion-page.component";
 import { SourceDetailComponent } from "./features/source-detail/source-detail.component";
 import { AuthenticatedLayoutComponent } from "./layout/authenticated-layout.component";
 
@@ -18,6 +19,7 @@ export const routes: Routes = [
       { path: "inicio", component: HomeComponent, title: "Início | Knowledge Hub" },
       { path: "busca", component: SearchPageComponent, title: "Busca inteligente | Knowledge Hub" },
       { path: "perguntar", component: AskPageComponent, title: "Pergunte à base | Knowledge Hub" },
+      { path: "ingestao", component: IngestionPageComponent, title: "Ingestão | Knowledge Hub" },
       { path: "sources/:sourceId", component: SourceDetailComponent, title: "Fonte | Knowledge Hub" },
       { path: "", pathMatch: "full", redirectTo: "inicio" },
     ],
