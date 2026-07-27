@@ -10,6 +10,7 @@ import {
   KnowledgeSearchResponse,
   KnowledgeSource,
   KnowledgeSourceDetail,
+  KnowledgeSourcePatchRequest,
   KnowledgeTextIngestRequest,
   KnowledgeUploadResponse,
   Project,
@@ -32,6 +33,12 @@ export class KnowledgeApiService {
   }
   sources(): Observable<KnowledgeSource[]> { return this.http.get<KnowledgeSource[]>(`${this.baseUrl}/sources`); }
   source(sourceId: string): Observable<KnowledgeSourceDetail> { return this.http.get<KnowledgeSourceDetail>(`${this.baseUrl}/sources/${encodeURIComponent(sourceId)}`); }
+  updateSource(sourceId: string, payload: KnowledgeSourcePatchRequest): Observable<KnowledgeSourceDetail> {
+    return this.http.patch<KnowledgeSourceDetail>(`${this.baseUrl}/sources/${encodeURIComponent(sourceId)}`, payload);
+  }
+  deleteSource(sourceId: string): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/sources/${encodeURIComponent(sourceId)}`, { params: new HttpParams().set("confirm", "true") });
+  }
   search(payload: KnowledgeSearchRequest): Observable<KnowledgeSearchResponse> { return this.http.post<KnowledgeSearchResponse>(`${this.baseUrl}/search`, payload); }
   answer(payload: KnowledgeAnswerRequest): Observable<KnowledgeAnswerResponse> { return this.http.post<KnowledgeAnswerResponse>(`${this.baseUrl}/answer`, payload); }
   ingestText(payload: KnowledgeTextIngestRequest): Observable<KnowledgeUploadResponse> { return this.http.post<KnowledgeUploadResponse>(`${this.baseUrl}/texts`, payload); }

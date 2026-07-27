@@ -31,6 +31,14 @@ export interface KnowledgeSourceDetail extends KnowledgeSource {
   content: string;
 }
 
+export interface KnowledgeSourcePatchRequest {
+  title?: string;
+  content?: string;
+  category_ids?: number[];
+  tag_ids?: number[];
+  project_ids?: number[];
+}
+
 export interface KnowledgeChunkLocation {
   chunk_index: number;
   page: number | null;
