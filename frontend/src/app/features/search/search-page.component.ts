@@ -1,12 +1,13 @@
 import { HttpErrorResponse } from "@angular/common/http";
 import { DecimalPipe } from "@angular/common";
-import { ChangeDetectorRef, Component, OnDestroy, OnInit, inject } from "@angular/core";
+import { ChangeDetectorRef, Component, OnDestroy, OnInit, effect, inject } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { RouterLink } from "@angular/router";
-import { Subject, forkJoin, of } from "rxjs";
+import { Subject, of } from "rxjs";
 import { catchError, debounceTime, distinctUntilChanged, switchMap, takeUntil } from "rxjs/operators";
 
 import { KnowledgeApiService } from "../../core/knowledge-api.service";
+import { MetadataCatalogService } from "../../core/metadata-catalog.service";
 import { Category, KnowledgeChunk, KnowledgeSearchRequest, Project, Tag } from "../../core/knowledge.types";
 
 type SearchStatus = "idle" | "loading" | "success" | "error";
@@ -19,6 +20,7 @@ type SearchStatus = "idle" | "loading" | "success" | "error";
 })
 export class SearchPageComponent implements OnInit, OnDestroy {
   private readonly api = inject(KnowledgeApiService);
+  private readonly catalog = inject(MetadataCatalogService);
   private readonly changeDetectorRef = inject(ChangeDetectorRef);
   private readonly destroy$ = new Subject<void>();
   private readonly tagQuery$ = new Subject<string>();
@@ -39,6 +41,10 @@ export class SearchPageComponent implements OnInit, OnDestroy {
   status: SearchStatus = "idle";
   message = "";
   metadataError = "";
+
+  constructor() {
+    effect(() => { this.categoryOptions = this.catalog.categories(); this.allTags = this.catalog.tags(); this.projectOptions = this.catalog.activeProjects(); this.metadataError = this.catalog.error(); });
+  }
 
   ngOnInit(): void {
     this.loadMetadata();
@@ -67,19 +73,7 @@ export class SearchPageComponent implements OnInit, OnDestroy {
   }
 
   loadMetadata(): void {
-    this.metadataError = "";
-    forkJoin({ categories: this.api.categories(), tags: this.api.tags(), projects: this.api.projects() }).subscribe({
-      next: ({ categories, tags, projects }) => {
-        this.categoryOptions = categories;
-        this.allTags = tags;
-        this.projectOptions = projects;
-        this.changeDetectorRef.markForCheck();
-      },
-      error: () => {
-        this.metadataError = "Não foi possível carregar os filtros. Tente recarregá-los.";
-        this.changeDetectorRef.markForCheck();
-      },
-    });
+    this.catalog.load(true);
   }
 
   search(): void {

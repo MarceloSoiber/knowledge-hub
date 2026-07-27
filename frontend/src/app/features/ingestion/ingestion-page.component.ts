@@ -2,9 +2,9 @@ import { HttpErrorResponse } from "@angular/common/http";
 import { ChangeDetectorRef, Component, ElementRef, OnInit, ViewChild, inject } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { RouterLink } from "@angular/router";
-import { forkJoin } from "rxjs";
 
 import { KnowledgeApiService } from "../../core/knowledge-api.service";
+import { MetadataCatalogService } from "../../core/metadata-catalog.service";
 import { Category, KnowledgeTextIngestRequest, KnowledgeUploadResponse, MetadataSelection, Project, Tag } from "../../core/knowledge.types";
 import { ErrorStateComponent } from "../../shared/error-state/error-state.component";
 import { LoadingStateComponent } from "../../shared/loading-state/loading-state.component";
@@ -74,15 +74,16 @@ export function duplicateSourceId(error: HttpErrorResponse): string | null {
 })
 export class IngestionPageComponent implements OnInit {
   private readonly api = inject(KnowledgeApiService);
+  private readonly catalog = inject(MetadataCatalogService);
   private readonly changeDetectorRef = inject(ChangeDetectorRef);
   @ViewChild("fileInput") private readonly fileInput?: ElementRef<HTMLInputElement>;
 
   activeTab: IngestionTab = "file";
-  metadataLoading = true;
-  metadataError = "";
-  categories: Category[] = [];
-  tags: Tag[] = [];
-  projects: Project[] = [];
+  get metadataLoading(): boolean { return this.catalog.loading(); }
+  get metadataError(): string { return this.catalog.error(); }
+  get categories(): Category[] { return this.catalog.categories(); }
+  get tags(): Tag[] { return this.catalog.tags(); }
+  get projects(): Project[] { return this.catalog.activeProjects(); }
 
   file: File | null = null;
   fileSelection = emptySelection();
@@ -95,24 +96,7 @@ export class IngestionPageComponent implements OnInit {
 
   ngOnInit(): void { this.loadMetadata(); }
 
-  loadMetadata(): void {
-    this.metadataLoading = true;
-    this.metadataError = "";
-    forkJoin({ categories: this.api.categories(), tags: this.api.tags(), projects: this.api.projects() }).subscribe({
-      next: ({ categories, tags, projects }) => {
-        this.categories = categories;
-        this.tags = tags;
-        this.projects = projects;
-        this.metadataLoading = false;
-        this.changeDetectorRef.markForCheck();
-      },
-      error: () => {
-        this.metadataLoading = false;
-        this.metadataError = "Não foi possível carregar os metadados. Tente novamente.";
-        this.changeDetectorRef.markForCheck();
-      },
-    });
-  }
+  loadMetadata(): void { this.catalog.load(true); }
 
   activateTab(tab: IngestionTab): void { this.activeTab = tab; }
 

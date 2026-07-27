@@ -4,6 +4,7 @@ import { Observable } from "rxjs";
 
 import {
   Category,
+  CategoryWrite,
   KnowledgeAnswerRequest,
   KnowledgeAnswerResponse,
   KnowledgeSearchRequest,
@@ -14,7 +15,10 @@ import {
   KnowledgeTextIngestRequest,
   KnowledgeUploadResponse,
   Project,
+  ProjectPatch,
+  ProjectWrite,
   Tag,
+  TagWrite,
 } from "./knowledge.types";
 
 @Injectable({ providedIn: "root" })
@@ -23,7 +27,13 @@ export class KnowledgeApiService {
   private readonly baseUrl = "/api/v1/knowledge";
 
   categories(): Observable<Category[]> { return this.http.get<Category[]>(`${this.baseUrl}/categories`); }
+  createCategory(payload: CategoryWrite): Observable<Category> { return this.http.post<Category>(`${this.baseUrl}/categories`, payload); }
+  updateCategory(id: number, payload: CategoryWrite): Observable<Category> { return this.http.patch<Category>(`${this.baseUrl}/categories/${id}`, payload); }
+  deleteCategory(id: number): Observable<void> { return this.http.delete<void>(`${this.baseUrl}/categories/${id}`); }
   tags(): Observable<Tag[]> { return this.http.get<Tag[]>(`${this.baseUrl}/tags`); }
+  createTag(payload: TagWrite): Observable<Tag> { return this.http.post<Tag>(`${this.baseUrl}/tags`, payload); }
+  updateTag(id: number, payload: TagWrite): Observable<Tag> { return this.http.patch<Tag>(`${this.baseUrl}/tags/${id}`, payload); }
+  deleteTag(id: number): Observable<void> { return this.http.delete<void>(`${this.baseUrl}/tags/${id}`); }
   tagAutocomplete(query: string, limit = 10): Observable<Tag[]> {
     return this.http.get<Tag[]>(`${this.baseUrl}/tags/autocomplete`, { params: new HttpParams().set("q", query).set("limit", limit) });
   }
@@ -31,6 +41,11 @@ export class KnowledgeApiService {
     const params = status ? new HttpParams().set("status", status) : undefined;
     return this.http.get<Project[]>(`${this.baseUrl}/projects`, { params });
   }
+  createProject(payload: ProjectWrite): Observable<Project> { return this.http.post<Project>(`${this.baseUrl}/projects`, payload); }
+  updateProject(id: number, payload: ProjectPatch): Observable<Project> { return this.http.patch<Project>(`${this.baseUrl}/projects/${id}`, payload); }
+  archiveProject(id: number): Observable<Project> { return this.http.post<Project>(`${this.baseUrl}/projects/${id}/archive`, {}); }
+  reactivateProject(id: number): Observable<Project> { return this.http.post<Project>(`${this.baseUrl}/projects/${id}/reactivate`, {}); }
+  projectSources(id: number): Observable<KnowledgeSource[]> { return this.http.get<KnowledgeSource[]>(`${this.baseUrl}/projects/${id}/sources`); }
   sources(): Observable<KnowledgeSource[]> { return this.http.get<KnowledgeSource[]>(`${this.baseUrl}/sources`); }
   source(sourceId: string): Observable<KnowledgeSourceDetail> { return this.http.get<KnowledgeSourceDetail>(`${this.baseUrl}/sources/${encodeURIComponent(sourceId)}`); }
   updateSource(sourceId: string, payload: KnowledgeSourcePatchRequest): Observable<KnowledgeSourceDetail> {

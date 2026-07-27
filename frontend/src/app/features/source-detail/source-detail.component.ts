@@ -2,9 +2,9 @@ import { HttpErrorResponse } from "@angular/common/http";
 import { ChangeDetectorRef, Component, OnInit, inject } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { ActivatedRoute, Router, RouterLink } from "@angular/router";
-import { forkJoin } from "rxjs";
 
 import { KnowledgeApiService } from "../../core/knowledge-api.service";
+import { MetadataCatalogService } from "../../core/metadata-catalog.service";
 import { Category, KnowledgeSourceDetail, KnowledgeSourcePatchRequest, MetadataSelection, Project, Tag } from "../../core/knowledge.types";
 import { ConfirmDialogComponent } from "../../shared/confirm-dialog/confirm-dialog.component";
 import { ErrorStateComponent } from "../../shared/error-state/error-state.component";
@@ -22,21 +22,22 @@ interface SourceDraft { title: string; content: string; selection: MetadataSelec
 export class SourceDetailComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly api = inject(KnowledgeApiService);
+  private readonly catalog = inject(MetadataCatalogService);
   private readonly router = inject(Router);
   private readonly changeDetectorRef = inject(ChangeDetectorRef);
   source: KnowledgeSourceDetail | null = null;
   draft: SourceDraft = emptyDraft();
-  categories: Category[] = [];
-  tags: Tag[] = [];
-  projects: Project[] = [];
+  get categories(): Category[] { return this.catalog.categories(); }
+  get tags(): Tag[] { return this.catalog.tags(); }
+  get projects(): Project[] { return this.catalog.activeProjects(); }
   loading = true;
-  loadingMetadata = false;
+  get loadingMetadata(): boolean { return this.catalog.loading(); }
   editing = false;
   saving = false;
   deleting = false;
   deleteDialogOpen = false;
   message = "";
-  metadataError = "";
+  get metadataError(): string { return this.catalog.error(); }
   private sourceId = "";
 
   ngOnInit(): void {
@@ -61,13 +62,7 @@ export class SourceDetailComponent implements OnInit {
     if (!this.categories.length && !this.loadingMetadata) this.loadMetadata();
   }
   cancelEditing(): void { if (this.source) this.draft = draftFrom(this.source); this.editing = false; this.message = ""; }
-  loadMetadata(): void {
-    this.loadingMetadata = true; this.metadataError = "";
-    forkJoin({ categories: this.api.categories(), tags: this.api.tags(), projects: this.api.projects() }).subscribe({
-      next: (data) => { this.categories = data.categories; this.tags = data.tags; this.projects = data.projects; this.loadingMetadata = false; this.changeDetectorRef.markForCheck(); },
-      error: () => { this.loadingMetadata = false; this.metadataError = "Não foi possível carregar os metadados para edição."; this.changeDetectorRef.markForCheck(); },
-    });
-  }
+  loadMetadata(): void { this.catalog.load(true); }
   save(): void {
     const payload = this.patchPayload();
     if (!Object.keys(payload).length) { this.message = "Não há alterações para salvar."; return; }
