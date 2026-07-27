@@ -3,7 +3,7 @@ import { ChangeDetectorRef, Component, OnInit, inject } from "@angular/core";
 import { RouterLink, ActivatedRoute } from "@angular/router";
 
 import { KnowledgeApiService } from "../../core/knowledge-api.service";
-import { KnowledgeSourceDetail } from "../../shared/models/knowledge.models";
+import { KnowledgeSourceDetail } from "../../core/knowledge.types";
 
 @Component({
   selector: "kh-source-detail",

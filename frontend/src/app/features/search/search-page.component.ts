@@ -7,7 +7,7 @@ import { Subject, forkJoin, of } from "rxjs";
 import { catchError, debounceTime, distinctUntilChanged, switchMap, takeUntil } from "rxjs/operators";
 
 import { KnowledgeApiService } from "../../core/knowledge-api.service";
-import { Category, KnowledgeSearchResult, Project, SearchRequest, Tag } from "../../shared/models/knowledge.models";
+import { Category, KnowledgeChunk, KnowledgeSearchRequest, Project, Tag } from "../../core/knowledge.types";
 
 type SearchStatus = "idle" | "loading" | "success" | "error";
 
@@ -35,7 +35,7 @@ export class SearchPageComponent implements OnInit, OnDestroy {
   selectedTags: Tag[] = [];
   allTags: Tag[] = [];
   tagQuery = "";
-  results: KnowledgeSearchResult[] = [];
+  results: KnowledgeChunk[] = [];
   status: SearchStatus = "idle";
   message = "";
   metadataError = "";
@@ -46,7 +46,7 @@ export class SearchPageComponent implements OnInit, OnDestroy {
       .pipe(
         debounceTime(250),
         distinctUntilChanged(),
-        switchMap((query) => query.trim().length > 0 ? this.api.autocompleteTags(query.trim()) : of([])),
+        switchMap((query) => query.trim().length > 0 ? this.api.tagAutocomplete(query.trim()) : of([])),
         takeUntil(this.destroy$),
       )
       .subscribe({
@@ -102,7 +102,7 @@ export class SearchPageComponent implements OnInit, OnDestroy {
 
     this.status = "loading";
     this.message = "";
-    const request: SearchRequest = {
+    const request: KnowledgeSearchRequest = {
       query: normalizedQuery,
       limit: this.limit,
       ...(this.selectedCategories.length ? { category_ids: this.selectedCategories.map((item) => item.id) } : {}),
@@ -150,7 +150,7 @@ export class SearchPageComponent implements OnInit, OnDestroy {
   removeProject(id: number): void { this.selectedProjects = this.selectedProjects.filter((item) => item.id !== id); }
   removeTag(id: number): void { this.selectedTags = this.selectedTags.filter((item) => item.id !== id); }
 
-  location(result: KnowledgeSearchResult): string {
+  location(result: KnowledgeChunk): string {
     const parts = [result.location.page ? `página ${result.location.page}` : "", result.location.section ?? "", `trecho ${result.location.chunk_index + 1}`];
     return parts.filter(Boolean).join(" · ");
   }
