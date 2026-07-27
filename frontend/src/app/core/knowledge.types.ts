@@ -5,6 +5,9 @@ export interface Category {
 
 export interface Tag extends Category {}
 
+export interface CategoryWrite { name: string; }
+export interface TagWrite { name: string; }
+
 export interface Project {
   id: number;
   name: string;
@@ -13,6 +16,9 @@ export interface Project {
   created_at: string | null;
   updated_at: string | null;
 }
+
+export interface ProjectWrite { name: string; description?: string | null; }
+export interface ProjectPatch { name?: string; description?: string | null; }
 
 export interface KnowledgeSource {
   source_id: string;

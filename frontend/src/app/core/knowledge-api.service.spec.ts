@@ -58,4 +58,39 @@ describe("KnowledgeApiService ingestion", () => {
     expect(request.request.method).toBe("DELETE");
     request.flush(null);
   });
+
+  it("manages categories and tags through their published CRUD endpoints", () => {
+    api.createCategory({ name: "Docs" }).subscribe();
+    const createCategory = http.expectOne("/api/v1/knowledge/categories");
+    expect(createCategory.request.method).toBe("POST");
+    expect(createCategory.request.body).toEqual({ name: "Docs" });
+    createCategory.flush({ id: 1, name: "docs" });
+
+    api.updateTag(7, { name: "RAG" }).subscribe();
+    const updateTag = http.expectOne("/api/v1/knowledge/tags/7");
+    expect(updateTag.request.method).toBe("PATCH");
+    updateTag.flush({ id: 7, name: "rag" });
+
+    api.deleteCategory(1).subscribe();
+    const deleteCategory = http.expectOne("/api/v1/knowledge/categories/1");
+    expect(deleteCategory.request.method).toBe("DELETE");
+    deleteCategory.flush(null);
+  });
+
+  it("manages project lifecycle and lists its sources", () => {
+    api.createProject({ name: "Hub", description: null }).subscribe();
+    const create = http.expectOne("/api/v1/knowledge/projects");
+    expect(create.request.method).toBe("POST");
+    create.flush({ id: 3, name: "hub", description: null, status: "active", created_at: null, updated_at: null });
+
+    api.archiveProject(3).subscribe();
+    const archive = http.expectOne("/api/v1/knowledge/projects/3/archive");
+    expect(archive.request.method).toBe("POST");
+    archive.flush({ id: 3, name: "hub", description: null, status: "archived", created_at: null, updated_at: null });
+
+    api.projectSources(3).subscribe();
+    const sources = http.expectOne("/api/v1/knowledge/projects/3/sources");
+    expect(sources.request.method).toBe("GET");
+    sources.flush([]);
+  });
 });
