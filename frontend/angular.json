@@ -45,6 +45,7 @@
           "builder": "@angular/build:unit-test",
           "options": {
             "buildTarget": "knowledge-hub-frontend:build:development",
+            "tsConfig": "tsconfig.spec.json",
             "runner": "vitest"
           }
         }

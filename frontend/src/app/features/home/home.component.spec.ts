@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from "@angular/core/testing";
+import { provideRouter } from "@angular/router";
 import { of, throwError } from "rxjs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -34,7 +35,7 @@ describe("HomeComponent", () => {
         { id: 6, name: "ativo dois", description: null, status: "active", created_at: null, updated_at: null },
       ])),
     };
-    TestBed.configureTestingModule({ providers: [{ provide: KnowledgeApiService, useValue: api }] });
+    TestBed.configureTestingModule({ providers: [provideRouter([]), { provide: KnowledgeApiService, useValue: api }] });
     fixture = TestBed.createComponent(HomeComponent);
     fixture.detectChanges();
   });

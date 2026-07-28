@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from "@angular/core/testing";
+import { provideRouter } from "@angular/router";
 import { of } from "rxjs";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -13,7 +14,7 @@ describe("LibraryPageComponent", () => {
   ];
 
   beforeEach(() => {
-    TestBed.configureTestingModule({ providers: [{ provide: KnowledgeApiService, useValue: { sources: () => of(sources) } }] });
+    TestBed.configureTestingModule({ providers: [provideRouter([]), { provide: KnowledgeApiService, useValue: { sources: () => of(sources) } }] });
     fixture = TestBed.createComponent(LibraryPageComponent);
     fixture.detectChanges();
   });

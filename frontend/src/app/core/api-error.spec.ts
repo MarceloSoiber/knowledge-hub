@@ -17,4 +17,20 @@ describe("toApiError", () => {
   it("classifies unauthorized responses for the session flow", () => {
     expect(toApiError(new HttpErrorResponse({ status: 401 })).kind).toBe("unauthorized");
   });
+
+  it.each([
+    [400, "validation"], [403, "forbidden"], [404, "not-found"], [409, "conflict"], [413, "too-large"],
+    [429, "rate-limited"], [502, "provider"], [503, "unavailable"],
+  ] as const)("maps status %i to a safe %s error", (status, kind) => {
+    const error = toApiError(new HttpErrorResponse({ status, error: "<script>untrusted</script>" }));
+    expect(error.kind).toBe(kind);
+    expect(error.message).not.toContain("untrusted");
+    expect(error.message).not.toContain("<script>");
+  });
+
+  it("uses a safe fallback for unmapped errors", () => {
+    const error = toApiError(new HttpErrorResponse({ status: 500, error: { detail: "token-secret" } }));
+    expect(error.kind).toBe("unknown");
+    expect(error.message).not.toContain("token-secret");
+  });
 });
