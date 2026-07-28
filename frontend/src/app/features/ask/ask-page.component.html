@@ -1,9 +1,9 @@
 <section class="ask-page" aria-labelledby="ask-title">
-  <header><p class="eyebrow">Conhecimento</p><h1 id="ask-title">Pergunte à base</h1><p>Obtenha uma resposta e confira as fontes que a sustentam.</p></header>
+  <header class="page-header"><p class="eyebrow page-header__eyebrow">Conhecimento</p><h1 id="ask-title">Pergunte à base</h1><p class="page-header__description">Obtenha uma resposta e confira as fontes que a sustentam.</p></header>
 
-  <form class="ask-form" (ngSubmit)="ask()" #askForm="ngForm">
+  <form class="ask-form surface-card" (ngSubmit)="ask()" #askForm="ngForm">
     <label for="question">Qual é a sua pergunta?</label>
-    <div class="query-row"><input id="question" name="question" [(ngModel)]="query" required [disabled]="status === 'loading'" placeholder="Ex.: quais decisões foram tomadas?" /><button type="submit" [disabled]="askForm.invalid || status === 'loading'">{{ status === "loading" ? "Consultando…" : "Perguntar" }}</button></div>
+    <div class="query-row"><input class="form-control" id="question" name="question" [(ngModel)]="query" required [disabled]="status === 'loading'" placeholder="Ex.: quais decisões foram tomadas?" /><button class="button-primary" type="submit" [disabled]="askForm.invalid || status === 'loading'">{{ status === "loading" ? "Consultando…" : "Perguntar" }}</button></div>
 
     <div class="filters" aria-label="Filtros da resposta">
       <label>Limite <input name="limit" type="number" min="1" max="20" [(ngModel)]="limit" [disabled]="status === 'loading'" /></label>
