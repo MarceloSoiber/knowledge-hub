@@ -1,11 +1,11 @@
 <section class="search-page" aria-labelledby="search-title">
-  <header><p class="eyebrow">Conhecimento</p><h1 id="search-title">Busca inteligente</h1><p>Encontre trechos relevantes e confira a fonte de cada resposta.</p></header>
+  <header class="page-header"><p class="eyebrow page-header__eyebrow">Conhecimento</p><h1 id="search-title">Busca inteligente</h1><p class="page-header__description">Encontre trechos relevantes e confira a fonte de cada resposta.</p></header>
 
-  <form class="search-form" (ngSubmit)="search()" #searchForm="ngForm">
+  <form class="search-form surface-card" (ngSubmit)="search()" #searchForm="ngForm">
     <label for="query">O que você procura?</label>
     <div class="query-row">
-      <input id="query" name="query" [(ngModel)]="query" required [disabled]="status === 'loading'" placeholder="Ex.: como configurar o MCP" />
-      <button type="submit" [disabled]="searchForm.invalid || status === 'loading'">{{ status === "loading" ? "Buscando…" : "Buscar" }}</button>
+      <input class="form-control" id="query" name="query" [(ngModel)]="query" required [disabled]="status === 'loading'" placeholder="Ex.: como configurar o MCP" />
+      <button class="button-primary" type="submit" [disabled]="searchForm.invalid || status === 'loading'">{{ status === "loading" ? "Buscando…" : "Buscar" }}</button>
     </div>
 
     <div class="filters" aria-label="Filtros de busca">

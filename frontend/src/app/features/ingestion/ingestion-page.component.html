@@ -1,8 +1,8 @@
 <section class="ingestion-page" aria-labelledby="ingestion-title">
-  <header>
-    <p class="eyebrow">Conhecimento</p>
+  <header class="page-header">
+    <p class="eyebrow page-header__eyebrow">Conhecimento</p>
     <h1 id="ingestion-title">Ingestão</h1>
-    <p>Inclua arquivos ou textos na base com os metadados que os tornam encontráveis.</p>
+    <p class="page-header__description">Inclua arquivos ou textos na base com os metadados que os tornam encontráveis.</p>
   </header>
 
   @if (metadataLoading) {
@@ -16,7 +16,7 @@
     </div>
 
     @if (activeTab === "file") {
-      <form id="file-panel" class="ingestion-form" role="tabpanel" aria-labelledby="file-tab" (ngSubmit)="submitFile()">
+      <form id="file-panel" class="ingestion-form surface-card" role="tabpanel" aria-labelledby="file-tab" (ngSubmit)="submitFile()">
         <label for="knowledge-file">Arquivo</label>
         <input #fileInput id="knowledge-file" name="file" type="file" accept=".txt,.md,.pdf" [disabled]="fileState.status === 'submitting'" (change)="selectFile($event)" aria-describedby="file-help" />
         <p id="file-help" class="help">Formatos aceitos: .txt, .md ou .pdf, com até 10 MB.</p>
@@ -30,7 +30,7 @@
         @if (fileState.status === "success" && fileState.result; as result) { <section class="notice notice--success" aria-live="polite"><h2>Arquivo ingerido</h2><p><strong>{{ result.title }}</strong></p><p>ID da fonte: <code>{{ result.source_id }}</code></p><p>{{ result.chunks_created }} chunks criados.</p><a [routerLink]="['/sources', result.source_id]">Abrir fonte</a></section> }
       </form>
     } @else {
-      <form id="text-panel" class="ingestion-form" role="tabpanel" aria-labelledby="text-tab" (ngSubmit)="submitText()">
+      <form id="text-panel" class="ingestion-form surface-card" role="tabpanel" aria-labelledby="text-tab" (ngSubmit)="submitText()">
         <label for="text-title">Título</label>
         <input id="text-title" name="title" maxlength="255" [(ngModel)]="textTitle" [disabled]="textState.status === 'submitting'" />
         <p class="help">{{ textTitle.length }}/255 caracteres</p>

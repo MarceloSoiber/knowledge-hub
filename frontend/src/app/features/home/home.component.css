@@ -1,14 +1,15 @@
-.dashboard { max-width: 72rem; }
+.dashboard { max-width: var(--content-width); }
 .dashboard__header { margin-bottom: var(--space-5); }
 .dashboard__header h1, h2, h3, p { margin-top: 0; }
 .dashboard__header h1 { margin-bottom: var(--space-2); font-size: clamp(2rem, 5vw, 3rem); letter-spacing: -.04em; }
 .dashboard__header > p:last-child, .section-heading p { color: var(--color-muted); }
 .eyebrow { margin-bottom: var(--space-2); color: var(--color-primary); font-weight: 700; }
 .quick-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: var(--space-3); margin-bottom: var(--space-6); }
-.quick-actions a, .empty-action { display: inline-flex; align-items: center; justify-content: center; min-height: 2.75rem; border-radius: var(--radius-sm); padding: .65rem 1rem; background: var(--color-primary); color: #fff; font-weight: 700; text-decoration: none; }
+.quick-actions a, .empty-action { display: inline-flex; align-items: center; justify-content: center; min-height: 3rem; border-radius: var(--radius-sm); padding: .65rem 1rem; background: var(--color-primary); color: #fff; font-weight: 700; text-decoration: none; box-shadow: 0 .4rem 1rem rgb(36 87 165 / 16%); }
 .quick-actions a:hover, .empty-action:hover { background: var(--color-primary-hover); }
 .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: var(--space-3); margin: var(--space-3) 0 var(--space-6); }
-.metric { min-height: 8.5rem; padding: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); box-shadow: var(--shadow-card); }
+.metric { min-height: 8.5rem; padding: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); box-shadow: var(--shadow-card); transition: transform .18s ease, box-shadow .18s ease; }
+.metric:hover { transform: translateY(-2px); box-shadow: 0 1rem 2rem rgb(20 36 60 / 11%); }
 .metric h3 { margin-bottom: var(--space-3); font-size: .95rem; color: var(--color-muted); }
 .metric__value { margin: 0; font-size: 2.25rem; font-weight: 750; line-height: 1; }
 .metric__error { margin-bottom: var(--space-3); color: var(--color-danger); font-size: .9rem; }

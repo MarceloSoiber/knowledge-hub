@@ -1,10 +1,11 @@
 <div class="app-shell" [class.app-shell--menu-open]="menuOpen">
+  <a class="skip-link" href="#main-content">Pular para o conteúdo</a>
   <header class="topbar">
     <button #menuButton class="menu-button" type="button" (click)="menuOpen = !menuOpen"
       [attr.aria-expanded]="menuOpen" aria-controls="primary-navigation" aria-label="Abrir navegação">
       <span aria-hidden="true">☰</span>
     </button>
-    <a class="brand" routerLink="/inicio">Knowledge Hub</a>
+    <a class="brand" routerLink="/inicio"><span class="brand__mark" aria-hidden="true">K</span><span>Knowledge Hub</span></a>
     <button class="logout-button" type="button" (click)="logout()">Desconectar</button>
   </header>
 
@@ -13,12 +14,14 @@
   }
 
   <nav id="primary-navigation" class="sidebar" aria-label="Navegação principal">
-    <a routerLink="/inicio" routerLinkActive="is-active" (click)="closeMenu()">Início</a>
-    <a routerLink="/busca" routerLinkActive="is-active" (click)="closeMenu()">Busca inteligente</a>
-    <a routerLink="/perguntar" routerLinkActive="is-active" (click)="closeMenu()">Pergunte à base</a>
-    <a routerLink="/ingestao" routerLinkActive="is-active" (click)="closeMenu()">Ingestão</a>
-    <a routerLink="/biblioteca" routerLinkActive="is-active" (click)="closeMenu()">Biblioteca</a>
-    <a routerLink="/organizacao" routerLinkActive="is-active" (click)="closeMenu()">Organização</a>
+    <p class="sidebar__label">Área de trabalho</p>
+    <a routerLink="/inicio" routerLinkActive="is-active" #homeLink="routerLinkActive" [attr.aria-current]="homeLink.isActive ? 'page' : null" (click)="closeMenu()"><span aria-hidden="true">⌂</span> Início</a>
+    <a routerLink="/busca" routerLinkActive="is-active" #searchLink="routerLinkActive" [attr.aria-current]="searchLink.isActive ? 'page' : null" (click)="closeMenu()"><span aria-hidden="true">⌕</span> Busca inteligente</a>
+    <a routerLink="/perguntar" routerLinkActive="is-active" #askLink="routerLinkActive" [attr.aria-current]="askLink.isActive ? 'page' : null" (click)="closeMenu()"><span aria-hidden="true">?</span> Pergunte à base</a>
+    <p class="sidebar__label">Acervo</p>
+    <a routerLink="/ingestao" routerLinkActive="is-active" #ingestionLink="routerLinkActive" [attr.aria-current]="ingestionLink.isActive ? 'page' : null" (click)="closeMenu()"><span aria-hidden="true">＋</span> Ingestão</a>
+    <a routerLink="/biblioteca" routerLinkActive="is-active" #libraryLink="routerLinkActive" [attr.aria-current]="libraryLink.isActive ? 'page' : null" (click)="closeMenu()"><span aria-hidden="true">▤</span> Biblioteca</a>
+    <a routerLink="/organizacao" routerLinkActive="is-active" #organizationLink="routerLinkActive" [attr.aria-current]="organizationLink.isActive ? 'page' : null" (click)="closeMenu()"><span aria-hidden="true">◌</span> Organização</a>
   </nav>
 
   <main id="main-content" class="content" tabindex="-1">
