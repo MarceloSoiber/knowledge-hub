@@ -4,6 +4,7 @@ import { FormsModule } from "@angular/forms";
 import { ActivatedRoute, Router } from "@angular/router";
 
 import { AuthService } from "../../core/auth.service";
+import { ThemeService } from "../../core/theme.service";
 
 export function safeReturnUrl(returnUrl: string | null): string {
   return returnUrl?.startsWith("/") && !returnUrl.startsWith("//") && returnUrl !== "/login"
@@ -19,6 +20,7 @@ export function safeReturnUrl(returnUrl: string | null): string {
 })
 export class LoginComponent implements OnInit {
   readonly auth = inject(AuthService);
+  readonly theme = inject(ThemeService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly changeDetectorRef = inject(ChangeDetectorRef);
