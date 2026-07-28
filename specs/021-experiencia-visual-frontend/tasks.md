@@ -41,6 +41,12 @@
 - [ ] T015 Executar `npm run build` em `frontend/`. _(bloqueado: Node.js 22.22.1; Angular CLI requer 22.22.3+)_
 - [x] T016 Comparar implementação, `spec.md`, `plan.md`, `tasks.md` e constituição; registrar eventuais lacunas.
 
+## Phase 6: Tema escuro
+
+- [x] T017 Atualizar `spec.md`, `plan.md`, `data-model.md` e `contracts/frontend-experience.md` para incluir a preferência de tema local.
+- [x] T018 Implementar `ThemeService` e seus testes em `frontend/src/app/core/theme.service.{ts,spec.ts}`.
+- [x] T019 Aplicar tokens de tema escuro em `frontend/src/styles.css` e incluir alternância acessível no layout autenticado.
+
 ## Dependencies & Execution Order
 
 - T001 e T002 são a fundação para T003–T011.

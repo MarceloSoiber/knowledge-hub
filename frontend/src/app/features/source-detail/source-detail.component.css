@@ -9,8 +9,8 @@ h1, h2 { margin: 0; color: var(--color-text); }
 .uri, .details { color: var(--color-muted); overflow-wrap: anywhere; }
 .details { font-size: .9rem; }
 .chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.chips span { padding: .32rem .6rem; border-radius: 999px; background: var(--color-primary-soft); color: #274b7e; font-size: .82rem; }
-.content { max-width: 80ch; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; color: #26354c; }
+.chips span { padding: .32rem .6rem; border-radius: 999px; background: var(--color-primary-soft); color: var(--color-primary); font-size: .82rem; }
+.content { max-width: 80ch; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; color: var(--color-text); }
 .editor { display: grid; gap: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); box-shadow: var(--shadow-card); }
 .editor label { display: grid; gap: var(--space-2); font-weight: 650; }
 .editor input, .editor textarea { box-sizing: border-box; width: 100%; padding: .7rem .75rem; border: 1px solid var(--color-border-strong); border-radius: var(--radius-sm); font: inherit; }

@@ -2,6 +2,7 @@ import { Component, ElementRef, HostListener, ViewChild, inject } from "@angular
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from "@angular/router";
 
 import { AuthService } from "../core/auth.service";
+import { ThemeService } from "../core/theme.service";
 
 @Component({
   selector: "kh-authenticated-layout",
@@ -11,6 +12,7 @@ import { AuthService } from "../core/auth.service";
 })
 export class AuthenticatedLayoutComponent {
   readonly auth = inject(AuthService);
+  readonly theme = inject(ThemeService);
   private readonly router = inject(Router);
   @ViewChild("menuButton") private readonly menuButton?: ElementRef<HTMLButtonElement>;
   menuOpen = false;
