@@ -12,7 +12,7 @@ Evoluir a aplicação Angular para uma experiência visual coesa e mais simples 
 
 **Language/Version**: TypeScript 6.0, Angular 22.0, CSS nativo  
 **Primary Dependencies**: Angular standalone components, Router/RouterLink/RouterLinkActive, Forms, componentes compartilhados existentes; sem nova dependência  
-**Storage**: N/A para esta feature; estado efêmero existente e PostgreSQL + pgvector inalterados  
+**Storage**: Preferência de tema em `localStorage`; estado efêmero existente e PostgreSQL + pgvector inalterados  
 **Testing**: Vitest/TestBed; `npm run typecheck`, `npm test -- --watch=false`, `npm run build`  
 **Target Platform**: Navegadores modernos em mobile, tablet e desktop; app Angular servida por Nginx  
 **Project Type**: Aplicação web Angular consumindo API FastAPI existente  
@@ -82,6 +82,7 @@ frontend/src/
 - Ampliar `frontend/src/styles.css` para incluir tokens semânticos completos: superfícies, texto, estados, foco, tipografia, espaçamento, largura de leitura, raios e elevação; eliminar valores repetidos gradualmente.
 - Definir primitives CSS consistentes para página, cabeçalho, botão, cartão/painel, campo/formulário, chip, aviso e links, documentadas pelo [modelo de design](data-model.md).
 - Garantir contraste, `:focus-visible`, estados `disabled`, áreas de toque adequadas e `prefers-reduced-motion`; não usar cor como indicador exclusivo.
+- Adicionar tokens de tema escuro e `ThemeService` pequeno, iniciado no bootstrap, que aplica a preferência no elemento raiz; usar a preferência do sistema somente quando ainda não houver escolha manual.
 - Refinar `LoadingState`, `EmptyState`, `ErrorState`, `ConfirmDialog` e `MetadataSelector` quando um contrato semântico ou visual já for compartilhado. Não abstrair CSS que só aparece em uma tela.
 
 ### 2. Tornar a navegação uma orientação confiável
@@ -89,6 +90,7 @@ frontend/src/
 - Ajustar `authenticated-layout.component.*` para incluir link de salto, `aria-current` no destino ativo e rótulos/agrupamentos mais claros para os seis destinos privados.
 - Preservar a sidebar no desktop e aperfeiçoar a gaveta móvel: controle de estado, backdrop, Escape, restauração de foco e transição reduzida conforme o [contrato](contracts/frontend-experience.md).
 - Diferenciar marca, contexto de navegação e ação de encerrar sessão sem criar uma segunda rota ou alterar guard/autenticação.
+- Oferecer no topo um botão com estado e nome acessíveis para alternar tema claro/escuro, com a preferência persistida localmente.
 - Criar/atualizar testes do layout para links, rota ativa, ciclo abrir-fechar e foco de menu.
 
 ### 3. Migrar os fluxos de descoberta e consulta
@@ -112,13 +114,13 @@ frontend/src/
 
 ## Data Model / API Implications
 
-- Não há migração, schema, endpoint FastAPI, contrato OpenAPI, MCP, autenticação ou mudança em `doc/API.md`.
+- Não há migração, schema, endpoint FastAPI, contrato OpenAPI, MCP, autenticação ou mudança em `doc/API.md`; a única persistência nova é a preferência visual local `knowledge-hub.theme`.
 - [data-model.md](data-model.md) define apenas tokens, padrões de apresentação e estado efêmero do menu.
 - As rotas atuais e as regras de interação estão preservadas em [frontend-experience.md](contracts/frontend-experience.md).
 
 ## Test Strategy
 
-- **Layout**: links, item ativo, link de salto, menu em mobile, Escape/backdrop e foco.
+- **Layout**: links, item ativo, link de salto, menu em mobile, Escape/backdrop, foco e alternância de tema.
 - **Shared**: semântica e variantes de estados carregando/vazio/erro/sucesso, com `prefers-reduced-motion` coberto por revisão de CSS.
 - **Features**: renderização de ação principal, filtros/chips, mensagens e confirmações nas telas alteradas; regras de negócio e HTTP continuam nos testes atuais.
 - **Manual/a11y**: roteiro de teclado, leitor de tela, contraste e três viewports documentado em [quickstart.md](quickstart.md).

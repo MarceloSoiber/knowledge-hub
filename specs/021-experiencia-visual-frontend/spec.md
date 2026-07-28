@@ -72,6 +72,7 @@ Uma pessoa usa os mesmos recursos em celular, tablet ou desktop com texto legív
 - **FR-007**: Ingestão, Biblioteca e Organização DEVEM priorizar a tarefa principal da tela e apresentar feedback imediato, acessível e recuperável para sucesso, vazio, validação e falha de rede.
 - **FR-008**: Todas as alterações DEVEM funcionar de 320 px a desktop, suportar teclado, foco visível, HTML semântico, nomes acessíveis e `prefers-reduced-motion`.
 - **FR-009**: A implementação NÃO DEVE mudar endpoints HTTP, esquemas, persistência, autenticação, regras de negócio, rotas publicadas, MCP ou `doc/API.md`.
+- **FR-010**: O sistema DEVE oferecer tema claro e escuro com alternância acessível; a escolha manual fica salva somente no navegador e, na ausência dela, respeita a preferência do sistema.
 
 ### Key Entities
 
@@ -96,8 +97,9 @@ Uma pessoa usa os mesmos recursos em celular, tablet ou desktop com texto legív
 - O idioma principal continua português (Brasil), com a terminologia atual do produto preservada.
 - Ícones, se empregados, serão poucos, decorativos quando redundantes ao texto e implementados sem dependência externa nova.
 - A implementação pode ser entregue em lotes, começando pela fundação visual e navegação antes de migrar os fluxos.
+- A preferência de tema é específica do navegador, sem sincronização entre dispositivos ou contas.
 
 ## Out of Scope
 
 - Redesenhar fluxos de negócio, criar novos recursos, alterar contratos da API ou adicionar métricas/gráficos ao Dashboard.
-- Tema escuro, internacionalização, personalização por usuário, onboarding guiado, analytics de comportamento ou testes formais com usuários.
+- Internacionalização, personalização por usuário, onboarding guiado, analytics de comportamento ou testes formais com usuários.

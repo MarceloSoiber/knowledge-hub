@@ -29,3 +29,11 @@ Não há modelo persistido, migração ou alteração de API. Este documento des
 | Fechado | rota inicial, clique em link, Escape, backdrop | Sidebar oculta e botão de menu focável. |
 | Aberto | botão do menu | Navegação visível, backdrop disponível e `aria-expanded=true`. |
 | Fechando | link, backdrop ou Escape | Sidebar oculta; Escape/backdrop devolve foco ao botão, enquanto um link transfere foco pelo fluxo normal da rota. |
+
+## Preferência de tema
+
+| Campo | Valores | Regra |
+| --- | --- | --- |
+| Tema atual | `light`, `dark` | Aplicado como `data-theme` no elemento raiz e refletido em `color-scheme`. |
+| Persistência | `localStorage: knowledge-hub.theme` | Uma escolha explícita substitui a preferência do sistema somente neste navegador. |
+| Padrão inicial | tema do sistema | Usado quando não há valor local válido. |

@@ -6,6 +6,10 @@
       <span aria-hidden="true">☰</span>
     </button>
     <a class="brand" routerLink="/inicio"><span class="brand__mark" aria-hidden="true">K</span><span>Knowledge Hub</span></a>
+    <button class="theme-button" type="button" (click)="theme.toggle()" [attr.aria-pressed]="theme.current() === 'dark'" [attr.aria-label]="theme.current() === 'dark' ? 'Usar tema claro' : 'Usar tema escuro'">
+      <span aria-hidden="true">{{ theme.current() === "dark" ? "☀" : "☾" }}</span>
+      <span>{{ theme.current() === "dark" ? "Tema claro" : "Tema escuro" }}</span>
+    </button>
     <button class="logout-button" type="button" (click)="logout()">Desconectar</button>
   </header>
 
