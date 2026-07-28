@@ -1,19 +1,41 @@
 <section class="dashboard" aria-labelledby="dashboard-title">
   <header class="dashboard__header page-header">
-    <p class="eyebrow page-header__eyebrow">Visão geral</p>
-    <h1 id="dashboard-title">Seu acervo</h1>
-    <p class="page-header__description">Acompanhe o que já está disponível e escolha seu próximo passo.</p>
+    <p class="eyebrow page-header__eyebrow">Acervo de conhecimento</p>
+    <h1 id="dashboard-title">Encontre o que importa.</h1>
+    <p class="page-header__description">Pesquise documentos, recupere decisões e organize o conhecimento que sustenta seu trabalho.</p>
   </header>
 
   <nav class="quick-actions" aria-label="Ações rápidas">
-    <a routerLink="/busca">Buscar no acervo</a>
-    <a routerLink="/perguntar">Pergunte à base</a>
-    <a routerLink="/ingestao">Adicionar fonte</a>
+    <a class="knowledge-search" routerLink="/busca"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"></circle><path d="m16 16 4 4"></path></svg><span>Pesquise no seu acervo</span><small>⌘ K</small></a>
+    <div class="secondary-actions"><a routerLink="/perguntar">Pergunte à base <span aria-hidden="true">↗</span></a><a routerLink="/ingestao">Adicionar fonte <span aria-hidden="true">↗</span></a></div>
   </nav>
 
-  <section aria-labelledby="metrics-title">
-    <h2 id="metrics-title">Resumo do acervo</h2>
-    <div class="metrics" role="list">
+  <div class="dashboard-grid">
+    <section class="recent" aria-labelledby="recent-title">
+      <div class="section-heading">
+        <div><p class="section-kicker">Continue explorando</p><h2 id="recent-title">Adicionados recentemente</h2></div>
+        <a routerLink="/biblioteca">Ver biblioteca</a>
+      </div>
+      @if (sourcesState.loading) {
+        <kh-loading-state message="Carregando fontes recentes…" />
+      } @else if (sourcesState.error) {
+        <kh-error-state title="Fontes indisponíveis" [message]="sourcesState.error" [showRetry]="true" (retry)="loadSources()" />
+      } @else if (!sourcesState.items.length) {
+        <kh-empty-state title="Nenhuma fonte no acervo" description="Comece adicionando a primeira fonte à sua base.">
+          <a class="empty-action" routerLink="/ingestao">Iniciar ingestão</a>
+        </kh-empty-state>
+      } @else {
+        <ul class="recent-list">
+          @for (source of recentSources; track source.source_id) {
+            <li><a [routerLink]="['/sources', source.source_id]"><span class="recent-list__title">{{ source.title }}</span><span>{{ source.source_type }} · {{ formatSourceDate(source) }}</span><span class="recent-list__arrow" aria-hidden="true">→</span></a></li>
+          }
+        </ul>
+      }
+    </section>
+
+    <section class="overview" aria-labelledby="metrics-title">
+      <div><p class="section-kicker">Visão do acervo</p><h2 id="metrics-title">Em números</h2></div>
+      <div class="metrics" role="list">
       @for (metric of metrics; track metric.label) {
         <article class="metric" role="listitem" [attr.aria-label]="metric.label">
           <h3>{{ metric.label }}</h3>
@@ -27,33 +49,7 @@
           }
         </article>
       }
-    </div>
-  </section>
-
-  <section class="recent" aria-labelledby="recent-title">
-    <div class="section-heading">
-      <div><h2 id="recent-title">Fontes recentes</h2><p>As últimas fontes adicionadas ao acervo.</p></div>
-      <a routerLink="/biblioteca">Ver biblioteca</a>
-    </div>
-    @if (sourcesState.loading) {
-      <kh-loading-state message="Carregando fontes recentes…" />
-    } @else if (sourcesState.error) {
-      <kh-error-state title="Fontes indisponíveis" [message]="sourcesState.error" [showRetry]="true" (retry)="loadSources()" />
-    } @else if (!sourcesState.items.length) {
-      <kh-empty-state title="Nenhuma fonte no acervo" description="Comece adicionando a primeira fonte à sua base.">
-        <a class="empty-action" routerLink="/ingestao">Iniciar ingestão</a>
-      </kh-empty-state>
-    } @else {
-      <ul class="recent-list">
-        @for (source of recentSources; track source.source_id) {
-          <li>
-            <a [routerLink]="['/sources', source.source_id]">
-              <span class="recent-list__title">{{ source.title }}</span>
-              <span>{{ source.source_type }} · {{ formatSourceDate(source) }}</span>
-            </a>
-          </li>
-        }
-      </ul>
-    }
-  </section>
+      </div>
+    </section>
+  </div>
 </section>

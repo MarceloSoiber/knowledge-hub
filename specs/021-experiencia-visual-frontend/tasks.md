@@ -47,6 +47,11 @@
 - [x] T018 Implementar `ThemeService` e seus testes em `frontend/src/app/core/theme.service.{ts,spec.ts}`.
 - [x] T019 Aplicar tokens de tema escuro em `frontend/src/styles.css` e incluir alternância acessível no layout autenticado.
 
+## Phase 7: Knowledge workspace
+
+- [x] T020 Atualizar `frontend/src/app/layout/authenticated-layout.component.{html,css}` para navegação compacta por ícones SVG, tooltips em mouse/foco e rótulos completos na gaveta mobile.
+- [x] T021 Reestruturar `frontend/src/app/features/home/home.component.{html,css}` como área de descoberta: busca principal, ações secundárias, fontes recentes e resumo compacto do acervo.
+
 ## Dependencies & Execution Order
 
 - T001 e T002 são a fundação para T003–T011.
