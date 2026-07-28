@@ -20,6 +20,7 @@ As rotas, seus guards e seus contratos HTTP não mudam.
 - O botão do menu móvel expõe estado com `aria-expanded` e controla a navegação nomeada por `aria-controls`.
 - Escape e backdrop fecham a gaveta; o foco retorna ao botão quando a interação que fechou foi Escape ou backdrop.
 - O botão de tema informa a ação seguinte (usar tema claro/escuro), expõe seu estado por `aria-pressed` e não depende de cor ou do ícone para ser compreendido.
+- Em desktop, a navegação compacta exibe ícones SVG acompanhados por tooltip em mouse e foco; cada link conserva nome acessível. Em mobile, a gaveta expõe ícone e texto.
 - Controles ativáveis por teclado usam elementos nativos (`a`, `button`, `input`, `select`, `textarea`) e foco visível global.
 - Conteúdo remoto é sempre interpolado como texto, nunca transformado em HTML.
 
