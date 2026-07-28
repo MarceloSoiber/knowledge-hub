@@ -5,6 +5,12 @@ import { ActivatedRoute, Router } from "@angular/router";
 
 import { AuthService } from "../../core/auth.service";
 
+export function safeReturnUrl(returnUrl: string | null): string {
+  return returnUrl?.startsWith("/") && !returnUrl.startsWith("//") && returnUrl !== "/login"
+    ? returnUrl
+    : "/inicio";
+}
+
 @Component({
   selector: "kh-login",
   imports: [CommonModule, FormsModule],
@@ -37,9 +43,6 @@ export class LoginComponent implements OnInit {
   }
 
   private safeReturnUrl(): string {
-    const returnUrl = this.route.snapshot.queryParamMap.get("returnUrl");
-    return returnUrl?.startsWith("/") && !returnUrl.startsWith("//") && returnUrl !== "/login"
-      ? returnUrl
-      : "/inicio";
+    return safeReturnUrl(this.route.snapshot.queryParamMap.get("returnUrl"));
   }
 }
