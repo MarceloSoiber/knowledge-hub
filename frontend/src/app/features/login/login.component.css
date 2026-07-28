@@ -1,7 +1,9 @@
 :host { display: block; }
-.login-shell { display: grid; min-height: 100vh; place-items: center; padding: var(--space-6); }
-.auth-card { width: min(100%, 28.75rem); padding: clamp(1.75rem, 6vw, 2.4rem); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: var(--shadow-card); }
-.brand { margin-bottom: var(--space-6); color: var(--color-primary); font-size: .84rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.login-shell { display: grid; min-height: 100vh; place-items: center; padding: var(--space-6); background: radial-gradient(circle at 15% 0%, var(--color-primary-soft), transparent 32rem); }
+.auth-card { width: min(100%, 29.5rem); padding: clamp(1.75rem, 6vw, 2.5rem); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: var(--shadow-card); }
+.auth-card__topline { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-6); }
+.brand { display: flex; align-items: center; gap: .55rem; color: var(--color-primary); font-size: .84rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }.brand span { display: grid; width: 1.65rem; height: 1.65rem; place-items: center; border-radius: .45rem; background: var(--color-primary); color: var(--color-on-primary); font-size: .75rem; letter-spacing: 0; }
+.theme-button { display: grid; width: 2.5rem; height: 2.5rem; place-items: center; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface-muted); color: var(--color-text); font: inherit; cursor: pointer; }.theme-button:hover { background: var(--color-neutral-soft); }
 h1 { margin: 0 0 var(--space-3); font-size: clamp(1.8rem, 5vw, 2.4rem); letter-spacing: -.035em; }
 p { margin: 0 0 var(--space-6); color: var(--color-muted); }
 form { display: grid; gap: var(--space-3); }
@@ -10,7 +12,7 @@ input[type="password"] { width: 100%; padding: .75rem .875rem; border: 1px solid
 small { margin-top: -.4rem; color: var(--color-muted); }
 .checkbox-row { display: flex; align-items: center; gap: .55rem; font-size: .92rem; font-weight: 500; cursor: pointer; }
 .checkbox-row input { inline-size: 1rem; block-size: 1rem; }
-.button { width: 100%; margin-top: var(--space-1); padding: .8rem 1rem; border: 0; border-radius: var(--radius-sm); background: var(--color-primary); color: #fff; font-weight: 700; cursor: pointer; }
+.button { width: 100%; margin-top: var(--space-1); padding: .8rem 1rem; border: 0; border-radius: var(--radius-sm); background: var(--color-primary); color: var(--color-on-primary); font-weight: 700; cursor: pointer; }
 .button:hover:not(:disabled) { background: var(--color-primary-hover); }
 .button:disabled { cursor: wait; opacity: .65; }
 .message { margin: 0; padding: .65rem .75rem; border-radius: var(--radius-sm); font-size: .92rem; }
