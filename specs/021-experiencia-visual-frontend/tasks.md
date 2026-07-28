@@ -57,6 +57,12 @@
 - [x] T022 Aplicar layout progressivo de filtros e cartões responsivos em `frontend/src/app/features/{search,ask}/`.
 - [x] T023 Aplicar grids de conteúdo, formulários e listas com melhor densidade em `frontend/src/app/features/{ingestion,library,organization,source-detail}/`.
 
+## Phase 9: Realinhamento de usabilidade
+
+- [x] T024 Reverter a divisão estrutural de páginas e aplicar fluxo vertical contextual em `frontend/src/app/features/{ingestion,organization,source-detail}/`.
+- [x] T025 Reestruturar Biblioteca como barra de busca + filtros progressivos + lista de documentos em `frontend/src/app/features/library/`.
+- [x] T026 Reorganizar resultados e citações em listas de leitura em `frontend/src/app/features/{search,ask,home}/`.
+
 ## Dependencies & Execution Order
 
 - T001 e T002 são a fundação para T003–T011.

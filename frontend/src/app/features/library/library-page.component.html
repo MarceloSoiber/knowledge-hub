@@ -4,12 +4,14 @@
   @if (error) { <kh-error-state title="Acervo indisponível" [message]="error" [showRetry]="true" (retry)="load()" /> }
   @if (!loading && !error && !sources.length) { <kh-empty-state title="Nenhuma fonte no acervo" description="Use a Ingestão para adicionar a primeira fonte." /> }
   @if (!loading && !error && sources.length) {
-    <div class="filters surface-card" aria-label="Filtros da biblioteca">
+    <div class="library-toolbar surface-card">
       <label>Buscar por título <input name="query" [(ngModel)]="query" placeholder="Ex.: ata de reunião" /></label>
-      <label>Categorias <select multiple (change)="categoryIds = selectedIds($event)">@for (item of categories; track item.id) { <option [value]="item.id">{{ item.name }}</option> }</select></label>
-      <label>Tags <select multiple (change)="tagIds = selectedIds($event)">@for (item of tags; track item.id) { <option [value]="item.id">{{ item.name }}</option> }</select></label>
-      <label>Projetos <select multiple (change)="projectIds = selectedIds($event)">@for (item of projects; track item.id) { <option [value]="item.id">{{ item.name }}</option> }</select></label>
-      @if (hasFilters) { <button type="button" class="secondary" (click)="clearFilters()">Limpar filtros</button> }
+      <details class="library-filters"><summary>Filtrar acervo</summary><div class="filters" aria-label="Filtros da biblioteca">
+        <label>Categorias <select multiple (change)="categoryIds = selectedIds($event)">@for (item of categories; track item.id) { <option [value]="item.id">{{ item.name }}</option> }</select></label>
+        <label>Tags <select multiple (change)="tagIds = selectedIds($event)">@for (item of tags; track item.id) { <option [value]="item.id">{{ item.name }}</option> }</select></label>
+        <label>Projetos <select multiple (change)="projectIds = selectedIds($event)">@for (item of projects; track item.id) { <option [value]="item.id">{{ item.name }}</option> }</select></label>
+        @if (hasFilters) { <button type="button" class="secondary" (click)="clearFilters()">Limpar filtros</button> }
+      </div></details>
     </div>
     <p class="count" aria-live="polite">{{ filteredSources.length }} fonte{{ filteredSources.length === 1 ? '' : 's' }} encontrada{{ filteredSources.length === 1 ? '' : 's' }}.</p>
     @if (!filteredSources.length) { <kh-empty-state title="Nenhuma fonte encontrada" description="Ajuste ou limpe os filtros para ver o acervo." /> }
