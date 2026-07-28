@@ -52,6 +52,11 @@
 - [x] T020 Atualizar `frontend/src/app/layout/authenticated-layout.component.{html,css}` para navegação compacta por ícones SVG, tooltips em mouse/foco e rótulos completos na gaveta mobile.
 - [x] T021 Reestruturar `frontend/src/app/features/home/home.component.{html,css}` como área de descoberta: busca principal, ações secundárias, fontes recentes e resumo compacto do acervo.
 
+## Phase 8: Corpos das telas
+
+- [x] T022 Aplicar layout progressivo de filtros e cartões responsivos em `frontend/src/app/features/{search,ask}/`.
+- [x] T023 Aplicar grids de conteúdo, formulários e listas com melhor densidade em `frontend/src/app/features/{ingestion,library,organization,source-detail}/`.
+
 ## Dependencies & Execution Order
 
 - T001 e T002 são a fundação para T003–T011.
