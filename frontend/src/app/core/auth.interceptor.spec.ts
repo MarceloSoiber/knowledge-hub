@@ -29,6 +29,11 @@ describe("authInterceptor", () => {
     expect(protectedRequest.request.headers.get("Authorization")).toBe("Bearer test-token");
     protectedRequest.flush([]);
 
+    httpClient.get("/api/v1/operations/backup").subscribe();
+    const operationsRequest = http.expectOne("/api/v1/operations/backup");
+    expect(operationsRequest.request.headers.get("Authorization")).toBe("Bearer test-token");
+    operationsRequest.flush(new Blob());
+
     httpClient.get("/health").subscribe();
     const publicRequest = http.expectOne("/health");
     expect(publicRequest.request.headers.has("Authorization")).toBe(false);

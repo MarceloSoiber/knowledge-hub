@@ -3,7 +3,7 @@ import { inject } from "@angular/core";
 
 import { AuthService } from "./auth.service";
 
-const protectedApiPrefix = "/api/v1/knowledge/";
+const protectedApiPrefix = "/api/v1/";
 
 export const authInterceptor: HttpInterceptorFn = (request, next) => {
   const token = inject(AuthService).token;
