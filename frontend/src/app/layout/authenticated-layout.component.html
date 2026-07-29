@@ -5,13 +5,15 @@
       [attr.aria-expanded]="menuOpen" aria-controls="primary-navigation" aria-label="Abrir navegação">
       <span aria-hidden="true">☰</span>
     </button>
-    <a class="brand" routerLink="/inicio"><span class="brand__mark" aria-hidden="true">K</span><span>Knowledge Hub</span></a>
-    <a class="global-search" routerLink="/busca" aria-label="Pesquisar no acervo"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"></circle><path d="m16 16 4 4"></path></svg><span>Pesquisar no acervo…</span><kbd>⌘ K</kbd></a>
-    <button class="theme-button" type="button" (click)="theme.toggle()" [attr.aria-pressed]="theme.current() === 'dark'" [attr.aria-label]="theme.current() === 'dark' ? 'Usar tema claro' : 'Usar tema escuro'">
-      <span aria-hidden="true">{{ theme.current() === "dark" ? "☀" : "☾" }}</span>
-      <span>{{ theme.current() === "dark" ? "Tema claro" : "Tema escuro" }}</span>
-    </button>
-    <button class="logout-button" type="button" (click)="logout()">Desconectar</button>
+    <a class="brand" routerLink="/inicio" aria-label="Knowledge Hub — início"><span class="brand__mark" aria-hidden="true">K</span><span class="brand__name">Knowledge Hub</span></a>
+    <a class="global-search" routerLink="/busca" aria-label="Abrir busca no acervo"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"></circle><path d="m16 16 4 4"></path></svg><span>Pesquisar no acervo</span><kbd>⌘ K</kbd></a>
+    <div class="topbar__actions">
+      <button class="theme-button" type="button" (click)="theme.toggle()" [attr.aria-pressed]="theme.current() === 'dark'" [attr.aria-label]="theme.current() === 'dark' ? 'Usar tema claro' : 'Usar tema escuro'">
+        <span class="theme-button__icon" aria-hidden="true">{{ theme.current() === "dark" ? "☀" : "☾" }}</span>
+        <span>{{ theme.current() === "dark" ? "Tema claro" : "Tema escuro" }}</span>
+      </button>
+      <button class="logout-button" type="button" (click)="logout()"><span aria-hidden="true">↗</span> Desconectar</button>
+    </div>
   </header>
 
   @if (menuOpen) {

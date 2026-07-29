@@ -11,16 +11,15 @@
     <kh-error-state title="Metadados indisponíveis" [message]="metadataError" [showRetry]="true" (retry)="loadMetadata()" />
   } @else {
     <div class="tabs" role="tablist" aria-label="Modo de ingestão">
-      <button id="file-tab" type="button" role="tab" [attr.aria-selected]="activeTab === 'file'" aria-controls="file-panel" [tabIndex]="activeTab === 'file' ? 0 : -1" (click)="activateTab('file')" (keydown)="onTabKeydown($event, 'file')">Enviar arquivo</button>
-      <button id="text-tab" type="button" role="tab" [attr.aria-selected]="activeTab === 'text'" aria-controls="text-panel" [tabIndex]="activeTab === 'text' ? 0 : -1" (click)="activateTab('text')" (keydown)="onTabKeydown($event, 'text')">Adicionar texto</button>
+      <button id="file-tab" type="button" role="tab" [attr.aria-selected]="activeTab === 'file'" aria-controls="file-panel" [tabIndex]="activeTab === 'file' ? 0 : -1" (click)="activateTab('file')" (keydown)="onTabKeydown($event, 'file')"><span aria-hidden="true">↥</span> Enviar arquivo</button>
+      <button id="text-tab" type="button" role="tab" [attr.aria-selected]="activeTab === 'text'" aria-controls="text-panel" [tabIndex]="activeTab === 'text' ? 0 : -1" (click)="activateTab('text')" (keydown)="onTabKeydown($event, 'text')"><span aria-hidden="true">✦</span> Adicionar texto</button>
     </div>
 
     @if (activeTab === "file") {
       <form id="file-panel" class="ingestion-form surface-card" role="tabpanel" aria-labelledby="file-tab" (ngSubmit)="submitFile()">
-        <label for="knowledge-file">Arquivo</label>
-        <input #fileInput id="knowledge-file" name="file" type="file" accept=".txt,.md,.pdf" [disabled]="fileState.status === 'submitting'" (change)="selectFile($event)" aria-describedby="file-help" />
-        <p id="file-help" class="help">Formatos aceitos: .txt, .md ou .pdf, com até 10 MB.</p>
-        @if (file) { <p class="selected-file">Selecionado: {{ file.name }}</p> }
+        <div class="form-heading"><div><p class="section-kicker">Etapa 1</p><h2>Escolha o arquivo</h2></div><span>Até 10 MB</span></div>
+        <label class="file-dropzone" for="knowledge-file"><input #fileInput id="knowledge-file" name="file" type="file" accept=".txt,.md,.pdf" [disabled]="fileState.status === 'submitting'" (change)="selectFile($event)" aria-describedby="file-help" /><span class="file-dropzone__icon" aria-hidden="true">↥</span><strong>{{ file ? file.name : "Escolha um arquivo" }}</strong><span>{{ file ? "Clique para substituir o arquivo selecionado" : "Arraste aqui ou clique para procurar no computador" }}</span></label>
+        <p id="file-help" class="help">Formatos aceitos: .txt, .md ou .pdf.</p>
 
         <kh-metadata-selector label="Metadados do arquivo" [categories]="categories" [tags]="tags" [projects]="projects" [selection]="fileSelection" [categoriesRequired]="true" [disabled]="fileState.status === 'submitting'" (selectionChange)="fileSelection = $event" />
         <button class="submit" type="submit" [disabled]="fileState.status === 'submitting'">{{ fileState.status === "submitting" ? "Enviando arquivo…" : "Enviar arquivo" }}</button>
@@ -31,6 +30,7 @@
       </form>
     } @else {
       <form id="text-panel" class="ingestion-form surface-card" role="tabpanel" aria-labelledby="text-tab" (ngSubmit)="submitText()">
+        <div class="form-heading"><div><p class="section-kicker">Etapa 1</p><h2>Escreva ou cole o conteúdo</h2></div><span>Texto livre</span></div>
         <label for="text-title">Título</label>
         <input id="text-title" name="title" maxlength="255" [(ngModel)]="textTitle" [disabled]="textState.status === 'submitting'" />
         <p class="help">{{ textTitle.length }}/255 caracteres</p>
