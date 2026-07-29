@@ -4,7 +4,7 @@ import { of, throwError } from "rxjs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { KnowledgeApiService } from "../../core/knowledge-api.service";
-import { KnowledgeSource } from "../../core/knowledge.types";
+import { KnowledgeChunk, KnowledgeSource } from "../../core/knowledge.types";
 import { compareRecentSources, HomeComponent } from "./home.component";
 
 const source = (sourceId: string, title: string, createdAt: string | null, updatedAt: string | null = null): KnowledgeSource => ({
@@ -22,7 +22,7 @@ const source = (sourceId: string, title: string, createdAt: string | null, updat
 
 describe("HomeComponent", () => {
   let fixture: ComponentFixture<HomeComponent>;
-  let api: { sources: ReturnType<typeof vi.fn>; categories: ReturnType<typeof vi.fn>; tags: ReturnType<typeof vi.fn>; projects: ReturnType<typeof vi.fn> };
+  let api: { sources: ReturnType<typeof vi.fn>; categories: ReturnType<typeof vi.fn>; tags: ReturnType<typeof vi.fn>; projects: ReturnType<typeof vi.fn>; search: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
     api = {
@@ -34,6 +34,7 @@ describe("HomeComponent", () => {
         { id: 5, name: "arquivado", description: null, status: "archived", created_at: null, updated_at: null },
         { id: 6, name: "ativo dois", description: null, status: "active", created_at: null, updated_at: null },
       ])),
+      search: vi.fn(() => of({ query: "decisão", limit: 4, results: [searchResult()] })),
     };
     TestBed.configureTestingModule({ providers: [provideRouter([]), { provide: KnowledgeApiService, useValue: api }] });
     fixture = TestBed.createComponent(HomeComponent);
@@ -78,6 +79,18 @@ describe("HomeComponent", () => {
     expect(links).toContain("/ingestao");
   });
 
+  it("searches in place and presents the matching source without navigating away", () => {
+    const component = fixture.componentInstance;
+    component.searchQuery = "decisão";
+    component.search();
+    fixture.detectChanges();
+
+    expect(api.search).toHaveBeenCalledWith({ query: "decisão", limit: 4 });
+    expect(component.searchStatus).toBe("success");
+    expect(fixture.nativeElement.textContent).toContain("Resultados para “decisão”");
+    expect(fixture.nativeElement.textContent).toContain("Ata de decisão");
+  });
+
   it("shows the first-ingestion call to action for an empty source list", () => {
     api.sources.mockReturnValueOnce(of([]));
     fixture = TestBed.createComponent(HomeComponent);
@@ -86,3 +99,18 @@ describe("HomeComponent", () => {
     expect(fixture.nativeElement.textContent).toContain("Iniciar ingestão");
   });
 });
+
+function searchResult(): KnowledgeChunk {
+  return {
+    id: 1,
+    source_id: "source-1",
+    source_title: "Ata de decisão",
+    source_type: "text",
+    uri: "text:ata",
+    categories: [], tags: [], projects: [],
+    location: { chunk_index: 0, page: null, section: "Decisões", start_char: 0, end_char: 48 },
+    content: "A equipe aprovou o plano de implantação.",
+    score: 0.9,
+    metadata: {},
+  };
+}
