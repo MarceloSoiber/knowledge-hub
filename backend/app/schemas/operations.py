@@ -33,3 +33,8 @@ class ReindexRunRead(BaseModel):
     started_at: datetime | None = None
     completed_at: datetime | None = None
     error_message: str | None = None
+
+
+class RestoreResult(BaseModel):
+    message: str
+    safety_backup: str

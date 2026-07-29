@@ -23,10 +23,13 @@ services:
       EMBEDDING_MODEL: "${EMBEDDING_MODEL:-text-embedding-nomic-embed-text-v1.5}"
       EMBEDDING_VERSION: "${EMBEDDING_VERSION:-default}"
       VECTOR_DIM: "${VECTOR_DIM:-768}"
+      BACKUP_DIRECTORY: "/var/lib/knowledge-hub/backups"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
       - "${BACKEND_PORT:-8000}:8000"
+    volumes:
+      - backup_data:/var/lib/knowledge-hub/backups
     healthcheck:
       test:
         [
@@ -114,3 +117,4 @@ services:
 
 volumes:
   postgres_data:
+  backup_data:
