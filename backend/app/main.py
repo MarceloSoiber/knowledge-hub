@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .api.routes.health import router as health_router
 from .api.routes.knowledge import router as knowledge_router
+from .api.routes.operations import router as operations_router
 from .core.auth import require_auth_token
 from .core.settings import get_settings
 from .db.init import init_db
@@ -40,6 +41,7 @@ def create_app() -> FastAPI:
         prefix="/api/v1",
         dependencies=[Depends(require_auth_token)],
     )
+    app.include_router(operations_router, prefix="/api/v1", dependencies=[Depends(require_auth_token)])
 
     @app.get("/")
     async def root() -> dict[str, str]:

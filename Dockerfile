@@ -8,6 +8,7 @@ WORKDIR /app
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         poppler-utils \
+        postgresql-client \
         tesseract-ocr \
         tesseract-ocr-eng \
         tesseract-ocr-por \

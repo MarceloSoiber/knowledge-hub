@@ -65,4 +65,9 @@ export class KnowledgeApiService {
     projectIds.forEach((id) => formData.append("project_ids", String(id)));
     return this.http.post<KnowledgeUploadResponse>(`${this.baseUrl}/uploads`, formData);
   }
+  backup(): Observable<Blob> { return this.http.get(`${this.baseUrl.replace("/knowledge", "/operations")}/backup`, { responseType: "blob" }); }
+  restoreBackup(file: File, confirmation: string): Observable<{ message: string; safety_backup: string }> {
+    const data = new FormData(); data.append("file", file); data.append("confirmation", confirmation);
+    return this.http.post<{ message: string; safety_backup: string }>(`${this.baseUrl.replace("/knowledge", "/operations")}/restore`, data);
+  }
 }
