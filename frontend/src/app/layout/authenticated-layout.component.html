@@ -6,7 +6,10 @@
       <span aria-hidden="true">☰</span>
     </button>
     <a class="brand" routerLink="/inicio" aria-label="Knowledge Hub — início"><span class="brand__mark" aria-hidden="true">K</span><span class="brand__name">Knowledge Hub</span></a>
-    <a class="global-search" routerLink="/busca" aria-label="Abrir busca no acervo"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"></circle><path d="m16 16 4 4"></path></svg><span>Pesquisar no acervo</span><kbd>⌘ K</kbd></a>
+    <div class="global-search-wrap">
+      <form class="global-search" (ngSubmit)="searchGlobal()"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"></circle><path d="m16 16 4 4"></path></svg><label class="sr-only" for="global-search">Pesquisar no acervo</label><input #globalSearchInput id="global-search" name="global-search" [(ngModel)]="globalQuery" (focus)="closeGlobalSearch()" placeholder="Pesquisar no acervo" autocomplete="off" /><kbd>⌘ K</kbd></form>
+      @if (globalSearchStatus !== 'idle' || globalResults.length) { <div class="global-search-results" aria-live="polite">@if (globalSearchStatus === 'loading') { <p>Pesquisando no acervo…</p> } @if (globalSearchStatus === 'error') { <p>Não foi possível pesquisar agora.</p> } @if (globalSearchStatus === 'idle' && !globalResults.length) { <p>Nenhum resultado encontrado.</p> } @for (result of globalResults; track result.id) { <a [routerLink]="['/sources', result.source_id]" (click)="closeGlobalSearch()"><span><strong>{{ result.source_title }}</strong><small>{{ result.location.section || 'Trecho do documento' }}</small></span><span aria-hidden="true">→</span></a> } <a class="global-search-results__advanced" routerLink="/busca" (click)="closeGlobalSearch()">Abrir busca avançada</a></div> }
+    </div>
     <div class="topbar__actions">
       <button class="theme-button" type="button" (click)="theme.toggle()" [attr.aria-pressed]="theme.current() === 'dark'" [attr.aria-label]="theme.current() === 'dark' ? 'Usar tema claro' : 'Usar tema escuro'">
         <span class="theme-button__icon" aria-hidden="true">{{ theme.current() === "dark" ? "☀" : "☾" }}</span>
