@@ -17,7 +17,7 @@
 
     @if (activeTab === "file") {
       <form id="file-panel" class="ingestion-form surface-card" role="tabpanel" aria-labelledby="file-tab" (ngSubmit)="submitFile()">
-        <div class="form-heading"><div><p class="section-kicker">Etapa 1</p><h2>Escolha o arquivo</h2></div><span>Até 25 MB</span></div>
+        <div class="form-heading"><div><p class="section-kicker">Etapa 1</p><h2>Escolha o arquivo</h2></div><span>Até 100 MB</span></div>
         <label class="file-dropzone" [class.file-dropzone--drag-over]="isFileDragOver" for="knowledge-file" (dragover)="onFileDragOver($event)" (dragleave)="onFileDragLeave($event)" (drop)="onFileDrop($event)"><input #fileInput id="knowledge-file" name="file" type="file" accept=".txt,.md,.pdf" [disabled]="fileState.status === 'submitting'" (change)="selectFile($event)" aria-describedby="file-help" /><span class="file-dropzone__icon" aria-hidden="true">↥</span><strong>{{ file ? file.name : "Escolha um arquivo" }}</strong><span>{{ file ? "Clique para substituir o arquivo selecionado" : "Arraste aqui ou clique para procurar no computador" }}</span></label>
         <p id="file-help" class="help">Formatos aceitos: .txt, .md ou .pdf.</p>
 
