@@ -86,6 +86,7 @@ export class IngestionPageComponent implements OnInit {
   get projects(): Project[] { return this.catalog.activeProjects(); }
 
   file: File | null = null;
+  isFileDragOver = false;
   fileSelection = emptySelection();
   fileState = idleState();
 
@@ -110,7 +111,27 @@ export class IngestionPageComponent implements OnInit {
 
   selectFile(event: Event): void {
     const input = event.target as HTMLInputElement;
-    this.file = input.files?.item(0) ?? null;
+    this.setSelectedFile(input.files?.item(0) ?? null);
+  }
+
+  onFileDragOver(event: DragEvent): void {
+    event.preventDefault();
+    this.isFileDragOver = true;
+  }
+
+  onFileDragLeave(event: DragEvent): void {
+    event.preventDefault();
+    this.isFileDragOver = false;
+  }
+
+  onFileDrop(event: DragEvent): void {
+    event.preventDefault();
+    this.isFileDragOver = false;
+    this.setSelectedFile(event.dataTransfer?.files.item(0) ?? null);
+  }
+
+  private setSelectedFile(file: File | null): void {
+    this.file = file;
     if (this.fileState.status === "validation-error") this.fileState = idleState();
   }
 
