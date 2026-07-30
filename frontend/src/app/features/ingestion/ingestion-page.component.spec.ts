@@ -12,7 +12,7 @@ describe("ingestion page helpers", () => {
     expect(validateFileDraft(null, selection)).toContain("Selecione");
     expect(validateFileDraft(new File(["x"], "notas.docx"), selection)).toContain(".txt");
     expect(validateFileDraft(validFile, { ...selection, categoryIds: [] })).toContain("categoria");
-    expect(validateFileDraft(new File([new Uint8Array(10 * 1024 * 1024 + 1)], "grande.pdf"), selection)).toContain("10 MB");
+    expect(validateFileDraft(new File([new Uint8Array(25 * 1024 * 1024 + 1)], "grande.pdf"), selection)).toContain("25 MB");
   });
 
   it("builds the text payload without empty optional arrays", () => {
@@ -34,7 +34,7 @@ describe("ingestion page helpers", () => {
   });
 
   it("maps request errors without exposing API details", () => {
-    expect(ingestionErrorMessage(413)).toContain("10 MB");
+    expect(ingestionErrorMessage(413)).toContain("25 MB");
     expect(ingestionErrorMessage(503)).toContain("indisponíveis");
     expect(ingestionErrorMessage(500)).not.toContain("detail");
   });

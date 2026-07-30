@@ -23,14 +23,14 @@ export interface IngestionState {
 const emptySelection = (): MetadataSelection => ({ categoryIds: [], tagIds: [], projectIds: [] });
 const idleState = (): IngestionState => ({ status: "idle", message: "", result: null, existingSourceId: null });
 const allowedExtensions = new Set(["txt", "md", "pdf"]);
-const maxFileSize = 10 * 1024 * 1024;
+const maxFileSize = 25 * 1024 * 1024;
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function validateFileDraft(file: File | null, selection: MetadataSelection): string {
   if (!file) return "Selecione um arquivo para enviar.";
   const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
   if (!allowedExtensions.has(extension)) return "Envie um arquivo .txt, .md ou .pdf.";
-  if (file.size > maxFileSize) return "O arquivo deve ter no máximo 10 MB.";
+  if (file.size > maxFileSize) return "O arquivo deve ter no máximo 25 MB.";
   if (!selection.categoryIds.length) return "Selecione pelo menos uma categoria.";
   return "";
 }
@@ -56,7 +56,7 @@ export function validateTextDraft(title: string, content: string, selection: Met
 export function ingestionErrorMessage(status: number): string {
   if (status === 400 || status === 422) return "Revise os dados informados antes de tentar novamente.";
   if (status === 404) return "Um metadado não existe mais. Recarregue os metadados e revise a seleção.";
-  if (status === 413) return "O arquivo excede o limite de 10 MB.";
+  if (status === 413) return "O arquivo excede o limite de 25 MB.";
   if (status === 502 || status === 503) return "Os embeddings estão indisponíveis no momento. Tente novamente em instantes.";
   return "Não foi possível concluir a ingestão. Verifique a conexão e tente novamente.";
 }

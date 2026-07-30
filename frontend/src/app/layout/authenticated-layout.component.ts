@@ -21,6 +21,7 @@ export class AuthenticatedLayoutComponent {
   @ViewChild("menuButton") private readonly menuButton?: ElementRef<HTMLButtonElement>;
   @ViewChild("globalSearchInput") private readonly globalSearchInput?: ElementRef<HTMLInputElement>;
   menuOpen = false;
+  showBackToTop = false;
   globalQuery = "";
   globalResults: KnowledgeChunk[] = [];
   globalSearchStatus: "idle" | "loading" | "error" = "idle";
@@ -49,8 +50,15 @@ export class AuthenticatedLayoutComponent {
 
   closeGlobalSearch(): void { this.globalResults = []; this.globalSearchStatus = "idle"; }
 
+  scrollToTop(): void {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   @HostListener("document:keydown.escape")
   onEscape(): void { this.closeMenu(true); this.closeGlobalSearch(); }
+
+  @HostListener("window:scroll")
+  onScroll(): void { this.showBackToTop = window.scrollY > 480; }
 
   @HostListener("document:keydown", ["$event"])
   onShortcut(event: KeyboardEvent): void {

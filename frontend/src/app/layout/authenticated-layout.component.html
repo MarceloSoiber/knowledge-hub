@@ -38,4 +38,10 @@
   <main id="main-content" class="content" tabindex="-1">
     <router-outlet />
   </main>
+
+  @if (showBackToTop) {
+    <button class="back-to-top" type="button" (click)="scrollToTop()" aria-label="Voltar ao topo">
+      <span aria-hidden="true">↑</span><span>Topo</span>
+    </button>
+  }
 </div>
