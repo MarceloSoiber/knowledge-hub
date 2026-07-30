@@ -45,4 +45,11 @@ describe("AuthenticatedLayoutComponent", () => {
     (fixture.nativeElement.querySelector(".backdrop") as HTMLButtonElement).click();
     expect(fixture.componentInstance.menuOpen).toBe(false);
   });
+
+  it("shows a button to return to the top after a long scroll", () => {
+    fixture.componentInstance.showBackToTop = true;
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector(".back-to-top")?.textContent).toContain("Topo");
+  });
 });
