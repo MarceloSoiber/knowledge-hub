@@ -1,7 +1,7 @@
 import { HttpErrorResponse } from "@angular/common/http";
 import { describe, expect, it } from "vitest";
 
-import { buildTextIngestionRequest, duplicateSourceId, ingestionErrorMessage, validateFileDraft, validateTextDraft } from "./ingestion-page.component";
+import { MAX_FILE_SIZE_BYTES, buildTextIngestionRequest, duplicateSourceId, ingestionErrorMessage, validateFileDraft, validateTextDraft } from "./ingestion-page.component";
 
 const selection = { categoryIds: [2], tagIds: [3], projectIds: [4] };
 
@@ -12,7 +12,7 @@ describe("ingestion page helpers", () => {
     expect(validateFileDraft(null, selection)).toContain("Selecione");
     expect(validateFileDraft(new File(["x"], "notas.docx"), selection)).toContain(".txt");
     expect(validateFileDraft(validFile, { ...selection, categoryIds: [] })).toContain("categoria");
-    expect(validateFileDraft(new File([new Uint8Array(25 * 1024 * 1024 + 1)], "grande.pdf"), selection)).toContain("25 MB");
+    expect(validateFileDraft({ name: "grande.pdf", size: MAX_FILE_SIZE_BYTES + 1 } as File, selection)).toContain("100 MB");
   });
 
   it("builds the text payload without empty optional arrays", () => {
@@ -34,7 +34,7 @@ describe("ingestion page helpers", () => {
   });
 
   it("maps request errors without exposing API details", () => {
-    expect(ingestionErrorMessage(413)).toContain("25 MB");
+    expect(ingestionErrorMessage(413)).toContain("100 MB");
     expect(ingestionErrorMessage(503)).toContain("indisponíveis");
     expect(ingestionErrorMessage(500)).not.toContain("detail");
   });

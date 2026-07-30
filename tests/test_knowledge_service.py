@@ -247,11 +247,18 @@ def test_extract_text_rejects_unsupported_extensions() -> None:
         extract_text("notes.docx", b"hello")
 
 
-def test_extract_text_allows_files_up_to_25_mb_and_rejects_larger_files() -> None:
-    assert validate_upload("notes.txt", b"x" * MAX_UPLOAD_BYTES) == ".txt"
+def test_extract_text_allows_files_up_to_100_mb_and_rejects_larger_files() -> None:
+    class SizedContent:
+        def __init__(self, size: int) -> None:
+            self.size = size
 
-    with pytest.raises(FileTooLargeError, match="25MB"):
-        validate_upload("notes.txt", b"x" * (MAX_UPLOAD_BYTES + 1))
+        def __len__(self) -> int:
+            return self.size
+
+    assert validate_upload("notes.txt", SizedContent(MAX_UPLOAD_BYTES)) == ".txt"  # type: ignore[arg-type]
+
+    with pytest.raises(FileTooLargeError, match="100MB"):
+        validate_upload("notes.txt", SizedContent(MAX_UPLOAD_BYTES + 1))  # type: ignore[arg-type]
 
 
 def test_extract_text_reads_pdf(monkeypatch: pytest.MonkeyPatch) -> None:
