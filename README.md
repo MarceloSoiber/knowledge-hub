@@ -10,6 +10,10 @@ The project is local-first by design: documents, embeddings, and inference can
 remain on infrastructure you control. Cloud models are optional and are only
 used when explicitly configured.
 
+
+https://github.com/user-attachments/assets/646b7069-fae6-442b-acd1-dfd4693da60f
+
+
 ## What is included
 
 | Component | Purpose | Default address |
