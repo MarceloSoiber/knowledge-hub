@@ -21,7 +21,7 @@ deploy:
         docker compose stop backend frontend mcp || true
         docker compose rm -sf backend frontend mcp || true
 
-        for name in knowledge-hub-backend knowledge-hub-frontend knowledge-hub-mcp knowledge-hub-postgres mcp-knowledge-hub-backend mcp-knowledge-hub-frontend mcp-knowledge-hub-mcp; do
+        for name in knowledge-hub-backend knowledge-hub-frontend knowledge-hub-mcp mcp-knowledge-hub-backend mcp-knowledge-hub-frontend mcp-knowledge-hub-mcp; do
           if docker container inspect "${name}" >/dev/null 2>&1; then
             remove_container_by_name "${name}" || return 1
           fi
@@ -30,7 +30,7 @@ deploy:
       }
 
       disable_restart_policies() {
-        for name in knowledge-hub-backend knowledge-hub-frontend knowledge-hub-mcp knowledge-hub-postgres mcp-knowledge-hub-backend mcp-knowledge-hub-frontend mcp-knowledge-hub-mcp; do
+        for name in knowledge-hub-backend knowledge-hub-frontend knowledge-hub-mcp mcp-knowledge-hub-backend mcp-knowledge-hub-frontend mcp-knowledge-hub-mcp; do
           if ! docker container inspect "${name}" >/dev/null 2>&1; then
             continue
           fi
@@ -89,7 +89,7 @@ deploy:
       }
 
       has_service_containers() {
-        for name in knowledge-hub-backend knowledge-hub-frontend knowledge-hub-mcp knowledge-hub-postgres mcp-knowledge-hub-backend mcp-knowledge-hub-frontend mcp-knowledge-hub-mcp; do
+        for name in knowledge-hub-backend knowledge-hub-frontend knowledge-hub-mcp mcp-knowledge-hub-backend mcp-knowledge-hub-frontend mcp-knowledge-hub-mcp; do
           if docker container inspect "${name}" >/dev/null 2>&1; then
             return 0
           fi
@@ -173,7 +173,9 @@ deploy:
       }
 
       wait_for_postgres_health() {
-        docker compose up -d --force-recreate postgres
+        # PostgreSQL uses a persistent volume and is intentionally preserved across deploys.
+        docker compose up -d postgres
+        docker update --restart=unless-stopped knowledge-hub-postgres
         healthy_checks=0
         for _ in $(seq 1 30); do
           status="$(docker inspect knowledge-hub-postgres --format '{{.State.Health.Status}}' 2>/dev/null || true)"
@@ -197,12 +199,12 @@ deploy:
       }
 
       deploy_containers() {
-        wait_for_postgres_health
-        docker compose up -d --build --no-deps --force-recreate backend
-        wait_for_backend_health
-        docker compose up -d --build --no-deps --force-recreate frontend
-        wait_for_frontend_health
-        docker compose up -d --build --no-deps --force-recreate mcp
+        wait_for_postgres_health || return 1
+        docker compose up -d --build --no-deps --force-recreate backend || return 1
+        wait_for_backend_health || return 1
+        docker compose up -d --build --no-deps --force-recreate frontend || return 1
+        wait_for_frontend_health || return 1
+        docker compose up -d --build --no-deps --force-recreate mcp || return 1
       }
 
       remove_recreate_containers() {

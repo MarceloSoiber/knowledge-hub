@@ -1,13 +1,14 @@
 import { HttpErrorResponse } from "@angular/common/http";
 import { DecimalPipe } from "@angular/common";
-import { ChangeDetectorRef, Component, OnDestroy, OnInit, inject } from "@angular/core";
+import { ChangeDetectorRef, Component, OnDestroy, OnInit, effect, inject } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { RouterLink } from "@angular/router";
-import { Subject, forkJoin, of } from "rxjs";
+import { Subject, of } from "rxjs";
 import { catchError, debounceTime, distinctUntilChanged, switchMap, takeUntil } from "rxjs/operators";
 
 import { KnowledgeApiService } from "../../core/knowledge-api.service";
-import { Category, KnowledgeSearchResult, Project, SearchRequest, Tag } from "../../shared/models/knowledge.models";
+import { MetadataCatalogService } from "../../core/metadata-catalog.service";
+import { Category, KnowledgeChunk, KnowledgeSearchRequest, Project, Tag } from "../../core/knowledge.types";
 
 type SearchStatus = "idle" | "loading" | "success" | "error";
 
@@ -19,6 +20,7 @@ type SearchStatus = "idle" | "loading" | "success" | "error";
 })
 export class SearchPageComponent implements OnInit, OnDestroy {
   private readonly api = inject(KnowledgeApiService);
+  private readonly catalog = inject(MetadataCatalogService);
   private readonly changeDetectorRef = inject(ChangeDetectorRef);
   private readonly destroy$ = new Subject<void>();
   private readonly tagQuery$ = new Subject<string>();
@@ -35,10 +37,14 @@ export class SearchPageComponent implements OnInit, OnDestroy {
   selectedTags: Tag[] = [];
   allTags: Tag[] = [];
   tagQuery = "";
-  results: KnowledgeSearchResult[] = [];
+  results: KnowledgeChunk[] = [];
   status: SearchStatus = "idle";
   message = "";
   metadataError = "";
+
+  constructor() {
+    effect(() => { this.categoryOptions = this.catalog.categories(); this.allTags = this.catalog.tags(); this.projectOptions = this.catalog.activeProjects(); this.metadataError = this.catalog.error(); });
+  }
 
   ngOnInit(): void {
     this.loadMetadata();
@@ -46,7 +52,7 @@ export class SearchPageComponent implements OnInit, OnDestroy {
       .pipe(
         debounceTime(250),
         distinctUntilChanged(),
-        switchMap((query) => query.trim().length > 0 ? this.api.autocompleteTags(query.trim()) : of([])),
+        switchMap((query) => query.trim().length > 0 ? this.api.tagAutocomplete(query.trim()) : of([])),
         takeUntil(this.destroy$),
       )
       .subscribe({
@@ -67,19 +73,7 @@ export class SearchPageComponent implements OnInit, OnDestroy {
   }
 
   loadMetadata(): void {
-    this.metadataError = "";
-    forkJoin({ categories: this.api.categories(), tags: this.api.tags(), projects: this.api.projects() }).subscribe({
-      next: ({ categories, tags, projects }) => {
-        this.categoryOptions = categories;
-        this.allTags = tags;
-        this.projectOptions = projects;
-        this.changeDetectorRef.markForCheck();
-      },
-      error: () => {
-        this.metadataError = "Não foi possível carregar os filtros. Tente recarregá-los.";
-        this.changeDetectorRef.markForCheck();
-      },
-    });
+    this.catalog.load(true);
   }
 
   search(): void {
@@ -102,7 +96,7 @@ export class SearchPageComponent implements OnInit, OnDestroy {
 
     this.status = "loading";
     this.message = "";
-    const request: SearchRequest = {
+    const request: KnowledgeSearchRequest = {
       query: normalizedQuery,
       limit: this.limit,
       ...(this.selectedCategories.length ? { category_ids: this.selectedCategories.map((item) => item.id) } : {}),
@@ -150,7 +144,7 @@ export class SearchPageComponent implements OnInit, OnDestroy {
   removeProject(id: number): void { this.selectedProjects = this.selectedProjects.filter((item) => item.id !== id); }
   removeTag(id: number): void { this.selectedTags = this.selectedTags.filter((item) => item.id !== id); }
 
-  location(result: KnowledgeSearchResult): string {
+  location(result: KnowledgeChunk): string {
     const parts = [result.location.page ? `página ${result.location.page}` : "", result.location.section ?? "", `trecho ${result.location.chunk_index + 1}`];
     return parts.filter(Boolean).join(" · ");
   }

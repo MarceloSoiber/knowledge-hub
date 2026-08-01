@@ -47,7 +47,7 @@ class OpenAIEmbeddingClient(EmbeddingClient):
         payload = {"model": self.settings.embedding_model, "input": texts}
 
         try:
-            async with httpx.AsyncClient(timeout=60) as client:
+            async with httpx.AsyncClient(timeout=600) as client:
                 response = await client.post(url, headers=headers, json=payload)
         except httpx.RequestError as exc:
             raise EmbeddingError(f"Could not connect to embedding provider at {url}.") from exc

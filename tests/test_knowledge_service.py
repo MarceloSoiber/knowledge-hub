@@ -56,9 +56,12 @@ from backend.app.services.tags import (
 )
 from backend.app.services.documents.chunker import chunk_text, chunk_text_with_locations
 from backend.app.services.documents.extractors import (
+    FileTooLargeError,
+    MAX_UPLOAD_BYTES,
     UnsupportedFileTypeError,
     extract_document,
     extract_text,
+    validate_upload,
 )
 from backend.app.services.ingestion import ingest_plain_text, ingest_uploaded_file
 from backend.app.services.rag import LLMConfigurationError, OpenAICompatibleAnswerClient
@@ -242,6 +245,20 @@ def test_extract_text_accepts_txt_and_md() -> None:
 def test_extract_text_rejects_unsupported_extensions() -> None:
     with pytest.raises(UnsupportedFileTypeError):
         extract_text("notes.docx", b"hello")
+
+
+def test_extract_text_allows_files_up_to_100_mb_and_rejects_larger_files() -> None:
+    class SizedContent:
+        def __init__(self, size: int) -> None:
+            self.size = size
+
+        def __len__(self) -> int:
+            return self.size
+
+    assert validate_upload("notes.txt", SizedContent(MAX_UPLOAD_BYTES)) == ".txt"  # type: ignore[arg-type]
+
+    with pytest.raises(FileTooLargeError, match="100MB"):
+        validate_upload("notes.txt", SizedContent(MAX_UPLOAD_BYTES + 1))  # type: ignore[arg-type]
 
 
 def test_extract_text_reads_pdf(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -1,25 +1,30 @@
-import { HttpClient } from "@angular/common/http";
 import { Injectable, inject } from "@angular/core";
 import { firstValueFrom } from "rxjs";
 
-interface Category {
-  id: number;
-  name: string;
-}
+import { KnowledgeApiService } from "./knowledge-api.service";
 
 export type AuthStatus = "checking" | "unauthenticated" | "authenticated" | "error";
 
 @Injectable({ providedIn: "root" })
 export class AuthService {
-  private readonly http = inject(HttpClient);
+  private readonly api = inject(KnowledgeApiService);
   private readonly storageKey = "knowledge-hub.auth-token";
+  private initialization: Promise<void> | null = null;
 
   token: string | null = null;
   status: AuthStatus = "checking";
   errorMessage = "";
   rememberToken = false;
 
+  get isAuthenticated(): boolean { return this.status === "authenticated" && this.token !== null; }
+
   async initialize(): Promise<void> {
+    if (this.initialization) return this.initialization;
+    this.initialization = this.restoreSession();
+    return this.initialization;
+  }
+
+  private async restoreSession(): Promise<void> {
     const storedToken = localStorage.getItem(this.storageKey);
     if (!storedToken) {
       this.status = "unauthenticated";
@@ -44,7 +49,7 @@ export class AuthService {
     this.errorMessage = "";
 
     try {
-      await firstValueFrom(this.http.get<Category[]>("/api/v1/knowledge/categories"));
+      await firstValueFrom(this.api.categories());
       if (remember) {
         localStorage.setItem(this.storageKey, normalizedToken);
       } else {

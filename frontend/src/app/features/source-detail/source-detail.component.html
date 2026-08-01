@@ -1,15 +1,24 @@
 <section class="source-detail" aria-labelledby="source-title">
-  <a routerLink="/search">← Voltar à busca</a>
-  @if (loading) { <p class="notice" aria-live="polite">Carregando fonte…</p> }
-  @if (message) { <p class="notice notice--error" role="alert">{{ message }}</p> }
+  <a class="back-link" routerLink="/biblioteca">← Voltar à Biblioteca</a>
+  @if (loading) { <kh-loading-state message="Carregando fonte…" /> }
+  @if (message) { <p class="notice" [class.notice--error]="message !== 'Alterações salvas.'" [attr.role]="message !== 'Alterações salvas.' ? 'alert' : 'status'">{{ message }}</p> }
+  @if (!loading && !source && message) { <kh-error-state title="Fonte indisponível" [message]="message" [showRetry]="true" (retry)="loadSource()" /> }
   @if (source) {
-    <article>
-      <p class="eyebrow">{{ source.source_type }}</p>
-      <h1 id="source-title">{{ source.title }}</h1>
-      <p class="uri">{{ source.uri }}</p>
+    <article class="surface-card">
+      <div class="heading"><div><p class="eyebrow">{{ source.source_type }}</p><h1 id="source-title">{{ source.title }}</h1></div><div class="actions"><button type="button" class="secondary" (click)="startEditing()" [disabled]="saving || deleting">Editar</button><button type="button" class="danger" (click)="openDeleteDialog()" [disabled]="saving || deleting">Excluir</button></div></div>
+      <p class="uri">Origem: {{ source.uri || 'Não informada' }}</p><p class="details">Criada: {{ source.created_at || 'não informada' }} · Atualizada: {{ source.updated_at || 'não informada' }}</p><p class="details">Hash: {{ source.content_hash }}</p>
       <div class="chips"><span>Categoria</span>@for (category of source.categories; track category.id) { <span>{{ category.name }}</span> } @for (tag of source.tags; track tag.id) { <span>#{{ tag.name }}</span> } @for (project of source.projects; track project.id) { <span>{{ project.name }}</span> }</div>
-      <h2>Conteúdo</h2>
-      <p class="content">{{ source.content }}</p>
+      <h2>Conteúdo</h2><p class="content">{{ source.content }}</p>
     </article>
   }
+  @if (source && editing) {
+    <form class="editor" (ngSubmit)="save()"><h2>Editar fonte</h2>
+      <label>Título <input name="title" [(ngModel)]="draft.title" maxlength="255" [disabled]="saving" required /></label>
+      <label>Conteúdo <textarea name="content" [(ngModel)]="draft.content" [disabled]="saving" required></textarea></label>
+      @if (contentChanged) { <p class="notice">Alterar o conteúdo recriará os chunks e embeddings desta fonte.</p> }
+      @if (loadingMetadata) { <kh-loading-state message="Carregando metadados…" /> } @else { <kh-metadata-selector label="Associações" [categories]="categories" [tags]="tags" [projects]="projects" [selection]="draft.selection" [disabled]="saving" [errorMessage]="metadataError" (selectionChange)="onSelectionChange($event)" /> }
+      <div class="actions"><button type="button" class="secondary" (click)="cancelEditing()" [disabled]="saving">Cancelar</button><button type="submit" [disabled]="saving || !hasChanges || !draft.title.trim() || !draft.content.trim()">{{ saving ? 'Salvando…' : 'Salvar alterações' }}</button></div>
+    </form>
+  }
+  <kh-confirm-dialog [open]="deleteDialogOpen" title="Excluir fonte definitivamente?" description="A fonte, seus chunks e associações serão removidos de forma permanente." cancelLabel="Cancelar" confirmLabel="Excluir definitivamente" (cancel)="closeDeleteDialog()" (confirm)="delete()" />
 </section>

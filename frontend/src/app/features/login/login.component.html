@@ -1,6 +1,6 @@
-<main class="page-shell">
+<main class="login-shell">
   <section class="auth-card" aria-labelledby="page-title">
-    <div class="brand">Knowledge Hub</div>
+    <div class="auth-card__topline"><div class="brand"><span aria-hidden="true">K</span> Knowledge Hub</div><button class="theme-button" type="button" (click)="theme.toggle()" [attr.aria-pressed]="theme.current() === 'dark'" [attr.aria-label]="theme.current() === 'dark' ? 'Usar tema claro' : 'Usar tema escuro'">{{ theme.current() === "dark" ? "☀" : "☾" }}</button></div>
     <h1 id="page-title">Acessar o Knowledge Hub</h1>
     <p>Informe o Bearer token configurado para a API.</p>
 
