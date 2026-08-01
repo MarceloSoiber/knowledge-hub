@@ -847,7 +847,7 @@ async def test_delete_source_removes_source_when_confirmed() -> None:
 
 
 @pytest.mark.asyncio
-async def test_create_category_normalizes_and_rejects_duplicates() -> None:
+async def test_create_category_preserves_capitalization_and_rejects_duplicates() -> None:
     class FakeCategorySession:
         def __init__(self, existing: Category | None = None) -> None:
             self.existing = existing
@@ -873,7 +873,7 @@ async def test_create_category_normalizes_and_rejects_duplicates() -> None:
 
     category = await create_category(session, "  Finance  ")  # type: ignore[arg-type]
 
-    assert category.name == "finance"
+    assert category.name == "Finance"
     assert session.committed is True
 
     with pytest.raises(CategoryConflictError):
@@ -884,7 +884,7 @@ async def test_create_category_normalizes_and_rejects_duplicates() -> None:
 
 
 @pytest.mark.asyncio
-async def test_create_tag_normalizes_accents_and_rejects_duplicates() -> None:
+async def test_create_tag_preserves_capitalization_and_rejects_duplicates() -> None:
     class FakeTagSession:
         def __init__(self, existing: Tag | None = None) -> None:
             self.existing = existing
@@ -911,7 +911,7 @@ async def test_create_tag_normalizes_accents_and_rejects_duplicates() -> None:
     session = FakeTagSession()
     tag = await create_tag(session, "  RÁG  ")  # type: ignore[arg-type]
 
-    assert tag.name == "rag"
+    assert tag.name == "RÁG"
     assert tag.normalized_name == "rag"
     assert session.committed is True
 
@@ -961,7 +961,7 @@ async def test_update_and_delete_tag_enforce_conflicts_and_in_use() -> None:
     session = FakeTagManagementSession(Tag(id=5, name="old", normalized_name="old"))
     updated = await update_tag(session, 5, " PósTgres ")  # type: ignore[arg-type]
 
-    assert updated.name == "postgres"
+    assert updated.name == "PósTgres"
     assert updated.normalized_name == "postgres"
     assert session.committed is True
 
@@ -992,7 +992,7 @@ async def test_update_and_delete_tag_enforce_conflicts_and_in_use() -> None:
 
 
 @pytest.mark.asyncio
-async def test_project_lifecycle_normalizes_conflicts_and_archives_without_deleting() -> None:
+async def test_project_lifecycle_preserves_capitalization_and_archives_without_deleting() -> None:
     class FakeProjectSession:
         def __init__(
             self,
@@ -1031,7 +1031,7 @@ async def test_project_lifecycle_normalizes_conflicts_and_archives_without_delet
     session = FakeProjectSession()
     project = await create_project(session, "  MCP Hub  ", "  Contexto  ")  # type: ignore[arg-type]
 
-    assert project.name == "mcp hub"
+    assert project.name == "MCP Hub"
     assert project.normalized_name == "mcp hub"
     assert project.description == "Contexto"
     assert project.status == "active"
@@ -1047,7 +1047,7 @@ async def test_project_lifecycle_normalizes_conflicts_and_archives_without_delet
     update_session = FakeProjectSession(project=project)
     updated = await update_project(update_session, 5, name="New Name", description="")  # type: ignore[arg-type]
 
-    assert updated.name == "new name"
+    assert updated.name == "New Name"
     assert updated.description is None
 
     archived = await archive_project(update_session, 5)  # type: ignore[arg-type]

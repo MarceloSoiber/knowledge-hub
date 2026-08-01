@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import exists, or_, select, update
+from sqlalchemy import exists, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -242,7 +242,7 @@ async def list_reindex_candidates(
 def select_column_category_ids(normalized_categories: list[str]):
     from ..db.models import Category
 
-    return select(Category.id).where(Category.name.in_(normalized_categories))
+    return select(Category.id).where(func.lower(Category.name).in_(normalized_categories))
 
 
 def classify_reindex_reason(
