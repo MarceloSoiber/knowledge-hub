@@ -1,0 +1,8 @@
+:host { display: block; min-height: 100vh; background: #f3f6fb; }
+.shell { width: min(1180px, calc(100% - 32px)); margin: 0 auto; }
+.topbar { display: flex; align-items: center; gap: 24px; min-height: 72px; }
+.brand { color: #172033; font-weight: 800; text-decoration: none; letter-spacing: -.02em; }
+nav { margin-right: auto; } nav a { color: #2457a5; font-weight: 650; text-decoration: none; }
+button { padding: 8px 12px; border: 1px solid #b9c6d8; border-radius: 8px; background: #fff; color: #26354c; font: inherit; cursor: pointer; }
+.content { padding: 12px 0 48px; }
+@media (max-width: 560px) { .shell { width: min(100% - 20px, 1180px); } .topbar { gap: 14px; } }

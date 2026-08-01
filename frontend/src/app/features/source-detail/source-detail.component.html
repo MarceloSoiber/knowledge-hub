@@ -1,0 +1,15 @@
+<section class="source-detail" aria-labelledby="source-title">
+  <a routerLink="/search">← Voltar à busca</a>
+  @if (loading) { <p class="notice" aria-live="polite">Carregando fonte…</p> }
+  @if (message) { <p class="notice notice--error" role="alert">{{ message }}</p> }
+  @if (source) {
+    <article>
+      <p class="eyebrow">{{ source.source_type }}</p>
+      <h1 id="source-title">{{ source.title }}</h1>
+      <p class="uri">{{ source.uri }}</p>
+      <div class="chips"><span>Categoria</span>@for (category of source.categories; track category.id) { <span>{{ category.name }}</span> } @for (tag of source.tags; track tag.id) { <span>#{{ tag.name }}</span> } @for (project of source.projects; track project.id) { <span>{{ project.name }}</span> }</div>
+      <h2>Conteúdo</h2>
+      <p class="content">{{ source.content }}</p>
+    </article>
+  }
+</section>
