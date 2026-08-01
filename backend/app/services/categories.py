@@ -26,6 +26,10 @@ def normalize_category_name(name: str) -> str:
     return name.strip().lower()
 
 
+def display_category_name(name: str) -> str:
+    return name.strip()
+
+
 async def get_category(session: AsyncSession, category_id: int) -> Category:
     category = await get_category_record(session, category_id)
     if category is None:
@@ -53,7 +57,7 @@ async def create_category(session: AsyncSession, name: str) -> Category:
     if await get_category_by_name(session, normalized_name) is not None:
         raise CategoryConflictError(f"Category '{normalized_name}' already exists.")
 
-    category = Category(name=normalized_name)
+    category = Category(name=display_category_name(name))
     session.add(category)
     await session.commit()
     await session.refresh(category)
@@ -67,7 +71,7 @@ async def update_category(session: AsyncSession, category_id: int, name: str) ->
     if existing is not None and existing.id != category.id:
         raise CategoryConflictError(f"Category '{normalized_name}' already exists.")
 
-    category.name = normalized_name
+    category.name = display_category_name(name)
     await session.commit()
     await session.refresh(category)
     return category

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { answerErrorMessage, buildAnswerRequest, referencesText } from "./ask-page.component";
+import { answerErrorMessage, buildAnswerRequest, createAnswerHistoryId, referencesText } from "./ask-page.component";
 
 const source = {
   id: 1, source_id: "source-uuid", source_title: "Decisões.md", source_type: "text", uri: "text:Decisões.md",
@@ -26,5 +26,16 @@ describe("ask page helpers", () => {
     expect(text).toContain("Página 3 · Contexto · Trecho 1");
     expect(text).not.toContain("source-uuid");
     expect(text).not.toContain("text:");
+  });
+
+  it("creates an ID even when randomUUID is unavailable", () => {
+    const originalRandomUuid = crypto.randomUUID;
+    Object.defineProperty(crypto, "randomUUID", { configurable: true, value: undefined });
+
+    try {
+      expect(createAnswerHistoryId()).toMatch(/^\d+-[a-z0-9]+$/);
+    } finally {
+      Object.defineProperty(crypto, "randomUUID", { configurable: true, value: originalRandomUuid });
+    }
   });
 });

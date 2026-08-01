@@ -31,6 +31,10 @@ def normalize_tag_name(name: str) -> str:
     return "".join(character for character in decomposed if not unicodedata.combining(character))
 
 
+def display_tag_name(name: str) -> str:
+    return " ".join(name.strip().split())
+
+
 async def get_tag(session: AsyncSession, tag_id: int) -> Tag:
     tag = await get_tag_record(session, tag_id)
     if tag is None:
@@ -67,7 +71,7 @@ async def create_tag(session: AsyncSession, name: str) -> Tag:
     if await get_tag_by_normalized_name(session, normalized_name) is not None:
         raise TagConflictError(f"Tag '{normalized_name}' already exists.")
 
-    tag = Tag(name=normalized_name, normalized_name=normalized_name)
+    tag = Tag(name=display_tag_name(name), normalized_name=normalized_name)
     session.add(tag)
     await session.commit()
     await session.refresh(tag)
@@ -83,7 +87,7 @@ async def update_tag(session: AsyncSession, tag_id: int, name: str) -> Tag:
     if existing is not None and existing.id != tag.id:
         raise TagConflictError(f"Tag '{normalized_name}' already exists.")
 
-    tag.name = normalized_name
+    tag.name = display_tag_name(name)
     tag.normalized_name = normalized_name
     await session.commit()
     await session.refresh(tag)

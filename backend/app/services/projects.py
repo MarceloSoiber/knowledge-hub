@@ -31,6 +31,10 @@ def normalize_project_name(name: str) -> str:
     return " ".join(name.strip().lower().split())
 
 
+def display_project_name(name: str) -> str:
+    return " ".join(name.strip().split())
+
+
 def validate_project_status(status: str) -> str:
     if status not in PROJECT_STATUSES:
         raise ProjectStatusError(f"Invalid project status: {status}.")
@@ -82,7 +86,7 @@ async def create_project(
         raise ProjectConflictError(f"Project '{normalized_name}' already exists.")
 
     project = Project(
-        name=normalized_name,
+        name=display_project_name(name),
         normalized_name=normalized_name,
         description=normalize_project_description(description),
         status=PROJECT_STATUS_ACTIVE,
@@ -107,7 +111,7 @@ async def update_project(
         existing = await get_project_by_normalized_name(session, normalized_name)
         if existing is not None and existing.id != project.id:
             raise ProjectConflictError(f"Project '{normalized_name}' already exists.")
-        project.name = normalized_name
+        project.name = display_project_name(name)
         project.normalized_name = normalized_name
     if description is not None:
         project.description = normalize_project_description(description)

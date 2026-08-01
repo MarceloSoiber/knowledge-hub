@@ -57,6 +57,11 @@ export function referencesText(sources: KnowledgeChunk[]): string {
   }).join("\n\n");
 }
 
+export function createAnswerHistoryId(): string {
+  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 @Component({
   selector: "kh-ask-page",
   imports: [DecimalPipe, FormsModule, RouterLink],
@@ -160,7 +165,7 @@ export class AskPageComponent implements OnInit, OnDestroy {
   }
 
   private addAnswer(response: KnowledgeAnswerResponse): void {
-    this.history = [{ id: crypto.randomUUID(), query: response.query, answer: response.answer, sources: response.sources, includeMatchReasons: this.includeMatchReasons }, ...this.history];
+    this.history = [{ id: createAnswerHistoryId(), query: response.query, answer: response.answer, sources: response.sources, includeMatchReasons: this.includeMatchReasons }, ...this.history];
     this.status = response.sources.length ? "success" : "success-without-sources";
     this.changeDetectorRef.markForCheck();
   }

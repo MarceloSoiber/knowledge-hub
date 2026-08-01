@@ -777,10 +777,10 @@ async def test_category_crud_status_mapping(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async def fake_create_category(_: object, name: str) -> object:
-        return SimpleNamespace(id=9, name=name.strip().lower())
+        return SimpleNamespace(id=9, name=name.strip())
 
     async def fake_update_category(_: object, category_id: int, name: str) -> object:
-        return SimpleNamespace(id=category_id, name=name.strip().lower())
+        return SimpleNamespace(id=category_id, name=name.strip())
 
     async def fake_delete_category(_: object, category_id: int) -> None:
         assert category_id == 9
@@ -796,9 +796,9 @@ async def test_category_crud_status_mapping(
         deleted = await client.delete("/api/v1/knowledge/categories/9")
 
     assert created.status_code == 201
-    assert created.json() == {"id": 9, "name": "docs"}
+    assert created.json() == {"id": 9, "name": "Docs"}
     assert updated.status_code == 200
-    assert updated.json() == {"id": 9, "name": "manuals"}
+    assert updated.json() == {"id": 9, "name": "Manuals"}
     assert deleted.status_code == 204
 
 
@@ -859,7 +859,7 @@ async def test_project_lifecycle_and_sources_contracts(
         assert project_id == 9
         assert name == "Hub 2"
         assert description == "novo"
-        return SimpleNamespace(**{**project_payload, "name": "hub 2", "description": "novo"})
+        return SimpleNamespace(**{**project_payload, "name": "Hub 2", "description": "novo"})
 
     async def fake_archive_project(_: object, project_id: int) -> object:
         assert project_id == 9
@@ -913,7 +913,7 @@ async def test_project_lifecycle_and_sources_contracts(
     assert created.status_code == 201
     assert created.json() == project_payload
     assert updated.status_code == 200
-    assert updated.json()["name"] == "hub 2"
+    assert updated.json()["name"] == "Hub 2"
     assert archived.status_code == 200
     assert archived.json()["status"] == "archived"
     assert reactivated.status_code == 200
@@ -966,10 +966,10 @@ async def test_tag_crud_and_autocomplete_contracts(
         return [{"id": 9, "name": "postgres"}]
 
     async def fake_create_tag(_: object, name: str) -> object:
-        return SimpleNamespace(id=9, name=name.strip().lower())
+        return SimpleNamespace(id=9, name=" ".join(name.strip().split()))
 
     async def fake_update_tag(_: object, tag_id: int, name: str) -> object:
-        return SimpleNamespace(id=tag_id, name=name.strip().lower())
+        return SimpleNamespace(id=tag_id, name=" ".join(name.strip().split()))
 
     async def fake_delete_tag(_: object, tag_id: int) -> None:
         assert tag_id == 9
@@ -993,9 +993,9 @@ async def test_tag_crud_and_autocomplete_contracts(
     assert completed.status_code == 200
     assert completed.json() == [{"id": 9, "name": "postgres"}]
     assert created.status_code == 201
-    assert created.json() == {"id": 9, "name": "postgres"}
+    assert created.json() == {"id": 9, "name": "Postgres"}
     assert updated.status_code == 200
-    assert updated.json() == {"id": 9, "name": "rag"}
+    assert updated.json() == {"id": 9, "name": "RAG"}
     assert deleted.status_code == 204
 
 

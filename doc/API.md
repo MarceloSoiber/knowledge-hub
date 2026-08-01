@@ -255,7 +255,7 @@ Resposta `201 Created`:
 ```json
 {
   "id": 2,
-  "name": "financeiro"
+  "name": "Financeiro"
 }
 ```
 
@@ -266,7 +266,8 @@ PATCH /api/v1/knowledge/categories/{id}
 Content-Type: application/json
 ```
 
-O nome é normalizado com remoção de espaços externos e letras minúsculas.
+O nome preserva a capitalização informada, removendo apenas espaços externos. A
+comparação para evitar duplicatas não diferencia maiúsculas de minúsculas.
 
 ### Excluir categoria
 
@@ -282,9 +283,10 @@ Tags são marcadores livres e granulares, como `python`, `postgres`, `imposto` o
 `rag`. Elas complementam categorias, mas não substituem a taxonomia controlada:
 categorias seguem sendo obrigatórias no cadastro, enquanto tags são opcionais.
 
-Nomes de tags são normalizados com remoção de espaços externos, letras minúsculas,
-colapso de espaços internos e comparação sem acentos. Assim, `PósTgres` e
-`postgres` representam a mesma tag.
+Nomes de tags preservam a capitalização informada, com remoção de espaços externos
+e colapso de espaços internos. Para evitar duplicatas, a comparação ignora
+maiúsculas, minúsculas e acentos. Assim, `PósTgres` e `postgres` representam a
+mesma tag.
 
 ### Listar tags
 
@@ -329,7 +331,7 @@ Resposta `201 Created`:
 ```json
 {
   "id": 1,
-  "name": "postgres"
+  "name": "Postgres"
 }
 ```
 
@@ -460,7 +462,7 @@ Resposta `201 Created`:
   "tags": [
     {
       "id": 1,
-      "name": "postgres"
+      "name": "Postgres"
     }
   ],
   "projects": [
