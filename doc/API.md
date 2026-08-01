@@ -423,7 +423,7 @@ Campos:
 
 | Campo | Tipo | Obrigatório | Regras |
 | --- | --- | --- | --- |
-| `file` | arquivo | sim | Formatos `.txt`, `.md` ou `.pdf`; máximo de 10 MB. |
+| `file` | arquivo | sim | Formatos `.txt`, `.md` ou `.pdf`; máximo de 100 MB. |
 | `category_ids` | inteiros repetidos | sim | Cada valor deve ser maior que zero, sem duplicatas, e apontar para uma categoria existente. |
 | `tag_ids` | inteiros repetidos | não | Cada valor deve ser maior que zero, sem duplicatas, e apontar para uma tag existente. |
 | `project_ids` | inteiros repetidos | não | Cada valor deve ser maior que zero, sem duplicatas, e apontar para um projeto existente. |
@@ -934,7 +934,7 @@ Principais códigos:
 | `401 Unauthorized` | Token Bearer ausente ou inválido quando a autenticação está ativa. |
 | `404 Not Found` | A categoria, tag, projeto ou fonte informada não existe. |
 | `409 Conflict` | Nome de categoria/tag/projeto duplicado, categoria/tag em uso ou conteúdo duplicado. |
-| `413 Content Too Large` | O arquivo enviado ultrapassa 10 MB. |
+| `413 Content Too Large` | O arquivo enviado ultrapassa 100 MB. |
 | `422 Unprocessable Entity` | O corpo ou os parâmetros não atendem ao schema. |
 | `502 Bad Gateway` | Falha ao consultar o serviço de embeddings ou o LLM. |
 | `503 Service Unavailable` | Embeddings ou LLM não estão configurados corretamente. |

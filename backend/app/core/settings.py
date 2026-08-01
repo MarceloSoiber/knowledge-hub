@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -13,6 +14,8 @@ class Settings(BaseSettings):
     postgres_dsn: str = Field(
         default="postgresql+asyncpg://postgres:postgres@localhost:5432/knowledge_hub"
     )
+    backup_directory: Path = Field(default=Path("/var/lib/knowledge-hub/backups"))
+    operations_restore_max_bytes: int = Field(default=1024 * 1024 * 1024, ge=1)
 
     llm_provider: str = Field(default="local")
     local_llm_base_url: str = Field(default="http://127.0.0.1:1234")

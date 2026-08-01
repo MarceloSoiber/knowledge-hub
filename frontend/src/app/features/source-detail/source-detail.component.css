@@ -1,1 +1,25 @@
-:host { display: block; }.source-detail { display: grid; gap: 20px; }.source-detail > a { color: #2457a5; font-weight: 700; text-decoration: none; } article { padding: 24px; border: 1px solid #dbe3f0; border-radius: 16px; background: #fff; }.eyebrow { margin: 0 0 7px; color: #2457a5; font-size: .82rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }h1 { margin: 0; color: #172033; }.uri { color: #526178; }.chips { display: flex; flex-wrap: wrap; gap: 7px; }.chips span { padding: 5px 9px; border-radius: 999px; background: #e8eef8; color: #274b7e; font-size: .82rem; }h2 { margin-top: 28px; font-size: 1.1rem; }.content { white-space: pre-wrap; line-height: 1.65; color: #26354c; }.notice { padding: 13px 15px; border-radius: 10px; background: #eaf1fc; color: #294a76; }.notice--error { background: #fff0f0; color: #8d2525; }
+:host { display: block; }
+.source-detail { display: grid; max-width: 72rem; gap: var(--space-5); }
+.back-link { width: fit-content; font-weight: 700; text-decoration: none; }
+article, .editor { padding: clamp(1.1rem, 3vw, 1.75rem); }
+.heading, .actions { display: flex; align-items: start; justify-content: space-between; gap: var(--space-3); }
+.actions { flex-wrap: wrap; }
+.eyebrow { margin: 0 0 var(--space-2); color: var(--color-primary); font-size: .82rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+h1, h2 { margin: 0; color: var(--color-text); }
+.uri, .details { color: var(--color-muted); overflow-wrap: anywhere; }
+.details { font-size: .9rem; }
+.chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.chips span { padding: .32rem .6rem; border-radius: 999px; background: var(--color-primary-soft); color: var(--color-primary); font-size: .82rem; }
+.content { max-width: 80ch; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; color: var(--color-text); }
+.editor { display: grid; gap: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); box-shadow: var(--shadow-card); }
+.editor label { display: grid; gap: var(--space-2); font-weight: 650; }
+.editor input, .editor textarea { box-sizing: border-box; width: 100%; padding: .7rem .75rem; border: 1px solid var(--color-border-strong); border-radius: var(--radius-sm); font: inherit; }
+.editor textarea { min-height: 14rem; resize: vertical; }
+.editor button, .actions button { min-height: 2.65rem; padding: .6rem .85rem; border: 0; border-radius: var(--radius-sm); background: var(--color-primary); color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+.actions .secondary { border: 1px solid var(--color-border-strong); background: var(--color-surface); color: var(--color-text); }
+.actions .danger { background: var(--color-danger); }
+@media (max-width: 38rem) { .heading { display: grid; }.heading .actions { justify-content: start; } }
+
+.source-detail { max-width: none; grid-template-columns: minmax(0, 1.35fr) minmax(18rem, .65fr); align-items: start; }.source-detail > .back-link, .source-detail > kh-loading-state, .source-detail > .notice, .source-detail > kh-error-state { grid-column: 1 / -1; }.source-detail > article { min-height: 34rem; }.source-detail article .heading { padding-bottom: var(--space-4); border-bottom: 1px solid var(--color-border); }.source-detail article h2 { margin-top: var(--space-6); }.source-detail .content { max-width: none; padding: 1.25rem; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface-muted); }.editor { grid-column: 2; position: sticky; top: 6rem; }.editor h2 { font-size: 1.1rem; }.editor textarea { min-height: 18rem; }@media (max-width: 64rem) { .source-detail { grid-template-columns: 1fr; }.source-detail > .back-link, .source-detail > kh-loading-state, .source-detail > .notice, .source-detail > kh-error-state { grid-column: auto; }.source-detail > article { min-height: 0; }.editor { grid-column: auto; position: static; } }
+
+.source-detail { max-width: 82rem; grid-template-columns: 1fr; }.source-detail > .back-link, .source-detail > kh-loading-state, .source-detail > .notice, .source-detail > kh-error-state { grid-column: auto; }.source-detail > article { min-height: 0; }.source-detail article { padding: clamp(1.25rem, 3vw, 2rem); }.source-detail .content { max-width: 78ch; }.editor { grid-column: auto; position: static; max-width: 82rem; }.editor textarea { min-height: 14rem; }

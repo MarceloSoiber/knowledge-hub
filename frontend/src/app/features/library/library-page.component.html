@@ -1,0 +1,25 @@
+<section class="library-page" aria-labelledby="library-title">
+  <header class="page-header"><p class="eyebrow page-header__eyebrow">Acervo</p><h1 id="library-title">Biblioteca</h1><p class="page-header__description">Consulte e mantenha as fontes já ingeridas.</p></header>
+  @if (loading) { <kh-loading-state message="Carregando fontes…" /> }
+  @if (error) { <kh-error-state title="Acervo indisponível" [message]="error" [showRetry]="true" (retry)="load()" /> }
+  @if (!loading && !error && !sources.length) { <kh-empty-state title="Nenhuma fonte no acervo" description="Use a Ingestão para adicionar a primeira fonte." /> }
+  @if (!loading && !error && sources.length) {
+    <div class="library-toolbar surface-card">
+      <label class="library-search"><span>Buscar por título</span><div><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"></circle><path d="m16 16 4 4"></path></svg><input name="query" [(ngModel)]="query" placeholder="Ex.: ata de reunião" /></div></label>
+      <details class="library-filters"><summary><span>Filtrar acervo</span><small>Categoria, tag ou projeto</small></summary><div class="filters" aria-label="Filtros da biblioteca">
+        <label>Categorias <select multiple (change)="categoryIds = selectedIds($event)">@for (item of categories; track item.id) { <option [value]="item.id">{{ item.name }}</option> }</select></label>
+        <label>Tags <select multiple (change)="tagIds = selectedIds($event)">@for (item of tags; track item.id) { <option [value]="item.id">{{ item.name }}</option> }</select></label>
+        <label>Projetos <select multiple (change)="projectIds = selectedIds($event)">@for (item of projects; track item.id) { <option [value]="item.id">{{ item.name }}</option> }</select></label>
+      </div></details>
+    </div>
+    <div class="library-results-heading"><div><p class="section-kicker">Acervo</p><p class="count" aria-live="polite">{{ filteredSources.length }} fonte{{ filteredSources.length === 1 ? '' : 's' }} encontrada{{ filteredSources.length === 1 ? '' : 's' }}.</p></div>@if (hasFilters) { <button type="button" class="clear-filters" (click)="clearFilters()">Limpar filtros</button> }</div>
+    @if (!filteredSources.length) { <kh-empty-state title="Nenhuma fonte encontrada" description="Ajuste ou limpe os filtros para ver o acervo." /> }
+    <ul class="source-list">
+      @for (source of filteredSources; track source.source_id) {
+        <li><article><div class="source-title"><span class="source-type">{{ source.source_type }}</span><h2><a [routerLink]="['/sources', source.source_id]">{{ source.title }}</a></h2></div><p class="source-origin">{{ source.uri || 'Sem origem informada' }}</p>
+          <div class="chips">@for (category of source.categories; track category.id) { <span>{{ category.name }}</span> } @for (tag of source.tags; track tag.id) { <span>#{{ tag.name }}</span> } @for (project of source.projects; track project.id) { <span>{{ project.name }}</span> }</div><a class="open-source" [routerLink]="['/sources', source.source_id]">Abrir <span aria-hidden="true">→</span></a>
+        </article></li>
+      }
+    </ul>
+  }
+</section>

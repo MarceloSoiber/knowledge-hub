@@ -1,0 +1,47 @@
+<div class="app-shell" [class.app-shell--menu-open]="menuOpen">
+  <a class="skip-link" href="#main-content">Pular para o conteúdo</a>
+  <header class="topbar">
+    <button #menuButton class="menu-button" type="button" (click)="menuOpen = !menuOpen"
+      [attr.aria-expanded]="menuOpen" aria-controls="primary-navigation" aria-label="Abrir navegação">
+      <span aria-hidden="true">☰</span>
+    </button>
+    <a class="brand" routerLink="/inicio" aria-label="Knowledge Hub — início"><span class="brand__mark" aria-hidden="true">K</span><span class="brand__name">Knowledge Hub</span></a>
+    <div class="global-search-wrap">
+      <form class="global-search" (ngSubmit)="searchGlobal()"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"></circle><path d="m16 16 4 4"></path></svg><label class="sr-only" for="global-search">Pesquisar no acervo</label><input #globalSearchInput id="global-search" name="global-search" [(ngModel)]="globalQuery" (focus)="closeGlobalSearch()" placeholder="Pesquisar no acervo" autocomplete="off" /><kbd>⌘ K</kbd></form>
+      @if (globalSearchStatus !== 'idle' || globalResults.length) { <div class="global-search-results" aria-live="polite">@if (globalSearchStatus === 'loading') { <p>Pesquisando no acervo…</p> } @if (globalSearchStatus === 'error') { <p>Não foi possível pesquisar agora.</p> } @if (globalSearchStatus === 'idle' && !globalResults.length) { <p>Nenhum resultado encontrado.</p> } @for (result of globalResults; track result.id) { <a [routerLink]="['/sources', result.source_id]" (click)="closeGlobalSearch()"><span><strong>{{ result.source_title }}</strong><small>{{ result.location.section || 'Trecho do documento' }}</small></span><span aria-hidden="true">→</span></a> } <a class="global-search-results__advanced" routerLink="/busca" (click)="closeGlobalSearch()">Abrir busca avançada</a></div> }
+    </div>
+    <div class="topbar__actions">
+      <button class="theme-button" type="button" (click)="theme.toggle()" [attr.aria-pressed]="theme.current() === 'dark'" [attr.aria-label]="theme.current() === 'dark' ? 'Usar tema claro' : 'Usar tema escuro'">
+        <span class="theme-button__icon" aria-hidden="true">{{ theme.current() === "dark" ? "☀" : "☾" }}</span>
+        <span>{{ theme.current() === "dark" ? "Tema claro" : "Tema escuro" }}</span>
+      </button>
+      <button class="logout-button" type="button" (click)="logout()"><span aria-hidden="true">↗</span> Desconectar</button>
+    </div>
+  </header>
+
+  @if (menuOpen) {
+    <button class="backdrop" type="button" aria-label="Fechar navegação" (click)="closeMenu(true)"></button>
+  }
+
+  <nav id="primary-navigation" class="sidebar" aria-label="Navegação principal">
+    <p class="sidebar__label">Explorar</p>
+    <a class="sidebar__item" data-tooltip="Início" aria-label="Início" routerLink="/inicio" routerLinkActive="is-active" #homeLink="routerLinkActive" [attr.aria-current]="homeLink.isActive ? 'page' : null" (click)="closeMenu()"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"></path><path d="M9 21v-6h6v6"></path></svg><span>Início</span></a>
+    <a class="sidebar__item" data-tooltip="Busca inteligente" aria-label="Busca inteligente" routerLink="/busca" routerLinkActive="is-active" #searchLink="routerLinkActive" [attr.aria-current]="searchLink.isActive ? 'page' : null" (click)="closeMenu()"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"></circle><path d="m16 16 4 4"></path></svg><span>Busca inteligente</span></a>
+    <a class="sidebar__item" data-tooltip="Pergunte à base" aria-label="Pergunte à base" routerLink="/perguntar" routerLinkActive="is-active" #askLink="routerLinkActive" [attr.aria-current]="askLink.isActive ? 'page' : null" (click)="closeMenu()"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 15a4 4 0 0 1-4 4H9l-5 3 1.5-4.5A7 7 0 1 1 20 15Z"></path><path d="M9 11h.01M13 11h.01M17 11h.01"></path></svg><span>Pergunte à base</span></a>
+    <p class="sidebar__label">Gerenciar</p>
+    <a class="sidebar__item" data-tooltip="Ingestão" aria-label="Ingestão" routerLink="/ingestao" routerLinkActive="is-active" #ingestionLink="routerLinkActive" [attr.aria-current]="ingestionLink.isActive ? 'page' : null" (click)="closeMenu()"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v12M7 8l5-5 5 5"></path><path d="M5 14v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"></path></svg><span>Ingestão</span></a>
+    <a class="sidebar__item" data-tooltip="Biblioteca" aria-label="Biblioteca" routerLink="/biblioteca" routerLinkActive="is-active" #libraryLink="routerLinkActive" [attr.aria-current]="libraryLink.isActive ? 'page' : null" (click)="closeMenu()"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5z"></path><path d="M4 5.5v16M8 7h8"></path></svg><span>Biblioteca</span></a>
+    <a class="sidebar__item" data-tooltip="Organização" aria-label="Organização" routerLink="/organizacao" routerLinkActive="is-active" #organizationLink="routerLinkActive" [attr.aria-current]="organizationLink.isActive ? 'page' : null" (click)="closeMenu()"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 6h14M5 12h14M5 18h14"></path><circle cx="8" cy="6" r="1"></circle><circle cx="16" cy="12" r="1"></circle><circle cx="11" cy="18" r="1"></circle></svg><span>Organização</span></a>
+    <a class="sidebar__item" data-tooltip="Backup e restauração" aria-label="Backup e restauração" routerLink="/operacoes" routerLinkActive="is-active" (click)="closeMenu()"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 4h14v16H5z"></path><path d="M8 4v6h8V4M8 17h8"></path></svg><span>Backup e restauração</span></a>
+  </nav>
+
+  <main id="main-content" class="content" tabindex="-1">
+    <router-outlet />
+  </main>
+
+  @if (showBackToTop) {
+    <button class="back-to-top" type="button" (click)="scrollToTop()" aria-label="Voltar ao topo">
+      <span aria-hidden="true">↑</span><span>Topo</span>
+    </button>
+  }
+</div>

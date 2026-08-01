@@ -8,7 +8,7 @@ from .chunker import PageSpan
 from .normalizer import normalize_pdf_text, normalize_text
 
 
-MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+MAX_UPLOAD_BYTES = 100 * 1024 * 1024
 PDF_OCR_DPI = 200
 PDF_OCR_LANGUAGES = "por+eng"
 SUPPORTED_EXTENSIONS = {".txt", ".md", ".pdf"}
@@ -89,7 +89,7 @@ def validate_upload(filename: str, content: bytes) -> str:
     if extension not in SUPPORTED_EXTENSIONS:
         raise UnsupportedFileTypeError("Only .txt, .md and .pdf files are supported.")
     if len(content) > MAX_UPLOAD_BYTES:
-        raise FileTooLargeError("Uploaded file is larger than 10MB.")
+        raise FileTooLargeError("Uploaded file is larger than 100MB.")
     return extension
 
 

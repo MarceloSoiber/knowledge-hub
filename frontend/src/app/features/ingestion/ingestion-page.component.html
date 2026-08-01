@@ -1,0 +1,48 @@
+<section class="ingestion-page" aria-labelledby="ingestion-title">
+  <header class="page-header">
+    <p class="eyebrow page-header__eyebrow">Conhecimento</p>
+    <h1 id="ingestion-title">Ingestão</h1>
+    <p class="page-header__description">Inclua arquivos ou textos na base com os metadados que os tornam encontráveis.</p>
+  </header>
+
+  @if (metadataLoading) {
+    <kh-loading-state message="Carregando metadados para a ingestão…" />
+  } @else if (metadataError) {
+    <kh-error-state title="Metadados indisponíveis" [message]="metadataError" [showRetry]="true" (retry)="loadMetadata()" />
+  } @else {
+    <div class="tabs" role="tablist" aria-label="Modo de ingestão">
+      <button id="file-tab" type="button" role="tab" [attr.aria-selected]="activeTab === 'file'" aria-controls="file-panel" [tabIndex]="activeTab === 'file' ? 0 : -1" (click)="activateTab('file')" (keydown)="onTabKeydown($event, 'file')"><span aria-hidden="true">↥</span> Enviar arquivo</button>
+      <button id="text-tab" type="button" role="tab" [attr.aria-selected]="activeTab === 'text'" aria-controls="text-panel" [tabIndex]="activeTab === 'text' ? 0 : -1" (click)="activateTab('text')" (keydown)="onTabKeydown($event, 'text')"><span aria-hidden="true">✦</span> Adicionar texto</button>
+    </div>
+
+    @if (activeTab === "file") {
+      <form id="file-panel" class="ingestion-form surface-card" role="tabpanel" aria-labelledby="file-tab" (ngSubmit)="submitFile()">
+        <div class="form-heading"><div><p class="section-kicker">Etapa 1</p><h2>Escolha o arquivo</h2></div><span>Até 100 MB</span></div>
+        <label class="file-dropzone" [class.file-dropzone--drag-over]="isFileDragOver" for="knowledge-file" (dragover)="onFileDragOver($event)" (dragleave)="onFileDragLeave($event)" (drop)="onFileDrop($event)"><input #fileInput id="knowledge-file" name="file" type="file" accept=".txt,.md,.pdf" [disabled]="fileState.status === 'submitting'" (change)="selectFile($event)" aria-describedby="file-help" /><span class="file-dropzone__icon" aria-hidden="true">↥</span><strong>{{ file ? file.name : "Escolha um arquivo" }}</strong><span>{{ file ? "Clique para substituir o arquivo selecionado" : "Arraste aqui ou clique para procurar no computador" }}</span></label>
+        <p id="file-help" class="help">Formatos aceitos: .txt, .md ou .pdf.</p>
+
+        <kh-metadata-selector label="Metadados do arquivo" [categories]="categories" [tags]="tags" [projects]="projects" [selection]="fileSelection" [categoriesRequired]="true" [disabled]="fileState.status === 'submitting'" (selectionChange)="fileSelection = $event" />
+        <button class="submit" type="submit" [disabled]="fileState.status === 'submitting'">{{ fileState.status === "submitting" ? "Enviando arquivo…" : "Enviar arquivo" }}</button>
+        @if (fileState.status === "submitting") { <kh-loading-state message="Processando arquivo e gerando embeddings…" /> }
+        @if (fileState.status === "validation-error" || fileState.status === "request-error") { <p class="notice notice--error" role="alert">{{ fileState.message }}</p> }
+        @if (fileState.status === "duplicate") { <p class="notice notice--error" role="alert">{{ fileState.message }} @if (fileState.existingSourceId) { <a [routerLink]="['/sources', fileState.existingSourceId]">Abrir fonte existente</a> }</p> }
+        @if (fileState.status === "success" && fileState.result; as result) { <section class="notice notice--success" aria-live="polite"><h2>Arquivo ingerido</h2><p><strong>{{ result.title }}</strong></p><p>ID da fonte: <code>{{ result.source_id }}</code></p><p>{{ result.chunks_created }} chunks criados.</p><a [routerLink]="['/sources', result.source_id]">Abrir fonte</a></section> }
+      </form>
+    } @else {
+      <form id="text-panel" class="ingestion-form surface-card" role="tabpanel" aria-labelledby="text-tab" (ngSubmit)="submitText()">
+        <div class="form-heading"><div><p class="section-kicker">Etapa 1</p><h2>Escreva ou cole o conteúdo</h2></div><span>Texto livre</span></div>
+        <label for="text-title">Título</label>
+        <input id="text-title" name="title" maxlength="255" [(ngModel)]="textTitle" [disabled]="textState.status === 'submitting'" />
+        <p class="help">{{ textTitle.length }}/255 caracteres</p>
+        <label for="text-content">Conteúdo</label>
+        <textarea id="text-content" name="content" rows="10" [(ngModel)]="textContent" [disabled]="textState.status === 'submitting'"></textarea>
+        <kh-metadata-selector label="Metadados do texto" [categories]="categories" [tags]="tags" [projects]="projects" [selection]="textSelection" [categoriesRequired]="true" [disabled]="textState.status === 'submitting'" (selectionChange)="textSelection = $event" />
+        <button class="submit" type="submit" [disabled]="textState.status === 'submitting'">{{ textState.status === "submitting" ? "Adicionando texto…" : "Adicionar texto" }}</button>
+        @if (textState.status === "submitting") { <kh-loading-state message="Processando texto e gerando embeddings…" /> }
+        @if (textState.status === "validation-error" || textState.status === "request-error") { <p class="notice notice--error" role="alert">{{ textState.message }}</p> }
+        @if (textState.status === "duplicate") { <p class="notice notice--error" role="alert">{{ textState.message }} @if (textState.existingSourceId) { <a [routerLink]="['/sources', textState.existingSourceId]">Abrir fonte existente</a> }</p> }
+        @if (textState.status === "success" && textState.result; as result) { <section class="notice notice--success" aria-live="polite"><h2>Texto adicionado</h2><p><strong>{{ result.title }}</strong></p><p>ID da fonte: <code>{{ result.source_id }}</code></p><p>{{ result.chunks_created }} chunks criados.</p><a [routerLink]="['/sources', result.source_id]">Abrir fonte</a></section> }
+      </form>
+    }
+  }
+</section>

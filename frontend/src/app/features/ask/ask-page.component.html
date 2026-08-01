@@ -1,0 +1,44 @@
+<section class="ask-page" aria-labelledby="ask-title">
+  <header class="page-header"><p class="eyebrow page-header__eyebrow">Conhecimento</p><h1 id="ask-title">Pergunte à base</h1><p class="page-header__description">Obtenha uma resposta e confira as fontes que a sustentam.</p></header>
+
+  <form class="ask-form surface-card" (ngSubmit)="ask()" #askForm="ngForm">
+    <div class="ask-form__intro"><label for="question">Qual é a sua pergunta?</label><span>A resposta será acompanhada pelas fontes consultadas.</span></div>
+    <div class="query-row"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 20a8 8 0 1 0-6.2-2.95L4 21l3.95-1.8A8 8 0 0 0 12 20Z"></path><path d="M9 11h.01M12 11h.01M15 11h.01"></path></svg><input class="form-control" id="question" name="question" [(ngModel)]="query" required [disabled]="status === 'loading'" placeholder="Ex.: quais decisões foram tomadas?" /><button class="button-primary" type="submit" [disabled]="askForm.invalid || status === 'loading'">{{ status === "loading" ? "Consultando…" : "Perguntar à base" }}</button></div>
+
+    <details class="advanced-filters">
+      <summary><span>Refinar resposta</span><small>Fontes, precisão e contexto</small></summary>
+      <div class="filters" aria-label="Filtros da resposta">
+      <label>Limite <input name="limit" type="number" min="1" max="20" [(ngModel)]="limit" [disabled]="status === 'loading'" /></label>
+      <label>Score mínimo <input name="min-score" type="number" min="0" max="1" step="0.01" [(ngModel)]="minScore" [disabled]="status === 'loading'" /></label>
+      <label class="checkbox"><input name="match-reasons" type="checkbox" [(ngModel)]="includeMatchReasons" [disabled]="status === 'loading'" /> Mostrar motivos de correspondência</label>
+      </div>
+
+      <div class="metadata-filters">
+      <label for="category">Categoria<select id="category" [disabled]="status === 'loading'" (change)="addCategory($any($event.target).value)"><option value="">Adicionar categoria</option>@for (category of categoryOptions; track category.id) { <option [value]="category.id">{{ category.name }}</option> }</select></label>
+      <label for="project">Projeto<select id="project" [disabled]="status === 'loading'" (change)="addProject($any($event.target).value)"><option value="">Adicionar projeto</option>@for (project of projectOptions; track project.id) { <option [value]="project.id">{{ project.name }}{{ project.status === 'archived' ? ' (arquivado)' : '' }}</option> }</select></label>
+      <label for="tag">Tag<input id="tag" name="tag" [(ngModel)]="tagQuery" (ngModelChange)="onTagInput()" [disabled]="status === 'loading'" autocomplete="off" placeholder="Digite para sugerir" /></label>
+      @if (tagOptions.length) { <ul class="suggestions" role="listbox" aria-label="Sugestões de tags">@for (tag of tagOptions; track tag.id) { <li><button type="button" (click)="addTag(tag)">{{ tag.name }}</button></li> }</ul> }
+      </div>
+    </details>
+
+    @if (metadataError) { <p class="notice notice--error" role="alert">{{ metadataError }} <button type="button" (click)="loadMetadata()">Recarregar filtros</button></p> }
+    <div class="chips" aria-label="Filtros aplicados">
+      @for (category of selectedCategories; track category.id) { <button type="button" class="chip" (click)="removeCategory(category.id)">Categoria: {{ category.name }} ×</button> }
+      @for (tag of selectedTags; track tag.id) { <button type="button" class="chip" (click)="removeTag(tag.id)">Tag: {{ tag.name }} ×</button> }
+      @for (project of selectedProjects; track project.id) { <button type="button" class="chip" (click)="removeProject(project.id)">Projeto: {{ project.name }} ×</button> }
+    </div>
+  </form>
+
+  <div class="answers" aria-live="polite">
+    @if (status === "error") { <p class="notice notice--error" role="alert">{{ message }} @if (message.includes('não existe')) { <button type="button" (click)="loadMetadata()">Recarregar filtros</button> } @if (message.includes('indisponíveis')) { <button type="button" (click)="ask()">Tentar novamente</button> }</p> }
+    @if (status === "loading") { <p class="notice">Consultando a base e preparando a resposta…</p> }
+    @if (status === "success-without-sources") { <p class="notice">A resposta não tem fontes recuperadas para auditoria. Ajuste a pergunta ou os filtros se precisar de referências.</p> }
+    @if (copyFeedback) { <p class="sr-only" role="status">{{ copyFeedback }}</p> }
+    @for (entry of history; track entry.id) {
+      <article class="answer-card"><header><div><p class="answer-card__eyebrow">Resposta para</p><p class="question">{{ entry.query }}</p></div><div class="actions"><button type="button" (click)="copyAnswer(entry)">Copiar resposta</button><button type="button" [disabled]="!entry.sources.length" (click)="copyReferences(entry)">Copiar referências</button></div></header>
+        <p class="answer-text">{{ entry.answer }}</p>
+        @if (entry.sources.length) { <section class="sources" [attr.aria-label]="'Fontes para: ' + entry.query"><h2>Fontes usadas</h2>@for (source of entry.sources; track source.id) { <article class="source-card"><div class="source-heading"><div><h3><a [routerLink]="['/sources', source.source_id]">{{ source.source_title }}</a></h3><p class="location">{{ location(source) }}</p></div>@if (source.score !== null) { <span class="score">Score {{ source.score | number:'1.2-2' }}</span> } @else { <span class="score score--unavailable">Score vetorial indisponível</span> }</div><p class="excerpt">{{ source.content }}</p><div class="source-meta">@for (category of source.categories; track category.id) { <span class="meta-chip">{{ category.name }}</span> } @for (tag of source.tags; track tag.id) { <span class="meta-chip">#{{ tag.name }}</span> } @for (project of source.projects; track project.id) { <span class="meta-chip">{{ project.name }}</span> }</div>@if (entry.includeMatchReasons && source.match_reasons?.length) { <p class="reasons">Motivos: {{ source.match_reasons.join(', ') }}</p> }</article> }</section> }
+      </article>
+    }
+  </div>
+</section>

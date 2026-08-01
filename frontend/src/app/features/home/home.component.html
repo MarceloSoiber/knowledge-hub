@@ -1,0 +1,76 @@
+<section class="dashboard" aria-labelledby="dashboard-title">
+  <header class="dashboard__header page-header">
+    <p class="eyebrow page-header__eyebrow">Acervo de conhecimento</p>
+    <h1 id="dashboard-title">Encontre o que importa.</h1>
+    <p class="page-header__description">Pesquise documentos, recupere decisões e organize o conhecimento que sustenta seu trabalho.</p>
+  </header>
+
+  <section class="quick-actions" aria-label="Busca no acervo">
+    <form class="knowledge-search" (ngSubmit)="search()">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"></circle><path d="m16 16 4 4"></path></svg>
+      <label class="sr-only" for="home-search">Pesquise no seu acervo</label>
+      <input id="home-search" name="home-search" [(ngModel)]="searchQuery" [disabled]="searchStatus === 'loading'" placeholder="Pesquise no seu acervo" autocomplete="off" />
+      <button type="submit" [disabled]="!searchQuery.trim() || searchStatus === 'loading'">{{ searchStatus === "loading" ? "Buscando…" : "Buscar" }}</button>
+    </form>
+    <div class="secondary-actions"><a routerLink="/perguntar">Pergunte à base <span aria-hidden="true">↗</span></a><a routerLink="/ingestao">Adicionar fonte <span aria-hidden="true">↗</span></a><a routerLink="/busca">Busca avançada <span aria-hidden="true">→</span></a></div>
+
+    @if (searchStatus !== "idle") {
+      <div class="home-results" aria-live="polite">
+        @if (searchStatus === "loading") { <p class="search-feedback">Procurando trechos relevantes…</p> }
+        @if (searchStatus === "error") { <p class="search-feedback search-feedback--error" role="alert">{{ searchMessage }}</p> }
+        @if (searchStatus === "success" && !searchResults.length) { <p class="search-feedback">Nenhum resultado encontrado. Tente outros termos ou use a busca avançada.</p> }
+        @if (searchStatus === "success" && searchResults.length) {
+          <div class="home-results__heading"><p>Resultados para “{{ searchQuery.trim() }}”</p><a routerLink="/busca">Abrir busca avançada</a></div>
+          <ul class="home-results__list">
+            @for (result of searchResults; track result.id) {
+              <li><a [routerLink]="['/sources', result.source_id]"><span><strong>{{ result.source_title }}</strong><small>{{ resultLocation(result) }}</small></span><span class="home-result__excerpt">{{ result.content }}</span><span aria-hidden="true">→</span></a></li>
+            }
+          </ul>
+        }
+      </div>
+    }
+  </section>
+
+  <div class="dashboard-grid">
+    <section class="recent" aria-labelledby="recent-title">
+      <div class="section-heading">
+        <div><p class="section-kicker">Continue explorando</p><h2 id="recent-title">Adicionados recentemente</h2></div>
+        <a routerLink="/biblioteca">Ver biblioteca</a>
+      </div>
+      @if (sourcesState.loading) {
+        <kh-loading-state message="Carregando fontes recentes…" />
+      } @else if (sourcesState.error) {
+        <kh-error-state title="Fontes indisponíveis" [message]="sourcesState.error" [showRetry]="true" (retry)="loadSources()" />
+      } @else if (!sourcesState.items.length) {
+        <kh-empty-state title="Nenhuma fonte no acervo" description="Comece adicionando a primeira fonte à sua base.">
+          <a class="empty-action" routerLink="/ingestao">Iniciar ingestão</a>
+        </kh-empty-state>
+      } @else {
+        <ul class="recent-list">
+          @for (source of recentSources; track source.source_id) {
+            <li><a [routerLink]="['/sources', source.source_id]"><span class="source-card__topline"><span class="source-type"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"></path><path d="M14 3v5h5"></path></svg>{{ source.source_type }}</span><span>{{ formatSourceDate(source) }}</span></span><span class="recent-list__title">{{ source.title }}</span><span class="source-card__metadata">@if (source.categories.length) { {{ source.categories[0].name }} } @else { Sem categoria } @if (source.tags.length) { · #{{ source.tags[0].name }} }</span><span class="source-card__open">Abrir fonte <span aria-hidden="true">→</span></span></a></li>
+          }
+        </ul>
+      }
+    </section>
+
+    <section class="overview" aria-labelledby="metrics-title">
+      <div><p class="section-kicker">Visão do acervo</p><h2 id="metrics-title">Em números</h2><p class="overview__description">Uma visão rápida do que já está disponível para pesquisar.</p></div>
+      <div class="metrics" role="list">
+      @for (metric of metrics; track metric.label) {
+        <article class="metric" role="listitem" [attr.aria-label]="metric.label">
+          <h3>{{ metric.label }}</h3>
+          @if (metric.loading) {
+            <kh-loading-state message="Carregando…" />
+          } @else if (metric.error) {
+            <p class="metric__error" role="alert">{{ metric.error }}</p>
+            <button type="button" (click)="metric.retry()">Tentar novamente</button>
+          } @else {
+            <p class="metric__value" aria-label="{{ metric.value }} {{ metric.label }}">{{ metric.value }}</p>
+          }
+        </article>
+      }
+      </div>
+    </section>
+  </div>
+</section>
