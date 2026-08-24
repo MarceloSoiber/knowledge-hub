@@ -9,14 +9,21 @@ deploy_develop:
   environment:
     name: development
   before_script:
-    - test -s "$SSH_PRIVATE_KEY"
+    # Keep the deploy key on one line in GitLab to avoid altering its PEM/OpenSSH format.
+    - test -n "$SSH_PRIVATE_KEY_B64"
     - test -s "$SSH_KNOWN_HOSTS"
     - command -v ssh
-    - chmod 600 "$SSH_PRIVATE_KEY"
+    - command -v ssh-keygen
+    - command -v base64
+    - export SSH_PRIVATE_KEY_FILE="$(mktemp)"
+    - trap 'rm -f "$SSH_PRIVATE_KEY_FILE"' EXIT
+    - printf '%s' "$SSH_PRIVATE_KEY_B64" | base64 --decode > "$SSH_PRIVATE_KEY_FILE"
+    - ssh-keygen -y -f "$SSH_PRIVATE_KEY_FILE" >/dev/null
+    - chmod 600 "$SSH_PRIVATE_KEY_FILE"
   script:
     - |
       ssh \
-        -i "$SSH_PRIVATE_KEY" \
+        -i "$SSH_PRIVATE_KEY_FILE" \
         -o IdentitiesOnly=yes \
         -o StrictHostKeyChecking=yes \
         -o UserKnownHostsFile="$SSH_KNOWN_HOSTS" \
