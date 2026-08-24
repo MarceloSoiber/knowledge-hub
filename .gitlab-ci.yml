@@ -28,12 +28,14 @@ deploy_develop:
         -o StrictHostKeyChecking=yes \
         -o UserKnownHostsFile="$SSH_KNOWN_HOSTS" \
         "$DEV_USER@$DEV_HOST" \
-        bash -s -- "$DEV_DEPLOY_PATH" "$CI_COMMIT_SHA" <<'REMOTE_SCRIPT'
+        bash -s -- "$DEV_DEPLOY_ROOT" "$CI_PROJECT_NAME" "$CI_COMMIT_SHA" <<'REMOTE_SCRIPT'
       # Print remote commands in the job log to make deployment failures diagnosable.
       set -eux
 
-      deploy_path="$1"
-      commit_sha="$2"
+      deploy_root="$1"
+      project_name="$2"
+      commit_sha="$3"
+      deploy_path="$deploy_root/$project_name"
 
       test -d "$deploy_path/.git"
       cd "$deploy_path"
