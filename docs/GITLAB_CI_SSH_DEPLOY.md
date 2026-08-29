@@ -77,6 +77,11 @@ separar a configuração dos ambientes. Este projeto fornece modelos seguros em
 `MCP_PUBLIC_URL` correspondente. Copie o conteúdo do modelo apropriado para a
 variável File no GitLab; não cadastre o `.env` real no repositório.
 
+Se mudar `POSTGRES_PASSWORD`, atualize a mesma senha dentro de `POSTGRES_DSN`.
+Em bancos já criados, altere também a senha do role `postgres` no próprio
+PostgreSQL; a variável do Compose só é aplicada durante a inicialização do
+volume.
+
 ## 4. Modelo de preparo no pipeline
 
 O bloco abaixo aceita `PROD_SSH_KNOWN_HOSTS` tanto como variável File quanto
