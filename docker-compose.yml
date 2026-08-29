@@ -11,7 +11,7 @@ services:
         condition: service_healthy
     environment:
       APP_NAME: "Knowledge Hub"
-      ENVIRONMENT: development
+      ENVIRONMENT: "${ENVIRONMENT:-development}"
       FRONTEND_ORIGIN: "${FRONTEND_ORIGIN:-http://localhost:8080}"
       POSTGRES_DSN: "${POSTGRES_DSN:-postgresql+asyncpg://postgres:postgres@host.docker.internal:15432/knowledge_hub}"
       LLM_PROVIDER: "${LLM_PROVIDER:-local}"
@@ -75,7 +75,7 @@ services:
     command: ["mcp-server"]
     environment:
       APP_NAME: "Knowledge Hub"
-      ENVIRONMENT: development
+      ENVIRONMENT: "${ENVIRONMENT:-development}"
       POSTGRES_DSN: "${POSTGRES_DSN:-postgresql+asyncpg://postgres:postgres@host.docker.internal:15432/knowledge_hub}"
       LLM_PROVIDER: "${LLM_PROVIDER:-local}"
       LOCAL_LLM_BASE_URL: "${DOCKER_LOCAL_LLM_BASE_URL:-http://host.docker.internal:1234}"

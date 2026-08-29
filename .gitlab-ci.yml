@@ -12,7 +12,9 @@ deploy_develop:
     # Keep the deploy key on one line in GitLab to avoid altering its PEM/OpenSSH format.
     - test -n "$SSH_PRIVATE_KEY_B64"
     - test -s "$SSH_KNOWN_HOSTS"
+    - test -s "$DEV_ENV_FILE"
     - command -v ssh
+    - command -v scp
     - command -v ssh-keygen
     - command -v base64
     - export SSH_PRIVATE_KEY_FILE="$(mktemp)"
@@ -29,7 +31,6 @@ deploy_develop:
         -o UserKnownHostsFile="$SSH_KNOWN_HOSTS" \
         "$DEV_USER@$DEV_HOST" \
         bash -s -- "$DEV_DEPLOY_ROOT" "$CI_PROJECT_NAME" "$CI_COMMIT_SHA" <<'REMOTE_SCRIPT'
-      # Print remote commands in the job log to make deployment failures diagnosable.
       set -eux
 
       deploy_root="$1"
@@ -43,8 +44,30 @@ deploy_develop:
       # The checkout on the development VM must have origin pointing at this GitLab project.
       git fetch --depth 1 origin "$commit_sha"
       git checkout --detach "$commit_sha"
+      REMOTE_SCRIPT
 
-      # Environment-specific values stay in the VM's untracked .env file.
+      scp \
+        -i "$SSH_PRIVATE_KEY_FILE" \
+        -o IdentitiesOnly=yes \
+        -o StrictHostKeyChecking=yes \
+        -o UserKnownHostsFile="$SSH_KNOWN_HOSTS" \
+        "$DEV_ENV_FILE" \
+        "$DEV_USER@$DEV_HOST:$DEV_DEPLOY_ROOT/$CI_PROJECT_NAME/.env"
+
+      ssh \
+        -i "$SSH_PRIVATE_KEY_FILE" \
+        -o IdentitiesOnly=yes \
+        -o StrictHostKeyChecking=yes \
+        -o UserKnownHostsFile="$SSH_KNOWN_HOSTS" \
+        "$DEV_USER@$DEV_HOST" \
+        bash -s -- "$DEV_DEPLOY_ROOT" "$CI_PROJECT_NAME" <<'REMOTE_SCRIPT'
+      set -eux
+
+      deploy_root="$1"
+      project_name="$2"
+      deploy_path="$deploy_root/$project_name"
+
+      cd "$deploy_path"
       docker compose config --quiet
       docker compose up -d --build --remove-orphans
 
@@ -63,3 +86,94 @@ deploy_develop:
       REMOTE_SCRIPT
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop"'
+
+deploy_master:
+  stage: deploy
+  tags:
+    - docker-deploy
+  resource_group: production
+  environment:
+    name: production
+  before_script:
+    # Keep the deploy key on one line in GitLab to avoid altering its PEM/OpenSSH format.
+    - test -n "$PROD_SSH_PRIVATE_KEY_B64"
+    # Accept a GitLab File variable (recommended) or a plain, unmasked text variable.
+    - test -n "$PROD_SSH_KNOWN_HOSTS"
+    - test -s "$PROD_ENV_FILE"
+    - command -v ssh
+    - command -v scp
+    - command -v ssh-keygen
+    - command -v base64
+    - export SSH_PRIVATE_KEY_FILE="$(mktemp)"
+    - export PROD_SSH_KNOWN_HOSTS_FILE="$(mktemp)"
+    - trap 'rm -f "$SSH_PRIVATE_KEY_FILE" "$PROD_SSH_KNOWN_HOSTS_FILE"' EXIT
+    - printf '%s' "$PROD_SSH_PRIVATE_KEY_B64" | base64 --decode > "$SSH_PRIVATE_KEY_FILE"
+    - ssh-keygen -y -f "$SSH_PRIVATE_KEY_FILE" >/dev/null
+    - chmod 600 "$SSH_PRIVATE_KEY_FILE"
+    - 'if [ -f "$PROD_SSH_KNOWN_HOSTS" ]; then cp "$PROD_SSH_KNOWN_HOSTS" "$PROD_SSH_KNOWN_HOSTS_FILE"; else printf "%s\\n" "$PROD_SSH_KNOWN_HOSTS" > "$PROD_SSH_KNOWN_HOSTS_FILE"; fi'
+    - test -s "$PROD_SSH_KNOWN_HOSTS_FILE"
+    - chmod 600 "$PROD_SSH_KNOWN_HOSTS_FILE"
+  script:
+    - |
+      ssh \
+        -i "$SSH_PRIVATE_KEY_FILE" \
+        -o IdentitiesOnly=yes \
+        -o StrictHostKeyChecking=yes \
+        -o UserKnownHostsFile="$PROD_SSH_KNOWN_HOSTS_FILE" \
+        "$PROD_USER@$PROD_HOST" \
+        bash -s -- "$PROD_DEPLOY_ROOT" "$CI_PROJECT_NAME" "$CI_COMMIT_SHA" <<'REMOTE_SCRIPT'
+      set -eux
+
+      deploy_root="$1"
+      project_name="$2"
+      commit_sha="$3"
+      deploy_path="$deploy_root/$project_name"
+
+      test -d "$deploy_path/.git"
+      cd "$deploy_path"
+
+      # The checkout on the production VM must have origin pointing at this GitLab project.
+      git fetch --depth 1 origin "$commit_sha"
+      git checkout --detach "$commit_sha"
+      REMOTE_SCRIPT
+
+      scp \
+        -i "$SSH_PRIVATE_KEY_FILE" \
+        -o IdentitiesOnly=yes \
+        -o StrictHostKeyChecking=yes \
+        -o UserKnownHostsFile="$PROD_SSH_KNOWN_HOSTS_FILE" \
+        "$PROD_ENV_FILE" \
+        "$PROD_USER@$PROD_HOST:$PROD_DEPLOY_ROOT/$CI_PROJECT_NAME/.env"
+
+      ssh \
+        -i "$SSH_PRIVATE_KEY_FILE" \
+        -o IdentitiesOnly=yes \
+        -o StrictHostKeyChecking=yes \
+        -o UserKnownHostsFile="$PROD_SSH_KNOWN_HOSTS_FILE" \
+        "$PROD_USER@$PROD_HOST" \
+        bash -s -- "$PROD_DEPLOY_ROOT" "$CI_PROJECT_NAME" <<'REMOTE_SCRIPT'
+      set -eux
+
+      deploy_root="$1"
+      project_name="$2"
+      deploy_path="$deploy_root/$project_name"
+
+      cd "$deploy_path"
+      docker compose config --quiet
+      docker compose up -d --build --remove-orphans
+
+      for _ in $(seq 1 30); do
+        status="$(docker inspect knowledge-hub-backend --format '{{.State.Health.Status}}' 2>/dev/null || true)"
+        if [ "$status" = healthy ]; then
+          break
+        fi
+        sleep 2
+      done
+
+      test "$status" = healthy
+      docker compose ps
+      docker compose exec -T backend python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5).read()"
+      docker compose exec -T frontend wget -q -O /dev/null http://127.0.0.1/
+      REMOTE_SCRIPT
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master"'

@@ -307,17 +307,24 @@ npm run frontend:quality
 npm run quality
 ```
 
-## GitLab CI/CD: build and production deployment
+## GitLab CI/CD: development and production deployment
 
-The repository contains a production deploy pipeline in `.gitlab-ci.yml`. It
-runs a single `deploy` stage only when a pipeline targets the GitLab default
-branch. The runner must have the `docker-deploy` tag.
+For a reusable, step-by-step SSH and GitLab-variable setup for this and future
+projects, see [GitLab CI/CD: deploy seguro por SSH](docs/GITLAB_CI_SSH_DEPLOY.md).
 
-The job intentionally runs Docker Compose **on the GitLab runner host**. That
-runner must therefore be the approved production deployment host, have Docker
-Engine plus the Compose v2 plugin installed, and have access to the local model
-server and PostgreSQL network route. Do not use an arbitrary shared runner for
-this job.
+The repository contains two deployment jobs in `.gitlab-ci.yml`, both run by a
+GitLab runner tagged `docker-deploy`:
+
+- `deploy_develop` runs only for the `develop` branch and deploys to the
+  development VM.
+- `deploy_master` runs only for the `master` branch and deploys to the
+  production Master VM.
+
+The runner connects to each target through SSH; Docker Compose runs **on the
+target VM**, not on the GitLab runner. The deployment VM must have Docker
+Engine and the Compose plugin installed, while the runner needs SSH, `ssh-keygen`
+and `base64` available. Do not configure either job to use an arbitrary shared
+runner without the required protected SSH credentials.
 
 ### What the pipeline does
 
@@ -332,40 +339,54 @@ this job.
 The deployed container names are `knowledge-hub-postgres`,
 `knowledge-hub-backend`, `knowledge-hub-frontend`, and `knowledge-hub-mcp`.
 
-### Required GitLab runner setup
+### Required target VM setup
 
-Configure a runner on the deployment host with:
+For each deployment VM, configure:
 
-- tag: `docker-deploy`
-- Docker Engine and `docker compose` available to the runner user
-- permission to manage the deployment Docker daemon
-- a checkout directory containing this repository and its Compose files
-- network access from containers to the local LLM endpoint
+- Docker Engine and `docker compose` available to the SSH user.
+- permission for that user to manage Docker.
+- a checkout at `$DEPLOY_ROOT/$CI_PROJECT_NAME`, with `origin` pointing to this
+  GitLab project.
+- an untracked, environment-specific `.env` file in that checkout.
+- network access from containers to the local LLM endpoint.
 - firewall rules allowing only the intended ports: backend `8000`, frontend
-  `8080`, MCP `8001`, and optionally PostgreSQL `5432`
+  `8080`, MCP `8001`, and optionally PostgreSQL `5432`.
 
-The pipeline currently uses these non-secret deployment values:
+The Master VM is `192.168.15.128`. Its non-secret deployment values include:
 
 ```yaml
 POSTGRES_HOST_PORT: "5432"
 POSTGRES_DSN: "postgresql+asyncpg://postgres:postgres@host.docker.internal:5432/knowledge_hub"
 DOCKER_LOCAL_LLM_BASE_URL: "http://192.168.15.114:1234"
 EMBEDDING_VERSION: "default"
-MCP_PUBLIC_URL: "http://192.168.15.125:8001"
+MCP_PUBLIC_URL: "http://192.168.15.128:8001"
 ```
 
-Replace the addresses with your own infrastructure values before deployment.
-For credentials or optional cloud-provider settings, add GitLab CI/CD variables
-under **Settings → CI/CD → Variables**, mark secrets as *masked* and
-*protected*, and do not place them in `.gitlab-ci.yml` or `.env` committed to
-the repository. Typical protected variables are `API_KEY`, `API_LLM_BASE_URL`,
-and `API_LLM_MODEL` when an external provider is intentionally enabled.
+Configure the following protected GitLab CI/CD variables for the Master job:
+
+```text
+PROD_HOST=192.168.15.128
+PROD_USER=<SSH user on Master>
+PROD_DEPLOY_ROOT=<absolute checkout parent directory on Master>
+PROD_SSH_PRIVATE_KEY_B64=<base64-encoded private key>
+PROD_SSH_KNOWN_HOSTS=<known_hosts file variable>
+PROD_ENV_FILE=<production .env file variable>
+```
+
+Configure the equivalent `DEV_*` variables for the development job, including
+`DEV_ENV_FILE`. The pipeline copies the File variable to the target as `.env`
+after checking out the release, so each environment keeps its own configuration.
+Use [the environment templates](deploy/env) as a starting point. Keep
+credentials and optional cloud-provider settings as masked, protected GitLab
+variables; do not commit them to `.gitlab-ci.yml` or `.env`. Typical protected
+application variables are `API_KEY`, `API_LLM_BASE_URL`, and `API_LLM_MODEL`
+when an external provider is intentionally enabled.
 
 ### Deploying through GitLab
 
-1. Ensure the target runner is online and tagged `docker-deploy`.
-2. Configure the deployment values and protected secrets in GitLab.
-3. Merge the desired change into the repository default branch.
+1. Ensure the GitLab runner is online and tagged `docker-deploy`.
+2. Configure the deployment variables and protected SSH credentials in GitLab.
+3. Push the desired change to `develop` for development or `master` for Master.
 4. Open **Build → Pipelines** in GitLab and follow the `deploy` job logs.
 5. Confirm the final health checks and open the frontend and MCP URLs.
 
@@ -395,7 +416,7 @@ you explicitly intend to create or rotate it.
 | `401 Unauthorized` from API or MCP | Create or rotate the token, then send it as a Bearer token. |
 | Frontend cannot call the API | Check `FRONTEND_ORIGIN`, backend health, and browser network errors. |
 | Port already in use | Run `docker compose ps`, identify the listener, then stop the relevant Compose service. |
-| GitLab job does not start | Confirm the default-branch rule, runner availability, and the `docker-deploy` runner tag. |
+| GitLab job does not start | Confirm the `develop` or `master` branch rule, runner availability, and the `docker-deploy` runner tag. |
 
 ## Security notes
 
