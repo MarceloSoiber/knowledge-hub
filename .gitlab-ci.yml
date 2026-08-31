@@ -8,10 +8,10 @@ variables:
   AST_ENABLE_MR_PIPELINES: "true"
 
 default:
-  # The project's available runner is restricted to this tag. Applying it here
-  # also schedules the jobs created by the security templates.
+  # Security scanning runs on the dedicated Docker runner. Deployment jobs
+  # explicitly retain the docker-deploy tag below.
   tags:
-    - docker-deploy
+    - security
 
 stages:
   - test
