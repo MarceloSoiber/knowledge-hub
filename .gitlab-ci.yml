@@ -7,6 +7,12 @@ variables:
   # Execute the security scanners in merge-request pipelines as well as branches.
   AST_ENABLE_MR_PIPELINES: "true"
 
+default:
+  # The project's available runner is restricted to this tag. Applying it here
+  # also schedules the jobs created by the security templates.
+  tags:
+    - docker-deploy
+
 stages:
   - test
   - deploy
