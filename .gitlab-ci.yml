@@ -1,4 +1,14 @@
+include:
+  - template: Jobs/SAST.gitlab-ci.yml
+  - template: Jobs/Secret-Detection.gitlab-ci.yml
+  - template: Jobs/Dependency-Scanning.v2.gitlab-ci.yml
+
+variables:
+  # Execute the security scanners in merge-request pipelines as well as branches.
+  AST_ENABLE_MR_PIPELINES: "true"
+
 stages:
+  - test
   - deploy
 
 deploy_develop:
