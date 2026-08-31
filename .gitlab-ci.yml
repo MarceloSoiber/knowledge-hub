@@ -6,6 +6,8 @@ include:
 variables:
   # Execute the security scanners in merge-request pipelines as well as branches.
   AST_ENABLE_MR_PIPELINES: "true"
+  # The committed uv.lock is scanned directly; skip the Python resolver sidecar.
+  DS_DISABLED_RESOLUTION_JOBS: "python"
 
 default:
   # Security scanning runs on the dedicated Docker runner. Deployment jobs
