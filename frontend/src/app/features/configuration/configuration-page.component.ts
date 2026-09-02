@@ -48,13 +48,17 @@ export class ConfigurationPageComponent {
     });
   }
 
-  origin(key: string): string { return this.configuration?.origins[key] === "portal" ? "Portal" : "Ambiente"; }
+  origin(key: string): string { return this.configuration?.origins?.[key] === "portal" ? "Portal" : "Ambiente"; }
   get isApiProvider(): boolean { return this.provider === "api"; }
 
   private apply(configuration: AIConfiguration): void {
-    this.configuration = configuration; this.provider = configuration.llm_provider;
-    this.localBaseUrl = configuration.local_llm_base_url; this.localModel = configuration.local_llm_model;
-    this.apiBaseUrl = configuration.api_llm_base_url; this.apiModel = configuration.api_llm_model;
-    this.embeddingModel = configuration.embedding_model; this.vectorDim = configuration.vector_dim;
+    this.configuration = { ...configuration, origins: configuration.origins ?? {} };
+    this.provider = configuration.llm_provider === "api" ? "api" : "local";
+    this.localBaseUrl = configuration.local_llm_base_url || "http://127.0.0.1:1234";
+    this.localModel = configuration.local_llm_model || "gemma-4-12b-it";
+    this.apiBaseUrl = configuration.api_llm_base_url || "https://api.openai.com/v1";
+    this.apiModel = configuration.api_llm_model || "gpt-4.1-mini";
+    this.embeddingModel = configuration.embedding_model || "text-embedding-nomic-embed-text-v1.5";
+    this.vectorDim = configuration.vector_dim || 768;
   }
 }

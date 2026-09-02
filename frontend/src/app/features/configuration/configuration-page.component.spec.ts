@@ -43,4 +43,13 @@ describe("ConfigurationPageComponent", () => {
     }));
     expect(api.updateAiConfiguration.mock.calls[0][0].api_key).toBeUndefined();
   });
+
+  it("keeps the form usable when an older API response omits origins", () => {
+    fixture.componentInstance["apply"]({ ...configuration, origins: undefined } as unknown as typeof configuration);
+    fixture.componentInstance.status = "idle";
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.origin("local_llm_base_url")).toBe("Ambiente");
+    expect(fixture.nativeElement.querySelector('[name="localBaseUrl"]')?.value).toBe("http://127.0.0.1:1234");
+  });
 });
