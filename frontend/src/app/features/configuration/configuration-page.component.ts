@@ -1,6 +1,7 @@
-import { Component, inject } from "@angular/core";
+import { ChangeDetectorRef, Component, inject } from "@angular/core";
 import { HttpErrorResponse } from "@angular/common/http";
 import { FormsModule } from "@angular/forms";
+import { timeout } from "rxjs";
 
 import { toApiError } from "../../core/api-error";
 import { AIConfiguration, AIConfigurationWrite, LLMProvider } from "../../core/knowledge.types";
@@ -14,9 +15,12 @@ import { KnowledgeApiService } from "../../core/knowledge-api.service";
 })
 export class ConfigurationPageComponent {
   private readonly api = inject(KnowledgeApiService);
+  private readonly changeDetector = inject(ChangeDetectorRef);
   configuration: AIConfiguration | null = null;
   provider: LLMProvider = "local";
-  localBaseUrl = ""; localModel = ""; apiBaseUrl = ""; apiModel = ""; apiKey = ""; embeddingModel = ""; vectorDim = 768;
+  localBaseUrl = "http://127.0.0.1:1234"; localModel = "gemma-4-12b-it";
+  apiBaseUrl = "https://api.openai.com/v1"; apiModel = "gpt-4.1-mini"; apiKey = "";
+  embeddingModel = "text-embedding-nomic-embed-text-v1.5"; vectorDim = 768;
   status: "loading" | "idle" | "saving" | "error" | "success" = "loading";
   message = "";
 
@@ -24,9 +28,13 @@ export class ConfigurationPageComponent {
 
   load(): void {
     this.status = "loading"; this.message = "";
-    this.api.aiConfiguration().subscribe({
-      next: (configuration) => { this.apply(configuration); this.status = "idle"; },
-      error: (error: HttpErrorResponse) => { this.status = "error"; this.message = toApiError(error).message; },
+    this.api.aiConfiguration().pipe(timeout(10000)).subscribe({
+      next: (configuration) => {
+        this.apply(configuration); this.status = "idle"; this.changeDetector.markForCheck();
+      },
+      error: (error: HttpErrorResponse) => {
+        this.status = "error"; this.message = toApiError(error).message; this.changeDetector.markForCheck();
+      },
     });
   }
 
