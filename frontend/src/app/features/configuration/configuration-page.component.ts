@@ -51,8 +51,15 @@ export class ConfigurationPageComponent {
     if (this.apiKey.trim()) payload.api_key = this.apiKey.trim();
     this.status = "saving"; this.message = "";
     this.api.updateAiConfiguration(payload).subscribe({
-      next: (configuration) => { this.apply(configuration); this.apiKey = ""; this.status = "success"; this.message = "Configuração de IA salva. Novas requisições usarão os valores ativos."; },
-      error: (error: HttpErrorResponse) => { this.status = "error"; this.message = error.error?.detail ?? toApiError(error).message; },
+      next: (configuration) => {
+        this.apply(configuration); this.apiKey = ""; this.status = "success";
+        this.message = "Configuração de IA salva. Novas requisições usarão os valores ativos.";
+        this.changeDetector.detectChanges();
+      },
+      error: (error: HttpErrorResponse) => {
+        this.status = "error"; this.message = error.error?.detail ?? toApiError(error).message;
+        this.changeDetector.detectChanges();
+      },
     });
   }
 
