@@ -25,7 +25,7 @@ from .documents.extractors import (
     extract_document,
 )
 from .documents.normalizer import normalize_text
-from .embeddings import EmbeddingClient
+from .embeddings import EmbeddingClient, embedding_client_settings
 from .embedding_versions import active_embedding_identity, compute_embedding_content_hash
 from .projects import get_projects
 from .tags import get_tags
@@ -149,7 +149,7 @@ async def ingest_text_source(
         section_spans=section_spans,
     )
     chunk_contents = [chunk.content for chunk in chunks]
-    embedding_identity = active_embedding_identity()
+    embedding_identity = active_embedding_identity(embedding_client_settings(embedding_client))
     embedding_batch = await create_embedding_batch(
         session,
         embedding_identity,

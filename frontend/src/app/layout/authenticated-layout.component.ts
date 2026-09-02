@@ -19,14 +19,17 @@ export class AuthenticatedLayoutComponent {
   private readonly api = inject(KnowledgeApiService);
   private readonly router = inject(Router);
   @ViewChild("menuButton") private readonly menuButton?: ElementRef<HTMLButtonElement>;
+  @ViewChild("userMenuButton") private readonly userMenuButton?: ElementRef<HTMLButtonElement>;
   @ViewChild("globalSearchInput") private readonly globalSearchInput?: ElementRef<HTMLInputElement>;
   menuOpen = false;
+  userMenuOpen = false;
   showBackToTop = false;
   globalQuery = "";
   globalResults: KnowledgeChunk[] = [];
   globalSearchStatus: "idle" | "loading" | "error" = "idle";
 
   async logout(): Promise<void> {
+    this.closeUserMenu();
     this.auth.logout();
     await this.router.navigate(["/login"]);
   }
@@ -36,6 +39,16 @@ export class AuthenticatedLayoutComponent {
     this.menuOpen = false;
     if (returnFocus) this.menuButton?.nativeElement.focus();
   }
+
+  toggleUserMenu(): void { this.userMenuOpen = !this.userMenuOpen; }
+
+  closeUserMenu(returnFocus = false): void {
+    if (!this.userMenuOpen) return;
+    this.userMenuOpen = false;
+    if (returnFocus) this.userMenuButton?.nativeElement.focus();
+  }
+
+  toggleTheme(): void { this.theme.toggle(); this.closeUserMenu(true); }
 
   searchGlobal(): void {
     const query = this.globalQuery.trim();
@@ -55,7 +68,7 @@ export class AuthenticatedLayoutComponent {
   }
 
   @HostListener("document:keydown.escape")
-  onEscape(): void { this.closeMenu(true); this.closeGlobalSearch(); }
+  onEscape(): void { this.closeMenu(true); this.closeUserMenu(true); this.closeGlobalSearch(); }
 
   @HostListener("window:scroll")
   onScroll(): void { this.showBackToTop = window.scrollY > 480; }

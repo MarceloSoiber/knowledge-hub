@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     api_llm_base_url: str = Field(default="https://api.openai.com/v1")
     api_llm_model: str = Field(default="gpt-4.1-mini")
     api_key: str = Field(default="")
+    config_encryption_key: str = Field(default="")
 
     embedding_model: str = Field(default="text-embedding-nomic-embed-text-v1.5")
     embedding_version: str = Field(default="default")

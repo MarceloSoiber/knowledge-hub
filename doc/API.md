@@ -888,6 +888,67 @@ usar esta operação em dados importantes.
 
 ## Endpoints públicos
 
+## Configuração de IA
+
+As rotas abaixo exigem o mesmo Bearer token das rotas privadas. A configuração salva
+no portal tem precedência sobre o ambiente para novas requisições; valores ausentes
+continuam usando `LLM_PROVIDER`, `LOCAL_LLM_*`, `API_LLM_*`, `API_KEY`,
+`EMBEDDING_MODEL` e `VECTOR_DIM` do processo.
+
+`DOCKER_LOCAL_LLM_BASE_URL` não é uma configuração de runtime: ele somente fornece
+`LOCAL_LLM_BASE_URL` ao backend na criação do container pelo Docker Compose.
+
+### Consultar a configuração efetiva
+
+```http
+GET /api/v1/configuration/ai
+```
+
+A resposta informa o valor efetivo e sua origem. A chave nunca é retornada; somente
+`api_key_configured` indica se há uma chave disponível.
+
+```json
+{
+  "llm_provider": "local",
+  "local_llm_base_url": "http://192.168.15.114:1234",
+  "local_llm_model": "gpt-oss-20b",
+  "api_llm_base_url": "https://api.openai.com/v1",
+  "api_llm_model": "gpt-4.1-mini",
+  "api_key_configured": false,
+  "embedding_model": "text-embedding-nomic-embed-text-v1.5",
+  "vector_dim": 768,
+  "origins": { "local_llm_base_url": "portal" }
+}
+```
+
+### Atualizar a configuração de runtime
+
+```http
+PUT /api/v1/configuration/ai
+Content-Type: application/json
+```
+
+```json
+{
+  "llm_provider": "local",
+  "local_llm_base_url": "http://192.168.15.114:1234",
+  "local_llm_model": "gpt-oss-20b",
+  "api_llm_base_url": "https://api.openai.com/v1",
+  "api_llm_model": "gpt-4.1-mini",
+  "embedding_model": "text-embedding-nomic-embed-text-v1.5",
+  "vector_dim": 768
+}
+```
+
+Para usar `llm_provider: "api"`, envie `api_key` na primeira configuração ou mantenha
+uma chave já salva. A chave é cifrada com `CONFIG_ENCRYPTION_KEY`, que deve existir
+somente no ambiente do backend. O valor de `VECTOR_DIM` é exibido mas não pode ser
+alterado nesta rota: a alteração requer uma migração de `pgvector`, reconstrução de
+índices e reindexação; a API retorna `409 Conflict` para proteger a base atual.
+
+Trocar provedor ou modelo de embeddings faz os vetores existentes ficarem
+incompatíveis. Execute a reindexação antes de esperar resultados vetoriais completos.
+
 ### Identificação da API
 
 ```http

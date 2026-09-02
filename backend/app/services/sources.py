@@ -15,7 +15,7 @@ from .categories import get_categories
 from .documents.chunker import chunk_text_with_locations, detect_markdown_sections
 from .documents.extractors import EmptyDocumentError
 from .documents.normalizer import normalize_text
-from .embeddings import EmbeddingClient
+from .embeddings import EmbeddingClient, embedding_client_settings
 from .embedding_versions import active_embedding_identity, compute_embedding_content_hash
 from .ingestion import (
     DuplicateSourceContentError,
@@ -93,7 +93,7 @@ async def update_source(
 
     chunks = chunk_text_with_locations(text, section_spans=detect_markdown_sections(text))
     chunk_contents = [chunk.content for chunk in chunks]
-    embedding_identity = active_embedding_identity()
+    embedding_identity = active_embedding_identity(embedding_client_settings(embedding_client))
     embedding_batch = await create_embedding_batch(
         session,
         embedding_identity,

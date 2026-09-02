@@ -13,7 +13,7 @@ from ..repositories.sources import list_sources as list_source_records
 from ..schemas.knowledge import KnowledgeChunkRead
 from .categories import get_categories
 from .embedding_versions import active_embedding_identity
-from .embeddings import EmbeddingClient
+from .embeddings import EmbeddingClient, embedding_client_settings
 from .rag import AnswerClient
 from .projects import get_projects
 from .tags import get_tags
@@ -80,7 +80,7 @@ async def search_knowledge(
     if latency_ms is not None:
         latency_ms["embedding"] = round((time.perf_counter() - embedding_started_at) * 1000, 3)
     search_started_at = time.perf_counter()
-    embedding_identity = active_embedding_identity()
+    embedding_identity = active_embedding_identity(embedding_client_settings(embedding_client))
     candidate_limit = resolve_candidate_limit(limit)
     vector_results = await search_similar_chunks(
         session=session,

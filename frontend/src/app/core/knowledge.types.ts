@@ -122,3 +122,30 @@ export interface MetadataSelection {
   tagIds: number[];
   projectIds: number[];
 }
+
+export type AIConfigOrigin = "environment" | "portal";
+export type LLMProvider = "local" | "api";
+
+export interface AIConfiguration {
+  llm_provider: LLMProvider;
+  local_llm_base_url: string;
+  local_llm_model: string;
+  api_llm_base_url: string;
+  api_llm_model: string;
+  api_key_configured: boolean;
+  embedding_model: string;
+  vector_dim: number;
+  origins: Record<string, AIConfigOrigin>;
+}
+
+export interface AIConfigurationWrite {
+  llm_provider: LLMProvider;
+  local_llm_base_url: string;
+  local_llm_model: string;
+  api_llm_base_url: string;
+  api_llm_model: string;
+  embedding_model: string;
+  vector_dim: number;
+  api_key?: string;
+  clear_api_key?: boolean;
+}

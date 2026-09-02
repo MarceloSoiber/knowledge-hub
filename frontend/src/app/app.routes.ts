@@ -11,6 +11,7 @@ import { LibraryPageComponent } from "./features/library/library-page.component"
 import { OrganizationPageComponent } from "./features/organization/organization-page.component";
 import { ProjectSourcesComponent } from "./features/organization/project-sources.component";
 import { OperationsPageComponent } from "./features/operations/operations-page.component";
+import { ConfigurationPageComponent } from "./features/configuration/configuration-page.component";
 import { AuthenticatedLayoutComponent } from "./layout/authenticated-layout.component";
 
 export const routes: Routes = [
@@ -27,6 +28,7 @@ export const routes: Routes = [
       { path: "biblioteca", component: LibraryPageComponent, title: "Biblioteca | Knowledge Hub" },
       { path: "organizacao", component: OrganizationPageComponent, title: "Organização | Knowledge Hub" },
       { path: "operacoes", component: OperationsPageComponent, title: "Backup e restauração | Knowledge Hub" },
+      { path: "configuracoes", component: ConfigurationPageComponent, title: "Configurações | Knowledge Hub" },
       { path: "organizacao/projetos/:projectId/fontes", component: ProjectSourcesComponent, title: "Fontes do projeto | Knowledge Hub" },
       { path: "sources/:sourceId", component: SourceDetailComponent, title: "Fonte | Knowledge Hub" },
       { path: "", pathMatch: "full", redirectTo: "inicio" },

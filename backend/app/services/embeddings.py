@@ -18,6 +18,11 @@ class EmbeddingClient:
         raise NotImplementedError
 
 
+def embedding_client_settings(client: EmbeddingClient) -> Settings:
+    settings = getattr(client, "settings", None)
+    return settings if isinstance(settings, Settings) else get_settings()
+
+
 def openai_base_url(base_url: str) -> str:
     clean_base_url = base_url.rstrip("/")
     if clean_base_url.endswith("/v1"):

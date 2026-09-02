@@ -19,12 +19,20 @@ import {
   ProjectWrite,
   Tag,
   TagWrite,
+  AIConfiguration,
+  AIConfigurationWrite,
 } from "./knowledge.types";
 
 @Injectable({ providedIn: "root" })
 export class KnowledgeApiService {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = "/api/v1/knowledge";
+  private readonly configurationUrl = "/api/v1/configuration/ai";
+
+  aiConfiguration(): Observable<AIConfiguration> { return this.http.get<AIConfiguration>(this.configurationUrl); }
+  updateAiConfiguration(payload: AIConfigurationWrite): Observable<AIConfiguration> {
+    return this.http.put<AIConfiguration>(this.configurationUrl, payload);
+  }
 
   categories(): Observable<Category[]> { return this.http.get<Category[]>(`${this.baseUrl}/categories`); }
   createCategory(payload: CategoryWrite): Observable<Category> { return this.http.post<Category>(`${this.baseUrl}/categories`, payload); }

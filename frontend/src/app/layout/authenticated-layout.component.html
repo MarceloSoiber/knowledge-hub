@@ -11,11 +11,8 @@
       @if (globalSearchStatus !== 'idle' || globalResults.length) { <div class="global-search-results" aria-live="polite">@if (globalSearchStatus === 'loading') { <p>Pesquisando no acervo…</p> } @if (globalSearchStatus === 'error') { <p>Não foi possível pesquisar agora.</p> } @if (globalSearchStatus === 'idle' && !globalResults.length) { <p>Nenhum resultado encontrado.</p> } @for (result of globalResults; track result.id) { <a [routerLink]="['/sources', result.source_id]" (click)="closeGlobalSearch()"><span><strong>{{ result.source_title }}</strong><small>{{ result.location.section || 'Trecho do documento' }}</small></span><span aria-hidden="true">→</span></a> } <a class="global-search-results__advanced" routerLink="/busca" (click)="closeGlobalSearch()">Abrir busca avançada</a></div> }
     </div>
     <div class="topbar__actions">
-      <button class="theme-button" type="button" (click)="theme.toggle()" [attr.aria-pressed]="theme.current() === 'dark'" [attr.aria-label]="theme.current() === 'dark' ? 'Usar tema claro' : 'Usar tema escuro'">
-        <span class="theme-button__icon" aria-hidden="true">{{ theme.current() === "dark" ? "☀" : "☾" }}</span>
-        <span>{{ theme.current() === "dark" ? "Tema claro" : "Tema escuro" }}</span>
-      </button>
-      <button class="logout-button" type="button" (click)="logout()"><span aria-hidden="true">↗</span> Desconectar</button>
+      <button #userMenuButton class="user-menu-button" type="button" (click)="toggleUserMenu()" aria-haspopup="menu" [attr.aria-expanded]="userMenuOpen" aria-controls="user-menu" aria-label="Abrir menu de usuário"><span aria-hidden="true">◉</span><span class="user-menu-button__label">Conta</span></button>
+      @if (userMenuOpen) { <button class="user-menu-backdrop" type="button" tabindex="-1" aria-label="Fechar menu de usuário" (click)="closeUserMenu(true)"></button><div id="user-menu" class="user-menu" role="menu" aria-label="Menu de usuário"><p class="user-menu__heading">Preferências</p><button type="button" role="menuitem" (click)="toggleTheme()"><span aria-hidden="true">{{ theme.current() === "dark" ? "☀" : "☾" }}</span>{{ theme.current() === "dark" ? "Usar tema claro" : "Usar tema escuro" }}</button><a role="menuitem" routerLink="/configuracoes" (click)="closeUserMenu()"><span aria-hidden="true">⚙</span>Configurações de IA</a><div class="user-menu__divider"></div><button class="user-menu__logout" type="button" role="menuitem" (click)="logout()"><span aria-hidden="true">↗</span>Desconectar</button></div> }
     </div>
   </header>
 
