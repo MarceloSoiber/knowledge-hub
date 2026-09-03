@@ -112,6 +112,28 @@ VECTOR_DIM="768"
 `DOCKER_LOCAL_LLM_BASE_URL` is used by Docker containers. On Linux, Compose
 maps `host.docker.internal` to the host gateway.
 
+### AI settings portal
+
+After signing in, open **Settings** from the user menu to manage the AI
+provider, endpoints, model IDs, and embedding model. Values saved there take
+precedence over the corresponding environment variables for new requests; the
+environment remains the fallback for any setting that has not been saved.
+
+`DOCKER_LOCAL_LLM_BASE_URL` remains a Docker Compose boot-time setting. It is
+used to set the backend's initial `LOCAL_LLM_BASE_URL` and is not managed by
+the portal.
+
+When storing an API key through the portal, set `CONFIG_ENCRYPTION_KEY` to one
+stable Fernet key in the backend environment. Generate it once:
+
+```bash
+uv run python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+Keep the generated key secret and unchanged. Without it, local-model settings
+continue to work, but the portal cannot save an API key; changing it prevents
+the application from decrypting API keys previously stored in PostgreSQL.
+
 ### LM Studio
 
 1. Load a chat model and an embedding model in LM Studio.
@@ -149,13 +171,14 @@ Copy `.env.example` and adjust only what your environment requires.
 | `LLM_PROVIDER` | `local` for local inference; set another value only when intentionally using the API configuration. |
 | `LOCAL_LLM_*` / `DOCKER_LOCAL_LLM_BASE_URL` | Local model endpoint and chat model name. |
 | `API_LLM_BASE_URL`, `API_LLM_MODEL`, `API_KEY` | Optional external OpenAI-compatible provider configuration. Keep `API_KEY` out of Git. |
+| `CONFIG_ENCRYPTION_KEY` | Stable Fernet key used only to encrypt an API key saved through the Settings portal. Keep it secret and do not rotate it while a saved API key is needed. |
 | `EMBEDDING_MODEL`, `EMBEDDING_VERSION`, `VECTOR_DIM` | Embedding identity and vector size. |
 | `MCP_HOST`, `MCP_PORT`, `MCP_PUBLIC_URL`, `MCP_PATH` | MCP listener and public Streamable HTTP URL. |
 | `MCP_WRITE_ENABLED` | Enables MCP text ingestion only when set to `true`; default is read-only. |
 
-Do not commit `.env` with real credentials or production addresses. The access
-token is not an environment variable: it is stored in the `app_config` table in
-PostgreSQL.
+Do not commit `.env` with real credentials, encryption keys, or production
+addresses. The access token is not an environment variable: it is stored in the
+`app_config` table in PostgreSQL.
 
 ## Authentication
 
@@ -379,8 +402,8 @@ after checking out the release, so each environment keeps its own configuration.
 Use [the environment templates](deploy/env) as a starting point. Keep
 credentials and optional cloud-provider settings as masked, protected GitLab
 variables; do not commit them to `.gitlab-ci.yml` or `.env`. Typical protected
-application variables are `API_KEY`, `API_LLM_BASE_URL`, and `API_LLM_MODEL`
-when an external provider is intentionally enabled.
+application variables are `API_KEY`, `API_LLM_BASE_URL`, `API_LLM_MODEL`, and
+`CONFIG_ENCRYPTION_KEY` when an external provider is intentionally enabled.
 
 ### Deploying through GitLab
 

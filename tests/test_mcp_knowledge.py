@@ -149,7 +149,16 @@ async def test_search_knowledge_returns_citation_context(
         "mcp_server.tools.knowledge.search_backend_knowledge",
         fake_search_backend_knowledge,
     )
-    monkeypatch.setattr("mcp_server.tools.knowledge.build_embedding_client", lambda: object())
+    effective_settings = Settings(local_llm_model="portal-model")
+
+    async def fake_resolve_ai_settings(_: object) -> Settings:
+        return effective_settings
+
+    monkeypatch.setattr("mcp_server.tools.knowledge.resolve_ai_settings", fake_resolve_ai_settings)
+    monkeypatch.setattr(
+        "mcp_server.tools.knowledge.build_embedding_client",
+        lambda settings: SimpleNamespace(settings=settings),
+    )
 
     results = await search_knowledge("find", limit=1, category_ids=[2], min_score=0.55)
 
@@ -157,6 +166,7 @@ async def test_search_knowledge_returns_citation_context(
     assert captured_kwargs["tag_ids"] is None
     assert captured_kwargs["project_ids"] is None
     assert captured_kwargs["include_match_reasons"] is False
+    assert captured_kwargs["embedding_client"].settings is effective_settings
     assert results[0].source_id == "33333333-3333-4333-8333-333333333333"
     assert results[0].source_title == "runbook.md"
     assert results[0].tags[0].name == "postgres"
@@ -208,11 +218,21 @@ async def test_search_knowledge_can_return_match_reasons(
         "mcp_server.tools.knowledge.search_backend_knowledge",
         fake_search_backend_knowledge,
     )
-    monkeypatch.setattr("mcp_server.tools.knowledge.build_embedding_client", lambda: object())
+    effective_settings = Settings(local_llm_model="portal-model")
+
+    async def fake_resolve_ai_settings(_: object) -> Settings:
+        return effective_settings
+
+    monkeypatch.setattr("mcp_server.tools.knowledge.resolve_ai_settings", fake_resolve_ai_settings)
+    monkeypatch.setattr(
+        "mcp_server.tools.knowledge.build_embedding_client",
+        lambda settings: SimpleNamespace(settings=settings),
+    )
 
     results = await search_knowledge("ERR_CONN_RESET", include_match_reasons=True)
 
     assert captured_kwargs["include_match_reasons"] is True
+    assert captured_kwargs["embedding_client"].settings is effective_settings
     assert results[0].match_reasons == ["vector", "text"]
 
 
@@ -300,6 +320,7 @@ async def test_ingest_mcp_text_creates_mcp_source(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     authorize(monkeypatch, ["knowledge:read", "knowledge:write"])
+    effective_settings = Settings(local_llm_model="portal-model")
 
     async def fake_ingest_plain_text(**kwargs: object) -> tuple[object, int]:
         assert kwargs["title"] == "Architecture note"
@@ -309,6 +330,7 @@ async def test_ingest_mcp_text_creates_mcp_source(
         assert kwargs["project_ids"] == [9]
         assert kwargs["source_type"] == "mcp"
         assert kwargs["metadata"] == {"note_type": "decision"}
+        assert kwargs["embedding_client"].settings is effective_settings
         return (
             SimpleNamespace(
                 public_id="11111111-1111-4111-8111-111111111111",
@@ -324,6 +346,15 @@ async def test_ingest_mcp_text_creates_mcp_source(
         )
 
     monkeypatch.setattr("mcp_server.tools.knowledge.ingest_plain_text", fake_ingest_plain_text)
+
+    async def fake_resolve_ai_settings(_: object) -> Settings:
+        return effective_settings
+
+    monkeypatch.setattr("mcp_server.tools.knowledge.resolve_ai_settings", fake_resolve_ai_settings)
+    monkeypatch.setattr(
+        "mcp_server.tools.knowledge.build_embedding_client",
+        lambda settings: SimpleNamespace(settings=settings),
+    )
 
     result = await ingest_mcp_text(
         title="Architecture note",
@@ -372,6 +403,11 @@ async def test_ingest_mcp_text_maps_category_and_empty_content_errors(
 ) -> None:
     authorize(monkeypatch, ["knowledge:write"])
 
+    async def fake_resolve_ai_settings(_: object) -> Settings:
+        return Settings()
+
+    monkeypatch.setattr("mcp_server.tools.knowledge.resolve_ai_settings", fake_resolve_ai_settings)
+
     async def missing_category(**_: object) -> tuple[object, int]:
         raise CategoryNotFoundError("Category 99 does not exist.")
 
@@ -394,6 +430,11 @@ async def test_ingest_mcp_text_maps_embedding_failure_without_success(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     authorize(monkeypatch, ["knowledge:write"])
+
+    async def fake_resolve_ai_settings(_: object) -> Settings:
+        return Settings()
+
+    monkeypatch.setattr("mcp_server.tools.knowledge.resolve_ai_settings", fake_resolve_ai_settings)
 
     async def embedding_failure(**_: object) -> tuple[object, int]:
         raise EmbeddingError("Embedding provider returned HTTP 500.")
