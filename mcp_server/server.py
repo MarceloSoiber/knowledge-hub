@@ -1,4 +1,8 @@
+import json
 import logging
+
+from starlette.middleware import Middleware
+from starlette.types import Receive, Scope, Send
 
 from mcp.server.fastmcp import FastMCP
 
@@ -74,18 +78,61 @@ def build_mcp_scopes() -> list[str]:
 
 
 def build_auth_settings():
-    settings = get_settings()
+    """Keep static bearer-token deployments out of OAuth metadata mode.
 
-    from mcp.server.auth.settings import AuthSettings
+    VS Code interprets OAuth-protected resource metadata as a sign that the MCP
+    server expects an interactive OAuth client registration flow. This project
+    intentionally uses a fixed bearer token instead, so we advertise no OAuth
+    metadata and enforce the static token via ASGI middleware.
+    """
+    return None
 
-    return AuthSettings(
-        issuer_url=settings.mcp_public_url,
-        # VS Code treats the protected-resource metadata as an OAuth flow and
-        # prompts for client registration. This server uses a static Bearer
-        # token instead, so keep bearer validation without advertising OAuth.
-        resource_server_url=None,
-        required_scopes=["knowledge:read"],
-    )
+
+class StaticBearerAuthMiddleware:
+    def __init__(self, app, token_verifier):
+        self.app = app
+        self.token_verifier = token_verifier
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        auth_header = next(
+            (
+                value.decode("latin-1")
+                for key, value in scope.get("headers", [])
+                if key.lower() == b"authorization"
+            ),
+            None,
+        )
+        if not auth_header or not auth_header.lower().startswith("bearer "):
+            await self._send_auth_error(send, "invalid_token", "Authentication required")
+            return
+
+        token = auth_header[7:].strip()
+        if not await self.token_verifier.verify_token(token):
+            await self._send_auth_error(send, "invalid_token", "Authentication required")
+            return
+
+        await self.app(scope, receive, send)
+
+    async def _send_auth_error(self, send: Send, error: str, description: str) -> None:
+        payload = {"error": error, "error_description": description}
+        body = json.dumps(payload).encode()
+        header = 'Bearer error="invalid_token", error_description="Authentication required"'
+        await send(
+            {
+                "type": "http.response.start",
+                "status": 401,
+                "headers": [
+                    (b"content-type", b"application/json"),
+                    (b"content-length", str(len(body)).encode()),
+                    (b"www-authenticate", header.encode()),
+                ],
+            }
+        )
+        await send({"type": "http.response.body", "body": body})
 
 
 settings = get_settings()
@@ -96,8 +143,6 @@ mcp = FastMCP(
     host=settings.mcp_host,
     port=settings.mcp_port,
     streamable_http_path=settings.mcp_path,
-    auth=build_auth_settings(),
-    token_verifier=build_token_verifier(),
 )
 
 
@@ -187,7 +232,11 @@ def workspace_overview() -> dict[str, str]:
 
 
 def main() -> None:
-    mcp.run(transport="streamable-http")
+    import uvicorn
+
+    app = mcp.streamable_http_app()
+    app.add_middleware(Middleware(StaticBearerAuthMiddleware, token_verifier=build_token_verifier()))
+    uvicorn.run(app, host=settings.mcp_host, port=settings.mcp_port)
 
 
 if __name__ == "__main__":

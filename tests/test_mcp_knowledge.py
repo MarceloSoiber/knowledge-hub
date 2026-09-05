@@ -61,6 +61,12 @@ def test_mcp_tool_descriptions_guide_discovery_search_and_writes() -> None:
     assert "arquivar conversas automaticamente" in tools.get_tool("ingest_text").description
 
 
+def test_mcp_uses_static_bearer_auth_without_oauth_metadata() -> None:
+    from mcp_server import server
+
+    assert server.build_auth_settings() is None
+
+
 def test_mcp_scopes_follow_write_enabled_setting(monkeypatch: pytest.MonkeyPatch) -> None:
     from mcp_server import server
 
