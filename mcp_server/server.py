@@ -1,10 +1,12 @@
 import json
 import logging
 
-from starlette.middleware import Middleware
+from starlette.authentication import AuthCredentials
 from starlette.types import Receive, Scope, Send
 
 from mcp.server.fastmcp import FastMCP
+from mcp.server.auth.middleware.auth_context import auth_context_var
+from mcp.server.auth.middleware.bearer_auth import AuthenticatedUser
 
 from backend.app.core.auth import is_valid_token
 from backend.app.core.settings import get_settings
@@ -88,39 +90,43 @@ def build_auth_settings():
     return None
 
 
-class StaticBearerAuthMiddleware:
-    def __init__(self, app, token_verifier):
-        self.app = app
-        self.token_verifier = token_verifier
+def build_static_bearer_asgi_app(app):
+    verifier = build_token_verifier()
 
-    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+    async def auth_wrapper(scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
-            await self.app(scope, receive, send)
+            await app(scope, receive, send)
             return
 
-        auth_header = next(
-            (
-                value.decode("latin-1")
-                for key, value in scope.get("headers", [])
-                if key.lower() == b"authorization"
-            ),
-            None,
-        )
+        headers = {
+            key.decode("latin-1").lower(): value.decode("latin-1")
+            for key, value in scope.get("headers", [])
+        }
+        auth_header = headers.get("authorization")
         if not auth_header or not auth_header.lower().startswith("bearer "):
-            await self._send_auth_error(send, "invalid_token", "Authentication required")
+            await _send_auth_error(send)
             return
 
         token = auth_header[7:].strip()
-        if not await self.token_verifier.verify_token(token):
-            await self._send_auth_error(send, "invalid_token", "Authentication required")
+        access_token = await verifier.verify_token(token)
+        if access_token is None:
+            await _send_auth_error(send)
             return
 
-        await self.app(scope, receive, send)
+        # FastMCP tools retrieve authorization through this context variable.
+        # The static middleware performs validation itself, so it must establish
+        # the same request context that FastMCP's OAuth middleware would create.
+        scope["user"] = AuthenticatedUser(access_token)
+        scope["auth"] = AuthCredentials(access_token.scopes)
+        context_token = auth_context_var.set(scope["user"])
+        try:
+            await app(scope, receive, send)
+        finally:
+            auth_context_var.reset(context_token)
 
-    async def _send_auth_error(self, send: Send, error: str, description: str) -> None:
-        payload = {"error": error, "error_description": description}
+    async def _send_auth_error(send: Send) -> None:
+        payload = {"error": "invalid_token", "error_description": "Authentication required"}
         body = json.dumps(payload).encode()
-        header = 'Bearer error="invalid_token", error_description="Authentication required"'
         await send(
             {
                 "type": "http.response.start",
@@ -128,11 +134,13 @@ class StaticBearerAuthMiddleware:
                 "headers": [
                     (b"content-type", b"application/json"),
                     (b"content-length", str(len(body)).encode()),
-                    (b"www-authenticate", header.encode()),
+                    (b"www-authenticate", b'Bearer error="invalid_token", error_description="Authentication required"'),
                 ],
             }
         )
         await send({"type": "http.response.body", "body": body})
+
+    return auth_wrapper
 
 
 settings = get_settings()
@@ -234,9 +242,9 @@ def workspace_overview() -> dict[str, str]:
 def main() -> None:
     import uvicorn
 
-    app = mcp.streamable_http_app()
-    app.add_middleware(Middleware(StaticBearerAuthMiddleware, token_verifier=build_token_verifier()))
-    uvicorn.run(app, host=settings.mcp_host, port=settings.mcp_port)
+    base_app = mcp.streamable_http_app()
+    protected_app = build_static_bearer_asgi_app(base_app)
+    uvicorn.run(protected_app, host=settings.mcp_host, port=settings.mcp_port)
 
 
 if __name__ == "__main__":

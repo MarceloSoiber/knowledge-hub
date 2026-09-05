@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 from mcp.server.auth.provider import AccessToken
+from mcp.server.auth.middleware.auth_context import get_access_token
 from pydantic import ValidationError
 
 from backend.app.services.categories import CategoryNotFoundError
@@ -65,6 +66,45 @@ def test_mcp_uses_static_bearer_auth_without_oauth_metadata() -> None:
     from mcp_server import server
 
     assert server.build_auth_settings() is None
+
+
+@pytest.mark.asyncio
+async def test_static_bearer_middleware_sets_fastmcp_auth_context(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from mcp_server import server
+
+    expected_token = access_token_with_scopes(["knowledge:read", "knowledge:write"])
+
+    class TokenVerifier:
+        async def verify_token(self, token: str) -> AccessToken | None:
+            assert token == "valid-token"
+            return expected_token
+
+    monkeypatch.setattr(server, "build_token_verifier", lambda: TokenVerifier())
+    seen_tokens: list[AccessToken | None] = []
+    sent: list[dict[str, object]] = []
+
+    async def downstream(scope: object, receive: object, send: object) -> None:
+        seen_tokens.append(get_access_token())
+        await send({"type": "http.response.start", "status": 204, "headers": []})  # type: ignore[misc]
+        await send({"type": "http.response.body", "body": b""})  # type: ignore[misc]
+
+    async def receive() -> dict[str, str]:
+        return {"type": "http.request"}
+
+    async def send(message: dict[str, object]) -> None:
+        sent.append(message)
+
+    app = server.build_static_bearer_asgi_app(downstream)
+    await app(
+        {"type": "http", "headers": [(b"Authorization", b"Bearer valid-token")]},
+        receive,
+        send,
+    )
+
+    assert seen_tokens == [expected_token]
+    assert sent[0]["status"] == 204
 
 
 def test_mcp_scopes_follow_write_enabled_setting(monkeypatch: pytest.MonkeyPatch) -> None:
