@@ -15,6 +15,7 @@ from .documents.chunker import (
     SectionSpan,
     TextChunk,
     chunk_text_with_locations,
+    detect_document_sections,
     detect_markdown_sections,
 )
 from .documents.extractors import (
@@ -82,7 +83,7 @@ async def ingest_uploaded_file(
         page_spans=document.page_spans,
         section_spans=detect_markdown_sections(document.text)
         if document.document_type == "md"
-        else None,
+        else detect_document_sections(document.text),
     )
 
 
@@ -119,7 +120,7 @@ async def ingest_plain_text(
         uri=uri,
         embedding_client=embedding_client,
         extra_metadata=metadata,
-        section_spans=detect_markdown_sections(text),
+        section_spans=detect_document_sections(text),
     )
 
 
