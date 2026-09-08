@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import math
+import re
 import time
 from dataclasses import dataclass
 
@@ -105,6 +106,7 @@ async def search_knowledge(
         text_results=text_results,
         limit=limit,
         min_score=threshold.value,
+        query=query,
         include_match_reasons=include_match_reasons,
     )
     log_search_filtering(vector_results, results, threshold)
@@ -180,6 +182,7 @@ def fuse_hybrid_results(
     text_results: list[TextSearchChunk],
     limit: int,
     min_score: float,
+    query: str = "",
     include_match_reasons: bool = False,
 ) -> list[KnowledgeChunkRead]:
     candidates = build_hybrid_candidates(vector_results, text_results)
@@ -187,7 +190,7 @@ def fuse_hybrid_results(
         (
             candidate
             for candidate in candidates.values()
-            if candidate_reaches_threshold(candidate, min_score)
+            if candidate_reaches_threshold(candidate, min_score, query)
         ),
         key=hybrid_sort_key,
         reverse=True,
@@ -223,10 +226,46 @@ def build_hybrid_candidates(
     return candidates
 
 
-def candidate_reaches_threshold(candidate: HybridSearchCandidate, min_score: float) -> bool:
+def candidate_reaches_threshold(
+    candidate: HybridSearchCandidate,
+    min_score: float,
+    query: str,
+) -> bool:
     if candidate.vector_rank is None:
         return True
-    return score_reaches_threshold(candidate.vector_score, min_score)
+    return score_reaches_threshold(candidate.vector_score, min_score) or has_exact_text_evidence(
+        candidate,
+        query,
+    )
+
+
+def has_exact_text_evidence(candidate: HybridSearchCandidate, query: str) -> bool:
+    """Allow a strong literal match to survive a semantic-score threshold.
+
+    FTS may find a command or identifier that is semantically distant from the
+    wording around it.  Only a query phrase with at least two terms (or a
+    distinctive identifier) can override the vector threshold; a loose FTS
+    match remains subject to the normal relevance policy.
+    """
+    if candidate.text_rank is None:
+        return False
+
+    normalized_query = normalize_text_for_literal_match(query)
+    if not is_distinctive_literal_query(normalized_query):
+        return False
+    normalized_content = normalize_text_for_literal_match(candidate.chunk.content)
+    return normalized_query in normalized_content
+
+
+def normalize_text_for_literal_match(value: str) -> str:
+    return re.sub(r"\s+", " ", value).strip().casefold()
+
+
+def is_distinctive_literal_query(normalized_query: str) -> bool:
+    terms = normalized_query.split()
+    return len(terms) >= 2 or any(
+        character.isdigit() or character in "_-" for character in normalized_query
+    )
 
 
 def hybrid_sort_key(candidate: HybridSearchCandidate) -> tuple[float, bool, float, float, int]:

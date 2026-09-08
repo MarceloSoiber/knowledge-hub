@@ -8,6 +8,7 @@
 |---|---|---|
 | Limite de relevância e ausência segura | Entregue | `backend/app/services/search.py`, API e MCP aceitam `min_score`; a lista pode ficar vazia. |
 | Busca híbrida e diagnóstico | Entregue | Busca FTS + vetorial com RRF, deduplicação e `match_reasons` opt-in. |
+| Evidência textual literal no threshold | Entregue | Um resultado híbrido com frase/identificador literal no chunk não é descartado apenas pelo score vetorial baixo; correspondências textuais parciais continuam filtradas. |
 | Runner de avaliação | Entregue | `rag-eval`, schemas, métricas, relatórios e comparador. |
 | Reindexação de embeddings | Entregue | `reindex-embeddings` com dry-run, filtros, retomada e contadores. |
 | Limpeza de PDF por margens repetitivas | Entregue | `normalize_pdf_pages()` remove apenas marcadores repetidos em margens de três ou mais páginas. |

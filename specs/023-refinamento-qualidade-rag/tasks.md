@@ -38,6 +38,7 @@
 - [ ] T016 [US2] Calibrar thresholds candidatos contra dataset, incluindo a pergunta de férias/reembolso, e registrar a decisão em `doc/OPERATIONS.md`.
 - [x] T017 [US2] Revisar o estado da spec 007: recuperação textual + vetorial, fusão RRF, deduplicação e `match_reasons` opt-in já estão em `backend/app/repositories/chunks.py` e `backend/app/services/search.py`.
 - [ ] T018 [US2] Executar avaliação de perguntas exatas, paráfrases e fora de escopo; manter a mudança somente se preservar casos semânticos e reduzir falsos positivos.
+- [x] T029 [US2] Preservar, em `backend/app/services/search.py`, resultado híbrido abaixo do threshold somente quando a frase distintiva consultada ocorrer literalmente no chunk; cobrir o caso `ollama pull` e uma correspondência textual parcial em `tests/test_knowledge_service.py`.
 
 **Checkpoint**: perguntas sem resposta não retornam evidência; perguntas válidas continuam recuperáveis.
 

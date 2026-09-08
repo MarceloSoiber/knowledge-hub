@@ -1367,6 +1367,68 @@ def test_fuse_hybrid_results_keeps_text_only_when_vector_score_is_filtered() -> 
     assert not hasattr(results[0], "match_reasons")
 
 
+def test_fuse_hybrid_results_keeps_exact_literal_match_below_vector_threshold() -> None:
+    command_chunk = build_test_chunk(
+        chunk_id=1,
+        content="Use ollama pull para baixar um modelo local.",
+        score=0.57,
+    )
+
+    results = fuse_hybrid_results(
+        vector_results=[command_chunk],
+        text_results=[
+            TextSearchChunk(chunk=command_chunk.model_copy(update={"score": None}), text_rank=1.0),
+        ],
+        limit=5,
+        min_score=0.75,
+        query="ollama pull",
+        include_match_reasons=True,
+    )
+
+    assert [result.id for result in results] == [1]
+    assert results[0].match_reasons == ["vector", "text"]
+
+
+def test_fuse_hybrid_results_keeps_exact_identifier_below_vector_threshold() -> None:
+    identifier_chunk = build_test_chunk(
+        chunk_id=1,
+        content="O erro ERR_CONN_RESET indica que a conexao foi interrompida.",
+        score=0.57,
+    )
+
+    results = fuse_hybrid_results(
+        vector_results=[identifier_chunk],
+        text_results=[
+            TextSearchChunk(chunk=identifier_chunk.model_copy(update={"score": None}), text_rank=1.0),
+        ],
+        limit=5,
+        min_score=0.75,
+        query="ERR_CONN_RESET",
+    )
+
+    assert [result.id for result in results] == [1]
+
+
+def test_fuse_hybrid_results_does_not_promote_non_literal_text_match() -> None:
+    partial_text_chunk = build_test_chunk(
+        chunk_id=1,
+        content="Ollama permite baixar modelos; o comando pull tambem esta disponivel.",
+        score=0.57,
+    )
+
+    results = fuse_hybrid_results(
+        vector_results=[partial_text_chunk],
+        text_results=[
+            TextSearchChunk(chunk=partial_text_chunk.model_copy(update={"score": None}), text_rank=1.0),
+        ],
+        limit=5,
+        min_score=0.75,
+        query="ollama pull",
+    )
+
+    assert results == []
+
+
 @pytest.mark.asyncio
 async def test_answer_knowledge_uses_search_sources() -> None:
     answer, sources = await answer_knowledge(

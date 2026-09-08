@@ -74,6 +74,7 @@ Observações da validação que motivam o plano:
 2. Calibrar valores candidatos no dataset. O score observado de 0,69–0,72 fora de escopo é um sinal de partida, não um threshold universal.
 3. Concluir/revisar `007-busca-hibrida`: GIN/FTS para termos exatos, busca vetorial para paráfrases e Reciprocal Rank Fusion para união de rankings.
 4. Expor `match_reasons` somente em diagnóstico operacional e confirmar que categoria/projeto/filtros são aplicados antes da fusão.
+5. Quando um resultado híbrido ficar abaixo do threshold vetorial, preservar somente evidência textual literal distintiva (frase com dois ou mais termos ou identificador); não usar o `text_rank` como score comparável ao vetor nem liberar correspondências parciais.
 
 **Gate**: Nenhuma configuração passa a padrão sem superar baseline em Recall@K/MRR e melhorar ou preservar recusas corretas.
 

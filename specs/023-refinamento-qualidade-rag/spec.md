@@ -78,6 +78,7 @@ Como mantenedor, quero comparar o corpus atual com uma versão refinada antes de
 - **FR-007**: System MUST avaliar busca híbrida/reranking como evolução controlada da busca vetorial, sem substituir a recuperação semântica sem comparação de métricas.
 - **FR-008**: System MUST permitir reindexação segura, idempotente e reversível do corpus refinado após a aprovação do candidato.
 - **FR-009**: System MUST documentar o procedimento operacional de avaliação, reindexação e rollback, sem registrar tokens ou conteúdo completo em logs.
+- **FR-010**: System MUST preservar um resultado abaixo do threshold vetorial quando a consulta distintiva ocorrer literalmente no chunk e a busca textual também o tiver recuperado; correspondências textuais parciais continuam sujeitas ao threshold normal.
 
 ### Key Entities
 
