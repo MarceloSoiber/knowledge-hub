@@ -6,6 +6,7 @@ from ..db.models import DocumentSource
 from ..repositories.chunks import add_source_chunks, delete_chunks_for_source
 from ..repositories.embeddings import complete_embedding_batch, create_embedding_batch
 from ..repositories.sources import (
+    delete_reindex_items_for_source,
     delete_source_by_id,
     get_source_by_content_hash,
     get_source_by_public_id,
@@ -137,6 +138,10 @@ async def delete_source(session: AsyncSession, source_id: str, confirm: bool) ->
     if not confirm:
         raise SourceDeleteConfirmationError("Use confirm=true to delete a source.")
     source = await _get_source_or_raise(session, source_id)
+    # These bulk deletes run before the source delete because the database
+    # foreign keys protect chunks and reindex audit items from orphaning.
+    await delete_chunks_for_source(session, source.id)
+    await delete_reindex_items_for_source(session, source.id)
     await delete_source_by_id(session, source.id)
     await session.commit()
 

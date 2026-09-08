@@ -150,6 +150,7 @@ class FakeSession:
         self.projects = projects or []
         self.added: list[object] = []
         self.deleted_old_chunks = False
+        self.deleted_reindex_items = False
         self.deleted_source = False
         self.committed = False
         source = DocumentSource(
@@ -208,6 +209,8 @@ class FakeSession:
         statement_text = str(statement)
         if statement.__class__.__name__ == "Delete" and "knowledge_chunks" in statement_text:
             self.deleted_old_chunks = True
+        if statement.__class__.__name__ == "Delete" and "reindex_items" in statement_text:
+            self.deleted_reindex_items = True
         if statement.__class__.__name__ == "Delete" and "document_sources" in statement_text:
             self.deleted_source = True
         if "categories" in str(statement):
@@ -842,6 +845,8 @@ async def test_delete_source_removes_source_when_confirmed() -> None:
 
     await delete_source(session, source.public_id, confirm=True)
 
+    assert session.deleted_old_chunks is True
+    assert session.deleted_reindex_items is True
     assert session.deleted_source is True
     assert session.committed is True
 

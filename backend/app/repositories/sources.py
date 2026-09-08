@@ -4,7 +4,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from ..db.models import DocumentSource
+from ..db.models import DocumentSource, ReindexItem
 
 
 def _source_options() -> tuple[object, ...]:
@@ -40,6 +40,11 @@ async def get_source_by_content_hash(
 
 async def delete_source_by_id(session: AsyncSession, source_id: int) -> None:
     await session.execute(delete(DocumentSource).where(DocumentSource.id == source_id))
+
+
+async def delete_reindex_items_for_source(session: AsyncSession, source_id: int) -> None:
+    """Remove audit items that cannot outlive their source foreign key."""
+    await session.execute(delete(ReindexItem).where(ReindexItem.source_id == source_id))
 
 
 def serialize_source(source: DocumentSource, include_content: bool = False) -> dict[str, object]:
