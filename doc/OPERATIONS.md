@@ -223,3 +223,41 @@ rag-eval compare --baseline reports/rag-baseline.json \
 gate e `2` para arquivo ou contrato invalido. Revise `regressed_cases`, deltas,
 erros de provider e os campos por caso antes de aceitar a mudanca. Para avaliar
 somente recuperacao, use `--search-only` em `baseline` ou `candidate`.
+
+## Refinamento de PDFs ja indexados
+
+A limpeza de margens repetitivas e o chunking por modulo/capitulo ocorrem na
+**extracao do PDF**. `reindex-embeddings` gera vetores novamente para chunks ja
+persistidos; ele nao possui o PDF original e, portanto, nao aplica uma nova
+extracao ou novo chunking.
+
+Para validar uma versao refinada de uma fonte, primeiro capture a linha de base:
+
+```bash
+cp evaluation/fundamentos-ia-rag.example.json evaluation/fundamentos-ia-rag.json
+cp evaluation/fundamentos-ia-thresholds.example.json evaluation/fundamentos-ia-thresholds.json
+rag-eval baseline --search-only \
+  --dataset evaluation/fundamentos-ia-rag.json \
+  --thresholds evaluation/fundamentos-ia-thresholds.json \
+  --output reports/fundamentos-ia-baseline.json
+```
+
+Depois de implantar a nova versão, envie o PDF original novamente com as mesmas
+relações de categoria, tag e projeto. Execute o candidato e compare-o com a
+linha de base:
+
+```bash
+rag-eval candidate --search-only \
+  --dataset evaluation/fundamentos-ia-rag.json \
+  --thresholds evaluation/fundamentos-ia-thresholds.json \
+  --output reports/fundamentos-ia-candidate.json
+rag-eval compare \
+  --baseline reports/fundamentos-ia-baseline.json \
+  --candidate reports/fundamentos-ia-candidate.json \
+  --thresholds evaluation/fundamentos-ia-thresholds.json \
+  --output reports/fundamentos-ia-comparison.json
+```
+
+Mantenha as duas fontes enquanto revisa o relatório. Exclua ou arquive a fonte
+antiga somente quando o candidato for aprovado; duas cópias do mesmo material
+reduzem a qualidade da recuperação por duplicação de chunks.

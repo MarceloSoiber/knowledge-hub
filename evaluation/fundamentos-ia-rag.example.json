@@ -1,0 +1,89 @@
+{
+  "dataset_version": "fundamentos-ia-rag-v1",
+  "description": "Dataset sanitizado para avaliar a recuperacao do curso Fundamentos de IA e LLMs para Programadores. As referencias usam titulo e trechos estaveis para sobreviver a reindexacao.",
+  "defaults": {
+    "limit": 5,
+    "min_score": null,
+    "filters": {
+      "category_ids": [15],
+      "project_ids": [1]
+    }
+  },
+  "cases": [
+    {
+      "id": "ia-ml-deep-learning",
+      "kind": "known_answer",
+      "question": "Qual e a diferenca entre inteligencia artificial, machine learning e deep learning?",
+      "expected_chunks": [{
+        "source_title": "Fundamentos de IA e LLMs para Programadores.pdf",
+        "snippet": "Machine Learning (ML), ou Aprendizado de Máquina"
+      }],
+      "expected_answer_points": ["Machine Learning", "Deep Learning"],
+      "expected_category": "Desenvolvimento de Software",
+      "expected_project": "Engenharia de Software em IA Aplicada",
+      "tags": ["fundamentos", "regressao"]
+    },
+    {
+      "id": "rag-versus-fine-tuning",
+      "kind": "semantic",
+      "question": "Como RAG funciona e em que ele difere de fine-tuning?",
+      "expected_chunks": [{
+        "source_title": "Fundamentos de IA e LLMs para Programadores.pdf",
+        "snippet": "RAG: é o método de buscar informação relevante antes de responder"
+      }],
+      "expected_answer_points": ["RAG", "fine-tuning"],
+      "tags": ["rag", "parafrase"]
+    },
+    {
+      "id": "embeddings-similaridade",
+      "kind": "semantic",
+      "question": "O que sao embeddings e como a busca por similaridade encontra conteudo relacionado?",
+      "expected_chunks": [{
+        "source_title": "Fundamentos de IA e LLMs para Programadores.pdf",
+        "snippet": "Embeddings são representações numéricas"
+      }],
+      "expected_answer_points": ["embeddings", "similaridade"],
+      "tags": ["embeddings", "parafrase"]
+    },
+    {
+      "id": "transformer-self-attention",
+      "kind": "semantic",
+      "question": "Como tokens, Transformer e self-attention se relacionam em uma LLM?",
+      "expected_chunks": [{
+        "source_title": "Fundamentos de IA e LLMs para Programadores.pdf",
+        "snippet": "mecanismo chamado Self-Attention"
+      }],
+      "expected_answer_points": ["Transformer", "Self-Attention"],
+      "tags": ["llm", "transformer"]
+    },
+    {
+      "id": "ollama-local-limitacoes",
+      "kind": "known_answer",
+      "question": "Quais sao os beneficios e as limitacoes de usar Ollama para rodar LLMs localmente?",
+      "expected_chunks": [{
+        "source_title": "Fundamentos de IA e LLMs para Programadores.pdf",
+        "snippet": "Ollama possui um amplo catálogo de modelos"
+      }],
+      "expected_answer_points": ["local", "produção"],
+      "tags": ["ollama", "llm-local"]
+    },
+    {
+      "id": "ollama-pull-exato",
+      "kind": "exact_term",
+      "question": "Qual comando do Ollama baixa um modelo?",
+      "expected_chunks": [{
+        "source_title": "Fundamentos de IA e LLMs para Programadores.pdf",
+        "snippet": "ollama pull"
+      }],
+      "expected_answer_points": ["ollama pull"],
+      "tags": ["ollama", "termo-exato"]
+    },
+    {
+      "id": "fora-escopo-ferias-reembolso",
+      "kind": "unanswered",
+      "question": "Qual e a politica de ferias e reembolso de despesas da empresa?",
+      "expected_refusal": true,
+      "tags": ["fora-de-escopo", "regressao"]
+    }
+  ]
+}
