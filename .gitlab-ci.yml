@@ -113,7 +113,10 @@ deploy_develop:
 
       cd "$deploy_path"
       docker compose config --quiet
-      docker compose up -d --build --remove-orphans
+      # BuildKit is configured with an unavailable loopback DNS resolver on the
+      # deployment hosts. The classic Docker builder uses the host resolver,
+      # which is validated before deployment.
+      DOCKER_BUILDKIT=0 COMPOSE_DOCKER_CLI_BUILD=0 docker compose up -d --build --remove-orphans
 
       for _ in $(seq 1 30); do
         status="$(docker inspect knowledge-hub-backend --format '{{.State.Health.Status}}' 2>/dev/null || true)"
@@ -206,7 +209,10 @@ deploy_master:
 
       cd "$deploy_path"
       docker compose config --quiet
-      docker compose up -d --build --remove-orphans
+      # BuildKit is configured with an unavailable loopback DNS resolver on the
+      # deployment hosts. The classic Docker builder uses the host resolver,
+      # which is validated before deployment.
+      DOCKER_BUILDKIT=0 COMPOSE_DOCKER_CLI_BUILD=0 docker compose up -d --build --remove-orphans
 
       for _ in $(seq 1 30); do
         status="$(docker inspect knowledge-hub-backend --format '{{.State.Health.Status}}' 2>/dev/null || true)"
