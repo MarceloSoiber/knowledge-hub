@@ -17,3 +17,4 @@ frontend/dist/
 *.pyd
 *.sqlite3
 *.egg-info/
+*.playwright-mcp
