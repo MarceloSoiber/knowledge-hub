@@ -15,6 +15,7 @@ from .documents.chunker import (
     SectionSpan,
     TextChunk,
     chunk_text_with_locations,
+    detect_document_sections,
     detect_markdown_sections,
 )
 from .documents.extractors import (
@@ -25,7 +26,7 @@ from .documents.extractors import (
     extract_document,
 )
 from .documents.normalizer import normalize_text
-from .embeddings import EmbeddingClient
+from .embeddings import EmbeddingClient, embedding_client_settings
 from .embedding_versions import active_embedding_identity, compute_embedding_content_hash
 from .projects import get_projects
 from .tags import get_tags
@@ -82,7 +83,7 @@ async def ingest_uploaded_file(
         page_spans=document.page_spans,
         section_spans=detect_markdown_sections(document.text)
         if document.document_type == "md"
-        else None,
+        else detect_document_sections(document.text),
     )
 
 
@@ -119,7 +120,7 @@ async def ingest_plain_text(
         uri=uri,
         embedding_client=embedding_client,
         extra_metadata=metadata,
-        section_spans=detect_markdown_sections(text),
+        section_spans=detect_document_sections(text),
     )
 
 
@@ -149,7 +150,7 @@ async def ingest_text_source(
         section_spans=section_spans,
     )
     chunk_contents = [chunk.content for chunk in chunks]
-    embedding_identity = active_embedding_identity()
+    embedding_identity = active_embedding_identity(embedding_client_settings(embedding_client))
     embedding_batch = await create_embedding_batch(
         session,
         embedding_identity,

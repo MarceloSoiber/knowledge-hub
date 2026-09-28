@@ -11,7 +11,7 @@ services:
         condition: service_healthy
     environment:
       APP_NAME: "Knowledge Hub"
-      ENVIRONMENT: development
+      ENVIRONMENT: "${ENVIRONMENT:-development}"
       FRONTEND_ORIGIN: "${FRONTEND_ORIGIN:-http://localhost:8080}"
       POSTGRES_DSN: "${POSTGRES_DSN:-postgresql+asyncpg://postgres:postgres@host.docker.internal:15432/knowledge_hub}"
       LLM_PROVIDER: "${LLM_PROVIDER:-local}"
@@ -20,6 +20,7 @@ services:
       API_LLM_BASE_URL: "${API_LLM_BASE_URL:-https://api.openai.com/v1}"
       API_LLM_MODEL: "${API_LLM_MODEL:-gpt-4.1-mini}"
       API_KEY: "${API_KEY:-}"
+      CONFIG_ENCRYPTION_KEY: "${CONFIG_ENCRYPTION_KEY:-}"
       EMBEDDING_MODEL: "${EMBEDDING_MODEL:-text-embedding-nomic-embed-text-v1.5}"
       EMBEDDING_VERSION: "${EMBEDDING_VERSION:-default}"
       VECTOR_DIM: "${VECTOR_DIM:-768}"
@@ -75,7 +76,7 @@ services:
     command: ["mcp-server"]
     environment:
       APP_NAME: "Knowledge Hub"
-      ENVIRONMENT: development
+      ENVIRONMENT: "${ENVIRONMENT:-development}"
       POSTGRES_DSN: "${POSTGRES_DSN:-postgresql+asyncpg://postgres:postgres@host.docker.internal:15432/knowledge_hub}"
       LLM_PROVIDER: "${LLM_PROVIDER:-local}"
       LOCAL_LLM_BASE_URL: "${DOCKER_LOCAL_LLM_BASE_URL:-http://host.docker.internal:1234}"
@@ -83,6 +84,7 @@ services:
       API_LLM_BASE_URL: "${API_LLM_BASE_URL:-https://api.openai.com/v1}"
       API_LLM_MODEL: "${API_LLM_MODEL:-gpt-4.1-mini}"
       API_KEY: "${API_KEY:-}"
+      CONFIG_ENCRYPTION_KEY: "${CONFIG_ENCRYPTION_KEY:-}"
       EMBEDDING_MODEL: "${EMBEDDING_MODEL:-text-embedding-nomic-embed-text-v1.5}"
       EMBEDDING_VERSION: "${EMBEDDING_VERSION:-default}"
       VECTOR_DIM: "${VECTOR_DIM:-768}"
@@ -103,7 +105,7 @@ services:
     environment:
       POSTGRES_DB: knowledge_hub
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-postgres}"
     ports:
       - "${POSTGRES_HOST_PORT:-15432}:5432"
     volumes:

@@ -19,6 +19,15 @@ def test_init_db_no_longer_forces_vector_768() -> None:
     assert "ALTER COLUMN embedding TYPE vector(768)" not in inspect.getsource(init_source.init_db)
 
 
+def test_init_db_repairs_legacy_text_search_vectors() -> None:
+    init_source = __import__("backend.app.db.init", fromlist=["init_db"])
+    source = inspect.getsource(init_source.init_db)
+
+    assert "refresh_knowledge_chunks_search_vector" in source
+    assert "trg_knowledge_chunks_search_vector" in source
+    assert "search_vector_generated = 'NEVER'" in source
+
+
 class FakeScalarResult:
     def __init__(self, value: int | None) -> None:
         self.value = value

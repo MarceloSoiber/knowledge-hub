@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import math
+import re
 import time
 from dataclasses import dataclass
 
@@ -13,7 +14,7 @@ from ..repositories.sources import list_sources as list_source_records
 from ..schemas.knowledge import KnowledgeChunkRead
 from .categories import get_categories
 from .embedding_versions import active_embedding_identity
-from .embeddings import EmbeddingClient
+from .embeddings import EmbeddingClient, embedding_client_settings
 from .rag import AnswerClient
 from .projects import get_projects
 from .tags import get_tags
@@ -80,7 +81,7 @@ async def search_knowledge(
     if latency_ms is not None:
         latency_ms["embedding"] = round((time.perf_counter() - embedding_started_at) * 1000, 3)
     search_started_at = time.perf_counter()
-    embedding_identity = active_embedding_identity()
+    embedding_identity = active_embedding_identity(embedding_client_settings(embedding_client))
     candidate_limit = resolve_candidate_limit(limit)
     vector_results = await search_similar_chunks(
         session=session,
@@ -105,6 +106,7 @@ async def search_knowledge(
         text_results=text_results,
         limit=limit,
         min_score=threshold.value,
+        query=query,
         include_match_reasons=include_match_reasons,
     )
     log_search_filtering(vector_results, results, threshold)
@@ -180,6 +182,7 @@ def fuse_hybrid_results(
     text_results: list[TextSearchChunk],
     limit: int,
     min_score: float,
+    query: str = "",
     include_match_reasons: bool = False,
 ) -> list[KnowledgeChunkRead]:
     candidates = build_hybrid_candidates(vector_results, text_results)
@@ -187,7 +190,7 @@ def fuse_hybrid_results(
         (
             candidate
             for candidate in candidates.values()
-            if candidate_reaches_threshold(candidate, min_score)
+            if candidate_reaches_threshold(candidate, min_score, query)
         ),
         key=hybrid_sort_key,
         reverse=True,
@@ -223,10 +226,46 @@ def build_hybrid_candidates(
     return candidates
 
 
-def candidate_reaches_threshold(candidate: HybridSearchCandidate, min_score: float) -> bool:
+def candidate_reaches_threshold(
+    candidate: HybridSearchCandidate,
+    min_score: float,
+    query: str,
+) -> bool:
     if candidate.vector_rank is None:
         return True
-    return score_reaches_threshold(candidate.vector_score, min_score)
+    return score_reaches_threshold(candidate.vector_score, min_score) or has_exact_text_evidence(
+        candidate,
+        query,
+    )
+
+
+def has_exact_text_evidence(candidate: HybridSearchCandidate, query: str) -> bool:
+    """Allow a strong literal match to survive a semantic-score threshold.
+
+    FTS may find a command or identifier that is semantically distant from the
+    wording around it.  Only a query phrase with at least two terms (or a
+    distinctive identifier) can override the vector threshold; a loose FTS
+    match remains subject to the normal relevance policy.
+    """
+    if candidate.text_rank is None:
+        return False
+
+    normalized_query = normalize_text_for_literal_match(query)
+    if not is_distinctive_literal_query(normalized_query):
+        return False
+    normalized_content = normalize_text_for_literal_match(candidate.chunk.content)
+    return normalized_query in normalized_content
+
+
+def normalize_text_for_literal_match(value: str) -> str:
+    return re.sub(r"\s+", " ", value).strip().casefold()
+
+
+def is_distinctive_literal_query(normalized_query: str) -> bool:
+    terms = normalized_query.split()
+    return len(terms) >= 2 or any(
+        character.isdigit() or character in "_-" for character in normalized_query
+    )
 
 
 def hybrid_sort_key(candidate: HybridSearchCandidate) -> tuple[float, bool, float, float, int]:

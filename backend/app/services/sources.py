@@ -6,6 +6,7 @@ from ..db.models import DocumentSource
 from ..repositories.chunks import add_source_chunks, delete_chunks_for_source
 from ..repositories.embeddings import complete_embedding_batch, create_embedding_batch
 from ..repositories.sources import (
+    delete_reindex_items_for_source,
     delete_source_by_id,
     get_source_by_content_hash,
     get_source_by_public_id,
@@ -15,7 +16,7 @@ from .categories import get_categories
 from .documents.chunker import chunk_text_with_locations, detect_markdown_sections
 from .documents.extractors import EmptyDocumentError
 from .documents.normalizer import normalize_text
-from .embeddings import EmbeddingClient
+from .embeddings import EmbeddingClient, embedding_client_settings
 from .embedding_versions import active_embedding_identity, compute_embedding_content_hash
 from .ingestion import (
     DuplicateSourceContentError,
@@ -93,7 +94,7 @@ async def update_source(
 
     chunks = chunk_text_with_locations(text, section_spans=detect_markdown_sections(text))
     chunk_contents = [chunk.content for chunk in chunks]
-    embedding_identity = active_embedding_identity()
+    embedding_identity = active_embedding_identity(embedding_client_settings(embedding_client))
     embedding_batch = await create_embedding_batch(
         session,
         embedding_identity,
@@ -137,6 +138,10 @@ async def delete_source(session: AsyncSession, source_id: str, confirm: bool) ->
     if not confirm:
         raise SourceDeleteConfirmationError("Use confirm=true to delete a source.")
     source = await _get_source_or_raise(session, source_id)
+    # These bulk deletes run before the source delete because the database
+    # foreign keys protect chunks and reindex audit items from orphaning.
+    await delete_chunks_for_source(session, source.id)
+    await delete_reindex_items_for_source(session, source.id)
     await delete_source_by_id(session, source.id)
     await session.commit()
 

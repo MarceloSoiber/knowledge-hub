@@ -46,6 +46,16 @@ describe("AuthenticatedLayoutComponent", () => {
     expect(fixture.componentInstance.menuOpen).toBe(false);
   });
 
+  it("groups theme, settings and logout in the user menu", () => {
+    const button = fixture.nativeElement.querySelector(".user-menu-button") as HTMLButtonElement;
+    button.click();
+    fixture.detectChanges();
+
+    expect(button.getAttribute("aria-expanded")).toBe("true");
+    expect(fixture.nativeElement.querySelector(".user-menu")?.textContent).toContain("Configurações de IA");
+    expect(fixture.nativeElement.querySelector(".user-menu")?.textContent).toContain("Desconectar");
+  });
+
   it("shows a button to return to the top after a long scroll", () => {
     fixture.componentInstance.showBackToTop = true;
     fixture.detectChanges();

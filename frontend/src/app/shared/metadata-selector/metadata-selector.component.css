@@ -1,0 +1,70 @@
+/* Keep the three metadata controls aligned while tag collections change. */
+.groups {
+  align-items: stretch !important;
+}
+
+.groups > label,
+.groups > .tag-picker {
+  height: 18rem;
+  min-height: 0;
+}
+
+.groups > label {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.groups > label select {
+  height: 100%;
+  min-height: 0;
+}
+
+.tag-picker {
+  position: relative;
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.tag-picker-panel {
+  min-height: 0;
+  overflow: hidden;
+  grid-template-rows: minmax(3.2rem, 0.85fr) minmax(4.5rem, 1.15fr);
+}
+
+.selected-tags,
+.available-tags {
+  min-height: 0;
+  overflow: hidden;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.tag-chip-list,
+.tag-options {
+  min-height: 0;
+  overflow-y: auto;
+  align-content: start;
+  scrollbar-gutter: stable;
+}
+
+.suggestions {
+  position: absolute !important;
+  z-index: 5;
+  top: 4.7rem;
+  right: 0;
+  left: 0;
+  max-height: 12rem;
+  overflow-y: auto;
+}
+
+@media (max-width: 40rem) {
+  .groups > label,
+  .groups > .tag-picker {
+    height: auto;
+  }
+
+  .groups > label select {
+    min-height: 8.25rem;
+  }
+
+  .tag-picker-panel {
+    height: 14rem;
+  }
+}

@@ -1,9 +1,3 @@
 {
-  "servers": {
-    "knowledge-hub-mcp": {
-      "type": "stdio",
-      "command": "uv",
-      "args": ["run", "mcp-server"]
-    }
-  }
+  "servers": {}
 }

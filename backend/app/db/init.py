@@ -327,6 +327,43 @@ async def init_db() -> None:
                 "GENERATED ALWAYS AS (to_tsvector('simple'::regconfig, content)) STORED"
             )
         )
+        # Older deployments can already have a regular tsvector column. In that
+        # case ADD COLUMN IF NOT EXISTS leaves it untouched and lexical search
+        # silently sees null/stale values. Backfill it and keep it current with
+        # a trigger; generated columns need neither operation.
+        await connection.execute(
+            text(
+                "CREATE OR REPLACE FUNCTION refresh_knowledge_chunks_search_vector() "
+                "RETURNS trigger LANGUAGE plpgsql AS $function$ "
+                "BEGIN "
+                "NEW.search_vector := to_tsvector('simple'::regconfig, NEW.content); "
+                "RETURN NEW; "
+                "END; "
+                "$function$"
+            )
+        )
+        await connection.execute(
+            text(
+                "DO $$ "
+                "DECLARE search_vector_generated text; "
+                "BEGIN "
+                "SELECT is_generated INTO search_vector_generated "
+                "FROM information_schema.columns "
+                "WHERE table_schema = current_schema() "
+                "AND table_name = 'knowledge_chunks' "
+                "AND column_name = 'search_vector'; "
+                "IF search_vector_generated = 'NEVER' THEN "
+                "UPDATE knowledge_chunks "
+                "SET search_vector = to_tsvector('simple'::regconfig, content) "
+                "WHERE search_vector IS DISTINCT FROM to_tsvector('simple'::regconfig, content); "
+                "EXECUTE 'DROP TRIGGER IF EXISTS trg_knowledge_chunks_search_vector ON knowledge_chunks'; "
+                "EXECUTE 'CREATE TRIGGER trg_knowledge_chunks_search_vector "
+                "BEFORE INSERT OR UPDATE OF content ON knowledge_chunks "
+                "FOR EACH ROW EXECUTE FUNCTION refresh_knowledge_chunks_search_vector()'; "
+                "END IF; "
+                "END $$"
+            )
+        )
         await connection.execute(
             text(
                 "CREATE INDEX IF NOT EXISTS ix_knowledge_chunks_search_vector "

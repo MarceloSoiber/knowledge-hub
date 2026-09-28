@@ -20,6 +20,7 @@ from backend.app.schemas.knowledge import validate_optional_project_ids
 from backend.app.schemas.knowledge import validate_required_category_ids
 from backend.app.schemas.knowledge import validate_optional_tag_ids
 from backend.app.services.categories import CategoryNotFoundError, list_categories
+from backend.app.services.config import resolve_ai_settings
 from backend.app.services.documents.extractors import EmptyDocumentError
 from backend.app.services.embeddings import (
     EmbeddingConfigurationError,
@@ -192,6 +193,7 @@ async def search_knowledge(
     validated_tag_ids = validate_optional_tag_ids(tag_ids)
     validated_project_ids = validate_optional_project_ids(project_ids)
     async with SessionLocal() as session:
+        settings = await resolve_ai_settings(session)
         results = await search_backend_knowledge(
             session=session,
             query=query,
@@ -201,7 +203,7 @@ async def search_knowledge(
             project_ids=validated_project_ids,
             min_score=validated_min_score,
             include_match_reasons=include_match_reasons,
-            embedding_client=build_embedding_client(),
+            embedding_client=build_embedding_client(settings),
         )
     return [KnowledgeHit(**result.model_dump()) for result in results]
 
@@ -275,6 +277,7 @@ async def ingest_mcp_text(
 
     try:
         async with SessionLocal() as session:
+            settings = await resolve_ai_settings(session)
             source, chunks_created = await ingest_plain_text(
                 session=session,
                 title=payload.title,
@@ -282,7 +285,7 @@ async def ingest_mcp_text(
                 category_ids=payload.category_ids,
                 tag_ids=payload.tag_ids,
                 project_ids=payload.project_ids,
-                embedding_client=build_embedding_client(),
+                embedding_client=build_embedding_client(settings),
                 source_type="mcp",
                 metadata=payload.metadata,
             )

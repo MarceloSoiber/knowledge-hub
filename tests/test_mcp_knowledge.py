@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 from mcp.server.auth.provider import AccessToken
+from mcp.server.auth.middleware.auth_context import get_access_token
 from pydantic import ValidationError
 
 from backend.app.services.categories import CategoryNotFoundError
@@ -59,6 +60,51 @@ def test_mcp_tool_descriptions_guide_discovery_search_and_writes() -> None:
     assert "prefixo" in tools.get_tool("tag_autocomplete").description
     assert "confirmacao explicita" in tools.get_tool("ingest_text").description
     assert "arquivar conversas automaticamente" in tools.get_tool("ingest_text").description
+
+
+def test_mcp_uses_static_bearer_auth_without_oauth_metadata() -> None:
+    from mcp_server import server
+
+    assert server.build_auth_settings() is None
+
+
+@pytest.mark.asyncio
+async def test_static_bearer_middleware_sets_fastmcp_auth_context(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from mcp_server import server
+
+    expected_token = access_token_with_scopes(["knowledge:read", "knowledge:write"])
+
+    class TokenVerifier:
+        async def verify_token(self, token: str) -> AccessToken | None:
+            assert token == "valid-token"
+            return expected_token
+
+    monkeypatch.setattr(server, "build_token_verifier", lambda: TokenVerifier())
+    seen_tokens: list[AccessToken | None] = []
+    sent: list[dict[str, object]] = []
+
+    async def downstream(scope: object, receive: object, send: object) -> None:
+        seen_tokens.append(get_access_token())
+        await send({"type": "http.response.start", "status": 204, "headers": []})  # type: ignore[misc]
+        await send({"type": "http.response.body", "body": b""})  # type: ignore[misc]
+
+    async def receive() -> dict[str, str]:
+        return {"type": "http.request"}
+
+    async def send(message: dict[str, object]) -> None:
+        sent.append(message)
+
+    app = server.build_static_bearer_asgi_app(downstream)
+    await app(
+        {"type": "http", "headers": [(b"Authorization", b"Bearer valid-token")]},
+        receive,
+        send,
+    )
+
+    assert seen_tokens == [expected_token]
+    assert sent[0]["status"] == 204
 
 
 def test_mcp_scopes_follow_write_enabled_setting(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -149,7 +195,16 @@ async def test_search_knowledge_returns_citation_context(
         "mcp_server.tools.knowledge.search_backend_knowledge",
         fake_search_backend_knowledge,
     )
-    monkeypatch.setattr("mcp_server.tools.knowledge.build_embedding_client", lambda: object())
+    effective_settings = Settings(local_llm_model="portal-model")
+
+    async def fake_resolve_ai_settings(_: object) -> Settings:
+        return effective_settings
+
+    monkeypatch.setattr("mcp_server.tools.knowledge.resolve_ai_settings", fake_resolve_ai_settings)
+    monkeypatch.setattr(
+        "mcp_server.tools.knowledge.build_embedding_client",
+        lambda settings: SimpleNamespace(settings=settings),
+    )
 
     results = await search_knowledge("find", limit=1, category_ids=[2], min_score=0.55)
 
@@ -157,6 +212,7 @@ async def test_search_knowledge_returns_citation_context(
     assert captured_kwargs["tag_ids"] is None
     assert captured_kwargs["project_ids"] is None
     assert captured_kwargs["include_match_reasons"] is False
+    assert captured_kwargs["embedding_client"].settings is effective_settings
     assert results[0].source_id == "33333333-3333-4333-8333-333333333333"
     assert results[0].source_title == "runbook.md"
     assert results[0].tags[0].name == "postgres"
@@ -208,11 +264,21 @@ async def test_search_knowledge_can_return_match_reasons(
         "mcp_server.tools.knowledge.search_backend_knowledge",
         fake_search_backend_knowledge,
     )
-    monkeypatch.setattr("mcp_server.tools.knowledge.build_embedding_client", lambda: object())
+    effective_settings = Settings(local_llm_model="portal-model")
+
+    async def fake_resolve_ai_settings(_: object) -> Settings:
+        return effective_settings
+
+    monkeypatch.setattr("mcp_server.tools.knowledge.resolve_ai_settings", fake_resolve_ai_settings)
+    monkeypatch.setattr(
+        "mcp_server.tools.knowledge.build_embedding_client",
+        lambda settings: SimpleNamespace(settings=settings),
+    )
 
     results = await search_knowledge("ERR_CONN_RESET", include_match_reasons=True)
 
     assert captured_kwargs["include_match_reasons"] is True
+    assert captured_kwargs["embedding_client"].settings is effective_settings
     assert results[0].match_reasons == ["vector", "text"]
 
 
@@ -300,6 +366,7 @@ async def test_ingest_mcp_text_creates_mcp_source(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     authorize(monkeypatch, ["knowledge:read", "knowledge:write"])
+    effective_settings = Settings(local_llm_model="portal-model")
 
     async def fake_ingest_plain_text(**kwargs: object) -> tuple[object, int]:
         assert kwargs["title"] == "Architecture note"
@@ -309,6 +376,7 @@ async def test_ingest_mcp_text_creates_mcp_source(
         assert kwargs["project_ids"] == [9]
         assert kwargs["source_type"] == "mcp"
         assert kwargs["metadata"] == {"note_type": "decision"}
+        assert kwargs["embedding_client"].settings is effective_settings
         return (
             SimpleNamespace(
                 public_id="11111111-1111-4111-8111-111111111111",
@@ -324,6 +392,15 @@ async def test_ingest_mcp_text_creates_mcp_source(
         )
 
     monkeypatch.setattr("mcp_server.tools.knowledge.ingest_plain_text", fake_ingest_plain_text)
+
+    async def fake_resolve_ai_settings(_: object) -> Settings:
+        return effective_settings
+
+    monkeypatch.setattr("mcp_server.tools.knowledge.resolve_ai_settings", fake_resolve_ai_settings)
+    monkeypatch.setattr(
+        "mcp_server.tools.knowledge.build_embedding_client",
+        lambda settings: SimpleNamespace(settings=settings),
+    )
 
     result = await ingest_mcp_text(
         title="Architecture note",
@@ -372,6 +449,11 @@ async def test_ingest_mcp_text_maps_category_and_empty_content_errors(
 ) -> None:
     authorize(monkeypatch, ["knowledge:write"])
 
+    async def fake_resolve_ai_settings(_: object) -> Settings:
+        return Settings()
+
+    monkeypatch.setattr("mcp_server.tools.knowledge.resolve_ai_settings", fake_resolve_ai_settings)
+
     async def missing_category(**_: object) -> tuple[object, int]:
         raise CategoryNotFoundError("Category 99 does not exist.")
 
@@ -394,6 +476,11 @@ async def test_ingest_mcp_text_maps_embedding_failure_without_success(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     authorize(monkeypatch, ["knowledge:write"])
+
+    async def fake_resolve_ai_settings(_: object) -> Settings:
+        return Settings()
+
+    monkeypatch.setattr("mcp_server.tools.knowledge.resolve_ai_settings", fake_resolve_ai_settings)
 
     async def embedding_failure(**_: object) -> tuple[object, int]:
         raise EmbeddingError("Embedding provider returned HTTP 500.")

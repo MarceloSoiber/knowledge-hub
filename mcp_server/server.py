@@ -1,6 +1,12 @@
+import json
 import logging
 
+from starlette.authentication import AuthCredentials
+from starlette.types import Receive, Scope, Send
+
 from mcp.server.fastmcp import FastMCP
+from mcp.server.auth.middleware.auth_context import auth_context_var
+from mcp.server.auth.middleware.bearer_auth import AuthenticatedUser
 
 from backend.app.core.auth import is_valid_token
 from backend.app.core.settings import get_settings
@@ -74,18 +80,67 @@ def build_mcp_scopes() -> list[str]:
 
 
 def build_auth_settings():
-    settings = get_settings()
+    """Keep static bearer-token deployments out of OAuth metadata mode.
 
-    from mcp.server.auth.settings import AuthSettings
+    VS Code interprets OAuth-protected resource metadata as a sign that the MCP
+    server expects an interactive OAuth client registration flow. This project
+    intentionally uses a fixed bearer token instead, so we advertise no OAuth
+    metadata and enforce the static token via ASGI middleware.
+    """
+    return None
 
-    return AuthSettings(
-        issuer_url=settings.mcp_public_url,
-        # VS Code treats the protected-resource metadata as an OAuth flow and
-        # prompts for client registration. This server uses a static Bearer
-        # token instead, so keep bearer validation without advertising OAuth.
-        resource_server_url=None,
-        required_scopes=["knowledge:read"],
-    )
+
+def build_static_bearer_asgi_app(app):
+    verifier = build_token_verifier()
+
+    async def auth_wrapper(scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await app(scope, receive, send)
+            return
+
+        headers = {
+            key.decode("latin-1").lower(): value.decode("latin-1")
+            for key, value in scope.get("headers", [])
+        }
+        auth_header = headers.get("authorization")
+        if not auth_header or not auth_header.lower().startswith("bearer "):
+            await _send_auth_error(send)
+            return
+
+        token = auth_header[7:].strip()
+        access_token = await verifier.verify_token(token)
+        if access_token is None:
+            await _send_auth_error(send)
+            return
+
+        # FastMCP tools retrieve authorization through this context variable.
+        # The static middleware performs validation itself, so it must establish
+        # the same request context that FastMCP's OAuth middleware would create.
+        scope["user"] = AuthenticatedUser(access_token)
+        scope["auth"] = AuthCredentials(access_token.scopes)
+        context_token = auth_context_var.set(scope["user"])
+        try:
+            await app(scope, receive, send)
+        finally:
+            auth_context_var.reset(context_token)
+
+    async def _send_auth_error(send: Send) -> None:
+        payload = {"error": "invalid_token", "error_description": "Authentication required"}
+        body = json.dumps(payload).encode()
+        await send(
+            {
+                "type": "http.response.start",
+                "status": 401,
+                "headers": [
+                    (b"content-type", b"application/json"),
+                    (b"content-length", str(len(body)).encode()),
+                    (b"www-authenticate", b'Bearer error="invalid_token", error_description="Authentication required"'),
+                ],
+            }
+        )
+        await send({"type": "http.response.body", "body": body})
+
+    return auth_wrapper
 
 
 settings = get_settings()
@@ -96,8 +151,6 @@ mcp = FastMCP(
     host=settings.mcp_host,
     port=settings.mcp_port,
     streamable_http_path=settings.mcp_path,
-    auth=build_auth_settings(),
-    token_verifier=build_token_verifier(),
 )
 
 
@@ -187,7 +240,11 @@ def workspace_overview() -> dict[str, str]:
 
 
 def main() -> None:
-    mcp.run(transport="streamable-http")
+    import uvicorn
+
+    base_app = mcp.streamable_http_app()
+    protected_app = build_static_bearer_asgi_app(base_app)
+    uvicorn.run(protected_app, host=settings.mcp_host, port=settings.mcp_port)
 
 
 if __name__ == "__main__":

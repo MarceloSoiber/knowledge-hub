@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .chunker import PageSpan
-from .normalizer import normalize_pdf_text, normalize_text
+from .normalizer import normalize_pdf_pages, normalize_pdf_text, normalize_text
 
 
 MAX_UPLOAD_BYTES = 100 * 1024 * 1024
@@ -120,12 +120,12 @@ def extract_document(filename: str, content: bytes) -> ExtractedDocument:
 
 
 def extract_pdf_native_document(reader: object) -> tuple[str, list[PageSpan]]:
+    raw_pages = [extract_pdf_page_text(page) for page in getattr(reader, "pages")]
+    normalized_pages = normalize_pdf_pages(raw_pages)
     parts: list[str] = []
     spans: list[PageSpan] = []
     cursor = 0
-    pages = getattr(reader, "pages")
-    for index, page in enumerate(pages, start=1):
-        page_text = normalize_pdf_text(extract_pdf_page_text(page))
+    for index, page_text in enumerate(normalized_pages, start=1):
         if not page_text:
             continue
         if parts:
